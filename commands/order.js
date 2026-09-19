@@ -262,7 +262,7 @@ module.exports = {
                     { name: 'Service', value: service, inline: true },
                     { name: 'Quantity', value: `${quantity}`, inline: true },
                     { name: 'Details', value: details },
-                    { name: 'Next step', value: 'Staff will review this request and contact the customer in a ticket.' },
+                    { name: 'Next step', value: 'Staff will review this request and open a support ticket if more details are needed.' },
                 )
                 .setFooter({ text: 'Order request • use /order status after staff logs the sale' })
                 .setTimestamp();
