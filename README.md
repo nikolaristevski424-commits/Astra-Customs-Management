@@ -110,6 +110,13 @@ auto-expires after 6 hours so an abandoned order doesn't permanently
 lock a slot; `/payment release` frees one up early, and `/payment
 pool` shows the status of every configured slot.
 
+Staff can use `/payment link check` with an asset type, asset ID, and Roblox
+username to verify ownership before sending a payment link. If the user owns
+the item, the bot returns the matching Game Pass or catalog purchase link. If
+the inventory is private, the username cannot be found, or the item is not
+owned, no payment link is sent. `/payment link get` retrieves a configured
+pool Game Pass link without changing its price.
+
 ## Payouts
 
 Rather than fully automating group payouts (see the honest limitation

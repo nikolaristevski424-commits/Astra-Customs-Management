@@ -25,20 +25,35 @@ module.exports = {
                 .setDescription('Free up a reserved game pass so it goes back in the pool')
                 .addStringOption((o) => o.setName('gamepass_id').setDescription('Game pass ID').setRequired(true).setAutocomplete(true))
         )
-        .addSubcommand((sub) =>
-            sub
+        .addSubcommand((sub) => sub.setName('pool').setDescription('See the status of every configured payment game pass'))
+        .addSubcommandGroup((group) =>
+            group
                 .setName('link')
-                .setDescription('Get the purchase + game links for a pool game pass without changing its price')
-                .addStringOption((o) => o.setName('gamepass_id').setDescription('Game pass ID').setRequired(true).setAutocomplete(true))
-        )
-        .addSubcommand((sub) => sub.setName('pool').setDescription('See the status of every configured payment game pass')),
+                .setDescription('Create or verify Roblox payment links')
+                .addSubcommand((sub) =>
+                    sub
+                        .setName('get')
+                        .setDescription('Get a configured payment game pass link')
+                        .addStringOption((o) => o.setName('gamepass_id').setDescription('Game pass ID').setRequired(true).setAutocomplete(true))
+                )
+                .addSubcommand((sub) =>
+                    sub
+                        .setName('check')
+                        .setDescription('Check whether a Roblox user owns an asset')
+                        .addStringOption((o) => o.setName('asset_type').setDescription('Roblox asset type').setRequired(true).addChoices({ name: 'Game Pass', value: 'gamepass' }, { name: 'Shirt', value: 'shirt' }))
+                        .addStringOption((o) => o.setName('asset_id').setDescription('Game Pass or Shirt asset ID').setRequired(true).setMaxLength(20))
+                        .addStringOption((o) => o.setName('username').setDescription('Roblox username to check').setRequired(true).setMaxLength(20))
+                )
+        ),
 
     async autocomplete(interaction) {
         const guildId = interaction.guildId;
         const cfg = config.getConfig(guildId);
+        const group = interaction.options.getSubcommandGroup(false);
+        const sub = interaction.options.getSubcommand();
+        if (group === 'link' && sub === 'check') return interaction.respond([]);
         if (!perms.isManager(interaction.member, cfg)) return interaction.respond([]);
 
-        const sub = interaction.options.getSubcommand();
         const focused = interaction.options.getFocused().toLowerCase();
         const statuses = pool.listStatus(guildId);
         const relevant = sub === 'release' ? statuses.filter((s) => s.reserved) : statuses;
@@ -52,11 +67,32 @@ module.exports = {
         const guildId = interaction.guildId;
         const cfg = config.getConfig(guildId);
 
-        if (!perms.isManager(interaction.member, cfg)) {
+        const sub = interaction.options.getSubcommand();
+        const group = interaction.options.getSubcommandGroup(false);
+        const isOwnershipCheck = group === 'link' && sub === 'check';
+        if (isOwnershipCheck ? !perms.isStaff(interaction.member, cfg) : !perms.isManager(interaction.member, cfg)) {
             return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
         }
 
-        const sub = interaction.options.getSubcommand();
+        if (isOwnershipCheck) {
+            const assetType = interaction.options.getString('asset_type', true);
+            const assetId = interaction.options.getString('asset_id', true).trim();
+            const username = interaction.options.getString('username', true).trim();
+            if (!/^\d+$/.test(assetId)) return interaction.reply({ content: 'Asset ID must contain numbers only.', ephemeral: true });
+
+            await interaction.deferReply({ ephemeral: true });
+            const user = await roblox.resolveUsername(username);
+            if (!user.success) return interaction.editReply(user.reason === 'user_not_found' ? `No Roblox user was found for **${username}**.` : 'Roblox could not resolve that username right now. Try again shortly.');
+
+            const ownership = await roblox.checkAssetOwnership({ userId: user.id, assetId, assetType });
+            if (!ownership.success) {
+                return interaction.editReply(ownership.reason === 'inventory_private' ? `Roblox did not allow an ownership check for **${user.name}**. The inventory may be private.` : 'Roblox could not complete the ownership check right now. Try again shortly.');
+            }
+            if (!ownership.owned) return interaction.editReply(`**${user.name}** does not own that ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}. No payment link was sent.`);
+
+            const link = roblox.assetLink(assetId, assetType);
+            return interaction.editReply(`**${user.name}** owns that ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.\n${link}`);
+        }
 
         if (!pool.getPoolIds().length) {
             return interaction.reply({ content: 'No payment game passes are configured. Add `PAYMENT_GAMEPASS_IDS=id1,id2,...` to `.env` and restart the bot.', ephemeral: true });
@@ -74,7 +110,7 @@ module.exports = {
             return interaction.reply({ content: released ? `Released \`${id}\` back into the pool.` : `\`${id}\` wasn't reserved.`, ephemeral: true });
         }
 
-        if (sub === 'link') {
+        if (group === 'link' && sub === 'get') {
             const id = interaction.options.getString('gamepass_id', true);
             return interaction.reply({ content: buildLinkMessage(cfg, id), components: [buildLinkButtons(cfg, id)] });
         }

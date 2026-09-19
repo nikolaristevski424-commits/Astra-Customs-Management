@@ -148,8 +148,36 @@ function gamePassLink(gamePassId) {
     return `https://www.roblox.com/game-pass/${gamePassId}`;
 }
 
+function assetLink(assetId, assetType) {
+    return assetType === 'gamepass' ? gamePassLink(assetId) : `https://www.roblox.com/catalog/${assetId}`;
+}
+
+async function resolveUsername(username) {
+    const axios = require('axios');
+    try {
+        const { data } = await axios.post('https://users.roblox.com/v1/usernames/users', { usernames: [username], excludeBannedUsers: false });
+        const user = data?.data?.[0];
+        if (!user) return { success: false, reason: 'user_not_found' };
+        return { success: true, id: user.id, name: user.name, displayName: user.displayName };
+    } catch (error) {
+        return { success: false, reason: 'request_failed', status: error.response?.status, message: error.message };
+    }
+}
+
+async function checkAssetOwnership({ userId, assetId, assetType }) {
+    const axios = require('axios');
+    const itemType = assetType === 'gamepass' ? 'GamePass' : 'Asset';
+    try {
+        const { data } = await axios.get(`https://inventory.roblox.com/v1/users/${userId}/items/${itemType}/${assetId}/is-owned`);
+        return { success: true, owned: data === true || data?.owned === true || data?.isOwned === true };
+    } catch (error) {
+        const status = error.response?.status;
+        return { success: false, reason: status === 403 ? 'inventory_private' : 'request_failed', status, message: error.response?.data?.message || error.message };
+    }
+}
+
 function gamePlaceLink(placeId) {
     return `https://www.roblox.com/games/${placeId}`;
 }
 
-module.exports = { getCsrfToken, updateGamePassPrice, updateCollectiblePrice, payoutGroupRobux, gamePassLink, gamePlaceLink };
+module.exports = { getCsrfToken, updateGamePassPrice, updateCollectiblePrice, payoutGroupRobux, gamePassLink, gamePlaceLink, assetLink, resolveUsername, checkAssetOwnership };

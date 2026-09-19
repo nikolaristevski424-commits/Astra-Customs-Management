@@ -6,7 +6,7 @@ const CATEGORIES = [
     { name: '📋 Job Queue', value: '`/order add`, `/order list` — post work and let designers claim it' },
     { name: '🧾 Sales Ledger', value: '`/order log|status|view|history|reset`, `/earnings`' },
     { name: '💰 Pricing', value: '`/pricelist view|set`, `/quote`, `/tax`' },
-    { name: '💸 Payments', value: '`/payment request|release|link|pool`, `/paymentrequest`' },
+    { name: '💸 Payments', value: '`/payment request|release|pool`, `/payment link get|check`, `/paymentrequest`' },
     { name: '🤑 Payouts & Credit', value: '`/payout request|list`, `/credit add|remove|view|history|leaderboard`' },
     { name: '📦 Packages & Bundles', value: '`/package create|request|setprice|list|view|collect`, `/bundle request`' },
     { name: '🖼️ Portfolio', value: '`/portfolio add|view|remove|profile`, `/panel portfolio`' },
