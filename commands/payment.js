@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
+const discounts = require('../utils/discounts');
 
 function formatSince(ts) {
     return `<t:${Math.floor(ts / 1000)}:R>`;
@@ -17,6 +18,7 @@ module.exports = {
                 .setName('request')
                 .setDescription('Auto-pick a free game pass, set its price, and get the payment link')
                 .addIntegerOption((o) => o.setName('price').setDescription('Price in Robux').setRequired(true).setMinValue(0))
+                .addStringOption((o) => o.setName('discount_code').setDescription('Optional discount code').setMaxLength(32))
                 .addStringOption((o) => o.setName('note').setDescription('What this payment is for (shown in /payment pool)'))
         )
         .addSubcommand((sub) =>
@@ -124,7 +126,20 @@ module.exports = {
             }
 
             const price = interaction.options.getInteger('price', true);
+            const discountCode = interaction.options.getString('discount_code');
             const note = interaction.options.getString('note') || `Requested by ${interaction.user.tag}`;
+
+            let discount = null;
+            let finalPrice = price;
+            if (discountCode) {
+                discount = discounts.preview(guildId, discountCode, price);
+                if (!discount.success) {
+                    const messages = { invalid: 'That discount code does not exist.', expired: 'That discount code has expired.', used_up: 'That discount code has reached its usage limit.' };
+                    return interaction.reply({ content: messages[discount.reason] || 'That discount code cannot be used.', ephemeral: true });
+                }
+                finalPrice = discount.total;
+                if (finalPrice < 1) return interaction.reply({ content: 'That discount makes the payment price less than R$1. Use a smaller discount or a higher subtotal.', ephemeral: true });
+            }
 
             const gamePassId = pool.pickAvailable(guildId, note);
             if (!gamePassId) {
@@ -132,7 +147,7 @@ module.exports = {
             }
 
             await interaction.deferReply();
-            const result = await roblox.updateGamePassPrice({ universeId: cfg.robloxUniverseId, gamePassId, price });
+            const result = await roblox.updateGamePassPrice({ universeId: cfg.robloxUniverseId, gamePassId, price: finalPrice });
 
             if (!result.success) {
                 pool.release(guildId, gamePassId); // don't hold a slot hostage for a failed update
@@ -143,16 +158,24 @@ module.exports = {
                 return interaction.editReply(reasons[result.reason] || 'Failed to update the price. Check the bot console for details.');
             }
 
-            return interaction.editReply({ content: buildLinkMessage(cfg, gamePassId, price), components: [buildLinkButtons(cfg, gamePassId)] });
+            if (discount) {
+                const redeemed = discounts.redeem(guildId, discount.code, interaction.user.id, price);
+                if (!redeemed.success) {
+                    return interaction.editReply('The payment link was created, but the discount could not be recorded because it was redeemed by someone else or reached its limit. Ask an executive to verify the order.');
+                }
+            }
+
+            return interaction.editReply({ content: buildLinkMessage(cfg, gamePassId, finalPrice, discount ? { original: price, savings: discount.savings, code: discount.code } : null), components: [buildLinkButtons(cfg, gamePassId)] });
         }
     },
 };
 
-function buildLinkMessage(cfg, gamePassId, price) {
+function buildLinkMessage(cfg, gamePassId, price, discount = null) {
     const lines = [
         price !== undefined ? `Payment link ready — price set to **R$${price}**.` : `Payment link for \`${gamePassId}\`:`,
+        discount ? `Discount **${discount.code}** applied: R$${discount.original} → R$${price} (saved R$${discount.savings}).` : null,
         roblox.gamePassLink(gamePassId),
-    ];
+    ].filter(Boolean);
     if (cfg.gamePlaceId) {
         lines.push('', `If the buyer is under 13 and the link above doesn't work for them, have them join the game directly and buy it in-game:`, roblox.gamePlaceLink(cfg.gamePlaceId));
     }

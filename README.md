@@ -158,6 +158,16 @@ simple built-in loyalty/rewards program.
 Astra Coins system for fun. Astra Coins have no Robux value and cannot be used
 as store credit.
 
+## Discounts
+
+Executives can create automatic discount codes with `/discounts create` by
+choosing a percentage or fixed Robux reduction, a UTC expiry date, and a total
+usage limit. Members can view active codes with `/discounts list` and preview
+and redeem one with `/discounts redeem`. `/payment request` accepts an optional
+`discount_code`; when valid, the bot lowers the Roblox game-pass price, sends
+the discounted payment link, and records the use automatically after Roblox
+accepts the price update. Each member can redeem a code once.
+
 ## Bundles
 
 `/bundle request` — bundle type, total after tax, notes → posted for

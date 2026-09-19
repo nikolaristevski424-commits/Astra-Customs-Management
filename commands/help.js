@@ -9,6 +9,7 @@ const CATEGORIES = [
     { name: '💸 Payments', value: '`/payment request|release|pool`, `/payment link get|check`, `/paymentrequest`' },
     { name: '🤑 Payouts & Credit', value: '`/payout request|list`, `/credit add|remove|view|history|leaderboard`' },
     { name: '🪙 Economy', value: '`/economy balance|daily|work|pay|coinflip|leaderboard` — virtual Astra Coins, separate from Robux credit' },
+    { name: '🏷️ Discounts', value: '`/discounts list|redeem`, executives: `/discounts create|disable`' },
     { name: '📦 Packages & Bundles', value: '`/package create|request|setprice|list|view|collect`, `/bundle request`' },
     { name: '🖼️ Portfolio', value: '`/portfolio add|view|remove|profile`, `/panel portfolio`' },
     { name: '✅ Quality Control', value: '`/qc submit` — submit work for QC approval' },

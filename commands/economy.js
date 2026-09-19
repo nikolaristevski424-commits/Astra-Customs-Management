@@ -16,6 +16,8 @@ module.exports = {
         .addSubcommand((sub) => sub.setName('work').setDescription('Work for Astra Coins once per hour'))
         .addSubcommand((sub) => sub.setName('pay').setDescription('Send Astra Coins to another member').addUserOption((o) => o.setName('user').setDescription('Recipient').setRequired(true)).addIntegerOption((o) => o.setName('amount').setDescription('Amount').setRequired(true).setMinValue(1)))
         .addSubcommand((sub) => sub.setName('coinflip').setDescription('Bet Astra Coins on heads or tails').addIntegerOption((o) => o.setName('amount').setDescription('Amount to bet').setRequired(true).setMinValue(1)).addStringOption((o) => o.setName('choice').setDescription('Your choice').setRequired(true).addChoices({ name: 'Heads', value: 'heads' }, { name: 'Tails', value: 'tails' })))
+        .addSubcommand((sub) => sub.setName('slots').setDescription('Spin the Astra Coins slot machine').addIntegerOption((o) => o.setName('amount').setDescription('Amount to bet').setRequired(true).setMinValue(1)))
+        .addSubcommand((sub) => sub.setName('roulette').setDescription('Bet Astra Coins on red, black, or green').addIntegerOption((o) => o.setName('amount').setDescription('Amount to bet').setRequired(true).setMinValue(1)).addStringOption((o) => o.setName('choice').setDescription('Your choice').setRequired(true).addChoices({ name: 'Red', value: 'red' }, { name: 'Black', value: 'black' }, { name: 'Green', value: 'green' })))
         .addSubcommand((sub) => sub.setName('leaderboard').setDescription('View the richest Astra Coins users')),
 
     async execute(interaction) {
@@ -55,6 +57,22 @@ module.exports = {
             const result = economy.coinflip(guildId, interaction.user.id, amount, choice);
             if (!result.success) return interaction.reply({ content: `You do not have enough Astra Coins to bet **${amount}**. Your balance is **${result.balance}**.`, ephemeral: true });
             return interaction.reply({ content: `${result.won ? '🎉' : '🪙'} The coin landed on **${result.result}**. You ${result.won ? `won **${amount.toLocaleString()} Astra Coins**` : `lost **${amount.toLocaleString()} Astra Coins**`}. Balance: **${result.balance.toLocaleString()}**.` });
+        }
+
+        if (sub === 'slots') {
+            const amount = interaction.options.getInteger('amount', true);
+            const result = economy.slots(guildId, interaction.user.id, amount);
+            if (!result.success) return interaction.reply({ content: `You do not have enough Astra Coins to bet **${amount}**. Your balance is **${result.balance}**.`, ephemeral: true });
+            const outcome = result.winnings ? `won **${result.winnings.toLocaleString()}**` : `lost **${amount.toLocaleString()}**`;
+            return interaction.reply({ content: `🎰 ${result.reels.join(' | ')}\nYou ${outcome}. Balance: **${result.balance.toLocaleString()} Astra Coins**.` });
+        }
+
+        if (sub === 'roulette') {
+            const amount = interaction.options.getInteger('amount', true);
+            const choice = interaction.options.getString('choice', true);
+            const result = economy.roulette(guildId, interaction.user.id, amount, choice);
+            if (!result.success) return interaction.reply({ content: `You do not have enough Astra Coins to bet **${amount}**. Your balance is **${result.balance}**.`, ephemeral: true });
+            return interaction.reply({ content: `🎡 The wheel landed on **${result.result} (${result.roll})**. You ${result.won ? `won **${result.winnings.toLocaleString()} Astra Coins**` : `lost **${amount.toLocaleString()} Astra Coins**`}. Balance: **${result.balance.toLocaleString()}**.` });
         }
 
         const top = economy.leaderboard(guildId);

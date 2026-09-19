@@ -104,6 +104,30 @@ function coinflip(guildId, userId, amount, choice) {
     return { success: true, won: false, result, balance: paid.balance };
 }
 
+function slots(guildId, userId, amount) {
+    const paid = remove(guildId, userId, amount);
+    if (!paid.success) return { success: false, balance: paid.balance };
+    const symbols = ['🍒', '🍋', '🔔', '⭐', '💎'];
+    const reels = Array.from({ length: 3 }, () => symbols[Math.floor(Math.random() * symbols.length)]);
+    const same = reels[0] === reels[1] && reels[1] === reels[2];
+    const pair = reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2];
+    const multiplier = same ? (reels[0] === '💎' ? 10 : 5) : pair ? 2 : 0;
+    const winnings = amount * multiplier;
+    const balance = winnings ? add(guildId, userId, winnings) : paid.balance;
+    return { success: true, reels, multiplier, winnings, balance };
+}
+
+function roulette(guildId, userId, amount, choice) {
+    const paid = remove(guildId, userId, amount);
+    if (!paid.success) return { success: false, balance: paid.balance };
+    const roll = Math.floor(Math.random() * 37);
+    const result = roll === 0 ? 'green' : roll % 2 === 0 ? 'black' : 'red';
+    const won = result === choice;
+    const winnings = won ? amount * (choice === 'green' ? 14 : 2) : 0;
+    const balance = winnings ? add(guildId, userId, winnings) : paid.balance;
+    return { success: true, roll, result, won, winnings, balance };
+}
+
 function leaderboard(guildId, limit = 10) {
     return Object.entries(getState(guildId).balances)
         .filter(([, amount]) => amount > 0)
@@ -112,4 +136,4 @@ function leaderboard(guildId, limit = 10) {
         .map(([userId, amount]) => ({ userId, amount }));
 }
 
-module.exports = { getBalance, add, remove, transfer, claimDaily, work, coinflip, leaderboard };
+module.exports = { getBalance, add, remove, transfer, claimDaily, work, coinflip, slots, roulette, leaderboard };
