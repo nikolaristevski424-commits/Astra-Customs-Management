@@ -7,7 +7,7 @@ const { parseColor } = require('../utils/embeds');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('credit')
-        .setDescription('Manage Robux store credit (refunds/bonuses tied to real payments).')
+        .setDescription('Manage Robux store credit tied to real payments. Separate from virtual Astra Coins.')
         .addSubcommand((sub) =>
             sub
                 .setName('add')
@@ -49,7 +49,8 @@ module.exports = {
                 return interaction.reply({ content: "You don't have permission to view someone else's credit balance.", ephemeral: true });
             }
             const balance = credits.getBalance(guildId, user.id);
-            return interaction.reply({ content: `**${user.tag}** has R$${balance} in store credit.`, ephemeral: true, allowedMentions: { users: [] } });
+            const embed = new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Store Credit').setDescription(`**${user.tag}** has **R$${balance}** in store credit.`).setFooter({ text: 'Store credit is tied to real orders and is not Astra Coins.' });
+            return interaction.reply({ embeds: [embed], ephemeral: true, allowedMentions: { users: [] } });
         }
 
         if (sub === 'history') {

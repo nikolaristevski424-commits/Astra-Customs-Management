@@ -154,6 +154,10 @@ group purchase automatically awards that percentage of the sale as
 store credit to the buyer's linked Discord account (via Bloxlink) — a
 simple built-in loyalty/rewards program.
 
+`/economy balance|daily|work|pay|coinflip|leaderboard` is a separate virtual
+Astra Coins system for fun. Astra Coins have no Robux value and cannot be used
+as store credit.
+
 ## Bundles
 
 `/bundle request` — bundle type, total after tax, notes → posted for
@@ -244,6 +248,10 @@ dashboard|prices|tickets|portfolio|guidelines|order-status|affiliations|honeypot
 honeypot trap channel (auto-softban), `/help`, `/ping`.
 
 Any command that mainly produces a public embed/panel (pricelist, tax,
+
+All `/panel` publishing commands are restricted to configured executives (or
+Discord administrators). Configure `EXECUTIVE_ROLE_IDS` or
+`EXECUTIVE_USER_IDS` in `.env`.
 portfolio, panels, prefix shortcuts) deletes the triggering
 command/message and posts the result as a normal channel message — no
 "used /command" line left behind.

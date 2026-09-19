@@ -12,13 +12,13 @@ const {
     MessageFlags,
 } = require('discord.js');
 const config = require('../utils/config');
-const perms = require('../utils/permissions');
 const affiliations = require('./affiliate');
 const portfolio = require('../utils/portfolio');
 const pricelistCmd = require('./pricelist');
 const { ICONS: SERVICE_ICONS } = require('./service');
 const { parseColor } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
+const { isExecutive } = require('../utils/env');
 
 const DEFAULT_SERVICES = { Liveries: 'available', Clothing: 'available', Graphics: 'available', Photography: 'available', Discord: 'available' };
 
@@ -191,8 +191,8 @@ module.exports = {
         const guildId = interaction.guildId;
         const cfg = config.getConfig(guildId);
 
-        if (!perms.isStaff(interaction.member, cfg)) {
-            return interaction.reply({ content: 'You do not have permission to send panels.', ephemeral: true });
+        if (!isExecutive(interaction.member)) {
+            return interaction.reply({ content: 'Only configured executives can send panels.', ephemeral: true });
         }
 
         const type = interaction.options.getSubcommand();
