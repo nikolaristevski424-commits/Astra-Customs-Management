@@ -25,7 +25,9 @@ function defaultConfig() {
         qcRoleIds: [],                // can accept/deny /qc submissions
         ticketStaffRoleIds: [],       // can claim/close tickets — falls back to staffRoleIds if empty
         welcomeRoleId: null,
-        applicationAcceptRoleId: null, // role given when a creative-team application is accepted
+        applicationReviewerRoleId: null, // role allowed to accept/deny applications
+        staffApplicationAcceptRoleId: null,
+        designerApplicationAcceptRoleId: null,
 
         // Commission — % of the after-tax price a designer keeps, by role.
         // e.g. { "123456": 75, "234567": 70 }. Highest matching rate wins
@@ -40,6 +42,7 @@ function defaultConfig() {
         orderLogChannelId: null,
         purchaseLogChannelId: null,
         applicationsChannelId: null,
+        applicationResultsChannelId: null,
         promotionsChannelId: null,
         infractionsChannelId: null,
         welcomeChannelId: null,

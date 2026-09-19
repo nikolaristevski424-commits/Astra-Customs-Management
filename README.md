@@ -181,11 +181,16 @@ to just use `STAFF_ROLE_IDS`). The ticket's own opener can also close
 it themselves. Closing posts a transcript to `TRANSCRIPT_CHANNEL_ID`
 if set, then deletes the channel.
 
-The same dashboard also has an **Apply** button (Creative Team
-application: why you want to join, activity 1-10, design experience,
-Roblox username, portfolio link — posted to `APPLICATIONS_CHANNEL_ID`
-with Accept/Deny) and a **Request LOA** button (same as `/loa
-request`, just as a modal instead of typing dates as command options).
+The dashboard has separate **Staff Application** and **Designer Application**
+buttons. Each opens a tailored five-question form and posts the result to
+`APPLICATIONS_CHANNEL_ID`. Reviewers are pinged using
+`APPLICATION_REVIEWER_ROLE_ID`; only that role (or an administrator) can
+Accept/Deny. Accepted applicants receive the matching role from
+`STAFF_APPLICATION_ACCEPT_ROLE_ID` or `DESIGNER_APPLICATION_ACCEPT_ROLE_ID`.
+Every submission receives a confirmation DM, every decision receives a DM, and
+decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
+dashboard also has a **Request LOA** button (same as `/loa request`, just as a
+modal instead of typing dates as command options).
 
 ## Fun
 

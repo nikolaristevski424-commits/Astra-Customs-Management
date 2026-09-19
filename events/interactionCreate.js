@@ -438,41 +438,72 @@ async function handleButton(interaction) {
         return interaction.showModal(modal);
     }
 
-    // ---- Dashboard: Apply ----
-    if (customId === 'dashboard_apply') {
-        const modal = new ModalBuilder().setCustomId('application_modal').setTitle('Creative Team Application');
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('why_join').setLabel('Why do you want to join our Creative Team?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('activity').setLabel('How active can you be, 1-10?').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('experience').setLabel('What experience do you have designing?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox_username').setLabel('Roblox Username').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(50)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('portfolio').setLabel('Portfolio link (optional)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(300)),
-        );
+    // ---- Dashboard: staff/designer applications ----
+    if (customId === 'application_staff_open' || customId === 'application_designer_open') {
+        const type = customId === 'application_staff_open' ? 'staff' : 'designer';
+        const modal = new ModalBuilder().setCustomId(`application_${type}_modal`).setTitle(`${type === 'staff' ? 'Staff' : 'Designer'} Application`);
+        const questions = type === 'staff'
+            ? [
+                  ['why_join', 'Why should we choose you for the team?', TextInputStyle.Paragraph, 1000],
+                  ['activity', 'How active can you be from 1-10?', TextInputStyle.Short, 10],
+                  ['experience', 'What experience do you have?', TextInputStyle.Paragraph, 1000],
+                  ['difficult_customer', 'How would you handle a difficult customer?', TextInputStyle.Paragraph, 1000],
+                  ['roblox_username', 'Roblox Username', TextInputStyle.Short, 50],
+              ]
+            : [
+                  ['why_join', 'Why do you want to join as a designer?', TextInputStyle.Paragraph, 1000],
+                  ['portfolio', 'Portfolio link(s)', TextInputStyle.Short, 500],
+                  ['software', 'What software do you use?', TextInputStyle.Short, 300],
+                  ['specialties', 'What do you specialize in?', TextInputStyle.Paragraph, 700],
+                  ['roblox_username', 'Roblox Username', TextInputStyle.Short, 50],
+              ];
+        modal.addComponents(...questions.map(([id, label, style, maxLength]) => new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style).setRequired(true).setMaxLength(maxLength))));
         return interaction.showModal(modal);
     }
 
     // ---- Application accept/deny ----
     if (customId.startsWith('app_accept_') || customId.startsWith('app_deny_')) {
-        if (!perms.isStaff(interaction.member, cfg)) return interaction.reply({ content: 'You do not have permission to do that.', ephemeral: true });
+        const parts = customId.split('_');
+        const type = parts[2];
+        const applicantId = parts[3];
+        const canReview = perms.isAdmin(interaction.member) || interaction.member.roles.cache.has(cfg.applicationReviewerRoleId);
+        if (!canReview) return interaction.reply({ content: 'Only the configured application reviewers can decide applications.', ephemeral: true });
 
-        const applicantId = customId.replace('app_accept_', '').replace('app_deny_', '');
         const accept = customId.startsWith('app_accept_');
         const applicant = await interaction.client.users.fetch(applicantId).catch(() => null);
 
-        if (accept && cfg.applicationAcceptRoleId) {
+        const acceptedRoleId = type === 'staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
+        if (accept && acceptedRoleId) {
             const member = await interaction.guild.members.fetch(applicantId).catch(() => null);
-            if (member) await member.roles.add(cfg.applicationAcceptRoleId).catch(() => null);
+            if (member) await member.roles.add(acceptedRoleId).catch(() => null);
         }
 
         if (applicant) {
             await applicant
-                .send(accept ? `Congratulations! Your application to **${cfg.brandName}** was accepted.` : `Thanks for applying to **${cfg.brandName}**. Unfortunately your application was not accepted this time.`)
+                .send(accept ? `Congratulations! Your **${type} application** to **${cfg.brandName}** was accepted by <@${interaction.user.id}>.` : `Thanks for applying to **${cfg.brandName}**. Your **${type} application** was not accepted this time. You are welcome to apply again later.`)
                 .catch(() => {});
+        }
+
+        if (cfg.applicationResultsChannelId) {
+            const resultsChannel = await interaction.client.channels.fetch(cfg.applicationResultsChannelId).catch(() => null);
+            if (resultsChannel) {
+                await resultsChannel.send({
+                    embeds: [{
+                        title: `${type === 'staff' ? 'Staff' : 'Designer'} Application ${accept ? 'Accepted' : 'Denied'}`,
+                        color: accept ? 0x2ecc71 : 0xe74c3c,
+                        fields: [
+                            { name: 'Applicant', value: `<@${applicantId}>`, inline: true },
+                            { name: 'Reviewed by', value: `<@${interaction.user.id}>`, inline: true },
+                        ],
+                        timestamp: new Date().toISOString(),
+                    }],
+                }).catch(() => {});
+            }
         }
 
         const disabled = disableAllButtons(interaction.message.components);
         await interaction.update({ components: disabled });
-        await interaction.followUp({ content: `Application ${accept ? 'accepted' : 'denied'} by <@${interaction.user.id}>.`, allowedMentions: { parse: [] } });
+        await interaction.followUp({ content: `${type === 'staff' ? 'Staff' : 'Designer'} application ${accept ? 'accepted' : 'denied'} by <@${interaction.user.id}>.`, allowedMentions: { parse: [] } });
         return;
     }
 
@@ -701,42 +732,49 @@ async function handleModal(interaction) {
         return;
     }
 
-    if (customId === 'application_modal') {
-        const whyJoin = interaction.fields.getTextInputValue('why_join');
-        const activity = interaction.fields.getTextInputValue('activity');
-        const experience = interaction.fields.getTextInputValue('experience');
-        const robloxUsername = interaction.fields.getTextInputValue('roblox_username');
-        const portfolioLink = interaction.fields.getTextInputValue('portfolio') || 'N/A';
+    if (customId === 'application_staff_modal' || customId === 'application_designer_modal') {
+        const type = customId === 'application_staff_modal' ? 'staff' : 'designer';
+        const answers = Object.fromEntries(['why_join', 'activity', 'experience', 'difficult_customer', 'roblox_username', 'portfolio', 'software', 'specialties']
+            .map((field) => [field, interaction.fields.fields.has(field) ? interaction.fields.getTextInputValue(field) : null]));
 
         if (!cfg.applicationsChannelId) {
-            return interaction.reply({ content: 'Applications are not accepted right now — no applications channel is configured.', ephemeral: true });
+            return interaction.reply({ content: 'Applications are not configured yet. Ask an administrator to set `APPLICATIONS_CHANNEL_ID` in `.env`.', ephemeral: true });
         }
 
         const channel = await interaction.client.channels.fetch(cfg.applicationsChannelId).catch(() => null);
-        if (channel) {
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`app_accept_${interaction.user.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`app_deny_${interaction.user.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+        if (!channel) return interaction.reply({ content: 'The configured applications channel could not be reached. Please contact an administrator.', ephemeral: true });
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`app_accept_${type}_${interaction.user.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`app_deny_${type}_${interaction.user.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+        );
+        const fields = [
+            { name: 'Applicant', value: `<@${interaction.user.id}>`, inline: true },
+            { name: 'Application type', value: type === 'staff' ? 'Staff' : 'Designer', inline: true },
+            { name: 'Roblox Username', value: answers.roblox_username, inline: true },
+            { name: 'Why join?', value: answers.why_join },
+        ];
+        if (type === 'staff') {
+            fields.push(
+                { name: 'Activity (1-10)', value: answers.activity, inline: true },
+                { name: 'Experience', value: answers.experience },
+                { name: 'Difficult customer response', value: answers.difficult_customer },
             );
-            await channel.send({
-                embeds: [
-                    {
-                        title: 'Creative Team Application',
-                        color: 0x2d2d31,
-                        fields: [
-                            { name: 'Applicant', value: `<@${interaction.user.id}>`, inline: true },
-                            { name: 'Roblox Username', value: robloxUsername, inline: true },
-                            { name: 'Activity (1-10)', value: activity, inline: true },
-                            { name: 'Why do you want to join?', value: whyJoin },
-                            { name: 'Design experience', value: experience },
-                            { name: 'Portfolio', value: portfolioLink },
-                        ],
-                    },
-                ],
-                components: [row],
-                allowedMentions: { parse: [] },
-            });
+        } else {
+            fields.push(
+                { name: 'Portfolio', value: answers.portfolio },
+                { name: 'Software', value: answers.software, inline: true },
+                { name: 'Specialties', value: answers.specialties },
+            );
         }
+        await channel.send({
+            content: cfg.applicationReviewerRoleId ? `<@&${cfg.applicationReviewerRoleId}>` : undefined,
+            embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
+            components: [row],
+            allowedMentions: { roles: cfg.applicationReviewerRoleId ? [cfg.applicationReviewerRoleId] : [] },
+        });
+
+        await interaction.user.send(`Your **${type} application** was submitted to **${cfg.brandName}**. The team will review it and DM you when a decision is made.`).catch(() => {});
 
         return interaction.reply({ content: 'Your application has been submitted!', ephemeral: true });
     }

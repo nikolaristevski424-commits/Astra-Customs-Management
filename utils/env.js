@@ -64,7 +64,9 @@ const ENV_FIELD_MAP = [
     ['QC_ROLE_IDS', 'qcRoleIds', 'idlist'],
     ['TICKET_STAFF_ROLE_IDS', 'ticketStaffRoleIds', 'idlist'],
     ['WELCOME_ROLE_ID', 'welcomeRoleId', 'string'],
-    ['APPLICATION_ACCEPT_ROLE_ID', 'applicationAcceptRoleId', 'string'],
+    ['APPLICATION_REVIEWER_ROLE_ID', 'applicationReviewerRoleId', 'string'],
+    ['STAFF_APPLICATION_ACCEPT_ROLE_ID', 'staffApplicationAcceptRoleId', 'string'],
+    ['DESIGNER_APPLICATION_ACCEPT_ROLE_ID', 'designerApplicationAcceptRoleId', 'string'],
     ['LOA_ROLE_ID', 'loaRoleId', 'string'],
 
     // Commission
@@ -78,6 +80,7 @@ const ENV_FIELD_MAP = [
     ['ORDER_LOG_CHANNEL_ID', 'orderLogChannelId', 'string'],
     ['PURCHASE_LOG_CHANNEL_ID', 'purchaseLogChannelId', 'string'],
     ['APPLICATIONS_CHANNEL_ID', 'applicationsChannelId', 'string'],
+    ['APPLICATION_RESULTS_CHANNEL_ID', 'applicationResultsChannelId', 'string'],
     ['PROMOTIONS_CHANNEL_ID', 'promotionsChannelId', 'string'],
     ['INFRACTIONS_CHANNEL_ID', 'infractionsChannelId', 'string'],
     ['WELCOME_CHANNEL_ID', 'welcomeChannelId', 'string'],

@@ -55,13 +55,18 @@ function dashboardPanel(cfg) {
 
     withFooter(container, cfg);
 
-    const buttons = [new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒')];
-    buttons.push(new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎧'));
-    buttons.push(new ButtonBuilder().setCustomId('dashboard_apply').setLabel('Apply').setStyle(ButtonStyle.Secondary).setEmoji('🚀'));
-    buttons.push(new ButtonBuilder().setCustomId('dashboard_loa').setLabel('Request LOA').setStyle(ButtonStyle.Secondary).setEmoji('🌴'));
-    if (cfg.groupUrl) buttons.push(new ButtonBuilder().setLabel('Group').setStyle(ButtonStyle.Link).setURL(cfg.groupUrl).setEmoji('🔗'));
+    const primaryButtons = [
+        new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
+        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎧'),
+        new ButtonBuilder().setCustomId('dashboard_loa').setLabel('Request LOA').setStyle(ButtonStyle.Secondary).setEmoji('🌴'),
+    ];
+    const applicationButtons = [
+        new ButtonBuilder().setCustomId('application_staff_open').setLabel('Staff Application').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
+        new ButtonBuilder().setCustomId('application_designer_open').setLabel('Designer Application').setStyle(ButtonStyle.Primary).setEmoji('🎨'),
+    ];
+    if (cfg.groupUrl) primaryButtons.push(new ButtonBuilder().setLabel('Group').setStyle(ButtonStyle.Link).setURL(cfg.groupUrl).setEmoji('🔗'));
 
-    return { components: [container, new ActionRowBuilder().addComponents(buttons)] };
+    return { components: [container, new ActionRowBuilder().addComponents(primaryButtons), new ActionRowBuilder().addComponents(applicationButtons)] };
 }
 
 function guidelinesPanel(cfg) {
@@ -101,7 +106,11 @@ function ticketsPanel(cfg) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
             new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎫'),
-        )
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('application_staff_open').setLabel('Staff Application').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
+            new ButtonBuilder().setCustomId('application_designer_open').setLabel('Designer Application').setStyle(ButtonStyle.Primary).setEmoji('🎨'),
+        ),
     );
     withFooter(container, cfg);
     return { components: [container] };
