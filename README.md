@@ -172,7 +172,7 @@ so QC can ask the designer questions without cluttering the channel.
 
 ## Tickets
 
-`/panel type:tickets` (or the `-tickets` shortcut) posts the support
+`/panel tickets` (or the `-tickets` shortcut) posts the support
 panel; clicking **Help** opens a modal and creates a private ticket
 channel. Claiming and closing a ticket is restricted to
 `TICKET_STAFF_ROLE_IDS` — set this to a dedicated ticket-support role
@@ -225,8 +225,7 @@ modal instead of typing dates as command options).
 `/quote` (interactive calculator), `/watermark` (faded tiled brand
 text by default), `/infract`, `/promote`, `/logs`, `/loa`,
 `/addstaff`, `/affiliate`, `/service`, `/text edit`, `/panel
-type:<...>` (dashboard/guidelines/order-status/tickets/pricelist/
-portfolio/affiliations/honeypot), prefix shortcuts (`-dashboard`,
+dashboard|prices|tickets|portfolio|guidelines|order-status|affiliations|honeypot`, prefix shortcuts (`-dashboard`,
 `-pricelist`, etc. — staff only, deletes the trigger message), a
 honeypot trap channel (auto-softban), `/help`, `/ping`.
 

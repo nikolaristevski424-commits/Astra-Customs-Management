@@ -6,6 +6,10 @@ const { parseColor } = require('../utils/embeds');
 // In-memory selection state per quote message: messageId -> { section: [itemKey, ...] }
 const state = new Map();
 
+function priceMinimum(price) {
+    return Number(String(price).split('-')[0]);
+}
+
 function sectionMenu(customId, placeholder, items) {
     if (!items.length) return null;
     return new ActionRowBuilder().addComponents(
@@ -27,6 +31,7 @@ function buildComponents(guildId) {
     return [
         sectionMenu('quote_sel_commandPacks', 'Command Packs...', pl.commandPacks.map((i, index) => ({ ...i, section: 'commandPacks', index }))),
         sectionMenu('quote_sel_singleCommands', 'Single Commands...', pl.singleCommands.map((i, index) => ({ ...i, section: 'singleCommands', index }))),
+        sectionMenu('quote_sel_products', 'Design Services...', pl.products.map((i, index) => ({ ...i, section: 'products', index }))),
         sectionMenu('quote_sel_basicPackAddons', 'Basic Pack Addons...', pl.basicPackAddons.map((i, index) => ({ ...i, section: 'basicPackAddons', index }))),
         sectionMenu('quote_sel_packages', 'Basic Pack / Full Pack...', packages.map((i) => ({ ...i, index: 'null' }))),
     ].filter(Boolean);
@@ -41,7 +46,7 @@ function flatByKey(guildId) {
 function buildSummaryEmbed(cfg, guildId, selections) {
     const flat = flatByKey(guildId);
     const chosen = Object.values(selections).flat().map((key) => flat.get(key)).filter(Boolean);
-    const total = chosen.reduce((sum, i) => sum + i.price, 0);
+    const total = chosen.reduce((sum, i) => sum + priceMinimum(i.price), 0);
 
     const embed = new EmbedBuilder()
         .setColor(parseColor(cfg.accentColor))

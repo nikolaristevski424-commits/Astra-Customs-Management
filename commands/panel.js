@@ -22,6 +22,10 @@ const { sendAsPanel } = require('../utils/respond');
 
 const DEFAULT_SERVICES = { Liveries: 'available', Clothing: 'available', Graphics: 'available', Photography: 'available', Discord: 'available' };
 
+function addPanelChannel(subcommand) {
+    return subcommand.addChannelOption((o) => o.setName('channel').setDescription('Channel to send the panel to').addChannelTypes(ChannelType.GuildText));
+}
+
 function baseContainer(cfg) {
     const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
     if (cfg.bannerUrl) container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl } }]));
@@ -174,23 +178,14 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('panel')
         .setDescription('Send a styled panel to a channel.')
-        .addStringOption((o) =>
-            o
-                .setName('type')
-                .setDescription('Which panel')
-                .setRequired(true)
-                .addChoices(
-                    { name: 'Dashboard', value: 'dashboard' },
-                    { name: 'Guidelines', value: 'guidelines' },
-                    { name: 'Order Status', value: 'order-status' },
-                    { name: 'Tickets', value: 'tickets' },
-                    { name: 'Price List', value: 'pricelist' },
-                    { name: 'Portfolio', value: 'portfolio' },
-                    { name: 'Affiliations', value: 'affiliations' },
-                    { name: 'Honeypot', value: 'honeypot' },
-                )
-        )
-        .addChannelOption((o) => o.setName('channel').setDescription('Channel to send to (defaults to here)').addChannelTypes(ChannelType.GuildText)),
+        .addSubcommand((sub) => addPanelChannel(sub.setName('dashboard').setDescription('Send the main dashboard panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('guidelines').setDescription('Send the guidelines panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('order-status').setDescription('Send the service status panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('tickets').setDescription('Send the ticket and order panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('prices').setDescription('Send the Robux price list.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('portfolio').setDescription('Send the portfolio panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('affiliations').setDescription('Send the affiliations panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('honeypot').setDescription('Send the honeypot panel.'))),
 
     async execute(interaction) {
         const guildId = interaction.guildId;
@@ -200,10 +195,10 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to send panels.', ephemeral: true });
         }
 
-        const type = interaction.options.getString('type', true);
+        const type = interaction.options.getSubcommand();
         const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
 
-        if (type === 'pricelist') {
+        if (type === 'prices') {
             return sendAsPanel(interaction, { embeds: [pricelistCmd.buildPricelistEmbed({ ...cfg, _guildId: guildId })] }, targetChannel);
         }
 

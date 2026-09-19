@@ -6,7 +6,21 @@ const { parseColor } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 
 function formatItems(items) {
-    return items.map((i) => `**${i.name}** — R$${i.price}`).join('\n');
+    return items.map((i) => `**${i.name}** — ${formatPrice(i.price)}`).join('\n');
+}
+
+function formatPrice(price) {
+    return typeof price === 'number' ? `R$${price}` : `R$${price}`;
+}
+
+function productFields(products) {
+    const groups = new Map();
+    for (const item of products) {
+        const category = item.category || 'Design Services';
+        if (!groups.has(category)) groups.set(category, []);
+        groups.get(category).push(item);
+    }
+    return [...groups].map(([category, items]) => ({ name: category, value: formatItems(items) }));
 }
 
 function buildPricelistEmbed(cfg) {
@@ -32,6 +46,7 @@ function buildPricelistEmbed(cfg) {
         .addFields(
             { name: 'Discord Bot — Command Packs', value: formatItems(pl.commandPacks) },
             { name: 'Discord Bot — Single Commands', value: formatItems(pl.singleCommands) },
+            ...productFields(pl.products),
             { name: `${pl.basicPack.name}`, value: `R$${pl.basicPack.price}\n${pl.basicPack.includes.map((i) => `• ${i}`).join('\n')}` },
             { name: 'Basic Pack Addons', value: formatItems(pl.basicPackAddons) },
             { name: `${pl.fullPack.name}`, value: `R$${pl.fullPack.price}\nIncludes: ${pl.fullPack.includes.join(', ')}` },
@@ -59,13 +74,14 @@ module.exports = {
                         .addChoices(
                             { name: 'Command Packs', value: 'commandPacks' },
                             { name: 'Single Commands', value: 'singleCommands' },
+                            { name: 'Design Services', value: 'products' },
                             { name: 'Basic Pack', value: 'basicPack' },
                             { name: 'Basic Pack Addons', value: 'basicPackAddons' },
                             { name: 'Full Pack', value: 'fullPack' },
                         )
                 )
                 .addStringOption((o) => o.setName('item').setDescription('Item name (autocomplete)').setRequired(true).setAutocomplete(true))
-                .addIntegerOption((o) => o.setName('price').setDescription('New price in Robux').setRequired(true).setMinValue(0))
+                .addStringOption((o) => o.setName('price').setDescription('New price in Robux, e.g. 250 or 120-140').setRequired(true).setMaxLength(20))
         ),
 
     async autocomplete(interaction) {
@@ -91,7 +107,11 @@ module.exports = {
                 return interaction.reply({ content: 'You do not have permission to edit prices.', ephemeral: true });
             }
             const itemKey = interaction.options.getString('item', true);
-            const price = interaction.options.getInteger('price', true);
+            const rawPrice = interaction.options.getString('price', true).replace(/\s/g, '');
+            if (!/^\d+(?:-\d+)?$/.test(rawPrice)) {
+                return interaction.reply({ content: 'Price must be a Robux amount like `250` or a range like `120-140`.', ephemeral: true });
+            }
+            const price = rawPrice.includes('-') ? rawPrice : Number(rawPrice);
             const [section, indexStr] = itemKey.split(':');
             const index = indexStr === 'null' ? null : Number(indexStr);
             pricelistUtil.setPrice(guildId, section, index, price);

@@ -9,12 +9,12 @@ const CATEGORIES = [
     { name: '💸 Payments', value: '`/payment request|release|link|pool`, `/paymentrequest`' },
     { name: '🤑 Payouts & Credit', value: '`/payout request|list`, `/credit add|remove|view|history|leaderboard`' },
     { name: '📦 Packages & Bundles', value: '`/package create|request|setprice|list|view|collect`, `/bundle request`' },
-    { name: '🖼️ Portfolio', value: '`/portfolio add|view|remove|profile`, `/panel type:portfolio`' },
+    { name: '🖼️ Portfolio', value: '`/portfolio add|view|remove|profile`, `/panel portfolio`' },
     { name: '✅ Quality Control', value: '`/qc submit` — submit work for QC approval' },
     { name: '🎉 Fun', value: '`/release`, `/giveaway start|reroll`, `/fact`, `/reverse`, `/wanted`, `/8ball`, `/coinflip`, `/roll`, `/rps`, `/ship`, `/wouldyourather`, `/avatar`' },
     { name: '🛠️ Staff & HR', value: '`/addstaff`, `/infract issue|void`, `/promote issue|void`, `/logs`, `/loa request|return|list`' },
     { name: '🖌️ Design Tools', value: '`/watermark`' },
-    { name: '📋 Panels', value: '`/panel type:dashboard|guidelines|order-status|tickets|pricelist|portfolio|affiliations|honeypot`, `/affiliate`, `/service`, `/text edit`' },
+    { name: '📋 Panels', value: '`/panel dashboard|guidelines|order-status|tickets|prices|portfolio|affiliations|honeypot`, `/affiliate`, `/service`, `/text edit`' },
     { name: '🤖 Bot Info', value: '`/help`, `/ping`' },
 ];
 

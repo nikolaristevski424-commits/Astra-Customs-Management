@@ -14,6 +14,7 @@ const SHORTCUTS = {
     affiliations: 'affiliations',
     honeypot: 'honeypot',
     pricelist: 'pricelist',
+    prices: 'pricelist',
 };
 
 module.exports = {
