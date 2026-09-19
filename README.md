@@ -139,11 +139,18 @@ a glance.
 ## Packages
 
 A lightweight product-catalog + approval workflow:
-- `/package create` — name, price, description, up to 5 photos → saved as a draft
+- `/package create` — name, price, description, up to 5 photos, and up to 5 delivery files → saved as a draft
 - `/package request` — submit your draft for approval (posts to `PACKAGE_REVIEW_CHANNEL_ID` with Approve/Deny/Edit Price buttons)
 - `/package setprice` — change the price of **any** package, any time — executive team only
 - `/package list` / `/package view` — browse
 - `/package collect` — canned pickup instructions for a purchased package
+
+To automate delivery, create a payment link with `/payment request`, choose the
+approved `package_id`, and optionally choose the Discord `customer`. When the
+configured Roblox purchase monitor sees that exact payment Game Pass sold, it
+DMs the package files automatically. The buyer must either be selected as the
+customer when the link is created or be linked through Bloxlink. If neither is
+available, the purchase is logged for manual delivery.
 
 ## Store credit
 
@@ -170,9 +177,13 @@ accepts the price update. Each member can redeem a code once.
 
 ## Bundles
 
-`/bundle request` — bundle type, total after tax, notes → posted for
-approval (Approve/Deny, manager+). Approved bundles are automatically
-posted into `BUNDLE_THREAD_ID`.
+Packages and bundles use one shared review destination. Set
+`PACKAGE_BUNDLE_CHANNEL_ID` to a Discord **Forum channel** (recommended) or
+regular text channel. `/package request` and `/bundle request` each create a
+new thread there and put the approval embed/buttons in that thread. Managers
+can Approve or Deny from the thread. The older `BUNDLE_REVIEW_CHANNEL_ID` and
+`PACKAGE_REVIEW_CHANNEL_ID` values remain fallback options for existing setups;
+`BUNDLE_THREAD_ID` is no longer used.
 
 ## Portfolio
 

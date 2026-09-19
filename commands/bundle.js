@@ -2,6 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const bundles = require('../utils/bundles');
+const { createCatalogThread } = require('../utils/catalogThreads');
 const { parseColor } = require('../utils/embeds');
 
 function buildEmbed(cfg, record) {
@@ -56,15 +57,20 @@ module.exports = {
 
         const record = bundles.create(guildId, { bundleType, designerId: interaction.user.id, totalAfterTax, notes });
 
-        const targetChannelId = cfg.bundleReviewChannelId || interaction.channelId;
+        const targetChannelId = cfg.packageBundleChannelId || cfg.bundleReviewChannelId || interaction.channelId;
         const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
         if (!channel) {
-            return interaction.reply({ content: 'Bundle request saved, but the review channel is not reachable. Set `BUNDLE_REVIEW_CHANNEL_ID` in `.env`.', ephemeral: true });
+            return interaction.reply({ content: 'Bundle request saved, but the catalog channel is not reachable. Set `PACKAGE_BUNDLE_CHANNEL_ID` in `.env`.', ephemeral: true });
         }
 
         const row = new ActionRowBuilder().addComponents(buildButtons(record));
-        await channel.send({ embeds: [buildEmbed(cfg, record)], components: [row], allowedMentions: { parse: [] } });
+        const thread = await createCatalogThread(channel, `Bundle ${record.id} - ${bundleType}`, {
+            embeds: [buildEmbed(cfg, record)],
+            components: [row],
+            allowedMentions: { parse: [] },
+        }).catch(() => null);
+        if (!thread) return interaction.reply({ content: 'Bundle request saved, but its review thread could not be created. Check the bot has permission to create threads in `PACKAGE_BUNDLE_CHANNEL_ID`.', ephemeral: true });
 
-        return interaction.reply({ content: `Bundle request \`#${record.id}\` submitted for approval.`, ephemeral: true });
+        return interaction.reply({ content: `Bundle request \`#${record.id}\` submitted in <#${thread.id}> for approval.`, ephemeral: true });
     },
 };

@@ -58,4 +58,8 @@ function setPrice(guildId, id, price, changedBy) {
     return updated;
 }
 
-module.exports = { create, find, listByCreator, list, updateStatus, setPrice };
+function markDelivered(guildId, id, deliveredTo) {
+    return updateStatus(guildId, id, 'delivered', { deliveredAt: Date.now(), deliveredTo });
+}
+
+module.exports = { create, find, listByCreator, list, updateStatus, setPrice, markDelivered };

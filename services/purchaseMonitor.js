@@ -10,14 +10,14 @@ const config = require('../utils/config');
 const { baseEmbed } = require('../utils/embeds');
 const { robloxToDiscord } = require('../utils/bloxlink');
 const credits = require('../utils/credits');
+const packages = require('../utils/packages');
+const paymentPool = require('../utils/paymentPool');
 
 const POLL_INTERVAL_MS = 30_000;
 const queue = [];
 let isProcessing = false;
 
 async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
-    if (!cfg.purchaseLogChannelId) return;
-
     const itemName = transaction.details?.name || 'Unknown Item';
     const itemId = transaction.details?.id;
     const buyerId = transaction.agent?.id;
@@ -48,11 +48,37 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
 
     const embed = baseEmbed(cfg, { title: 'Purchase Log', description: descriptionLines.join('\n') });
 
+    if (cfg.purchaseLogChannelId) {
+        try {
+            const channel = await client.channels.fetch(cfg.purchaseLogChannelId);
+            await channel.send({ embeds: [embed], allowedMentions: { users: discordId ? [discordId] : [] } });
+        } catch (err) {
+            console.error('[purchaseMonitor] Failed to send purchase log:', err.message);
+        }
+    }
+
+    const reservation = itemId ? paymentPool.findReservation(guildId, String(itemId)) : null;
+    if (!reservation?.packageId) return;
+
+    const pkg = packages.find(guildId, reservation.packageId);
+    if (!pkg?.files?.length) return;
+
+    const recipientId = reservation.customerDiscordId || discordId;
+    if (!recipientId) {
+        console.warn(`[purchaseMonitor] Package #${pkg.id} was paid for by ${buyerName}, but no Discord account is linked. Manual delivery is required.`);
+        return;
+    }
+
     try {
-        const channel = await client.channels.fetch(cfg.purchaseLogChannelId);
-        await channel.send({ embeds: [embed], allowedMentions: { users: discordId ? [discordId] : [] } });
+        const recipient = await client.users.fetch(recipientId);
+        await recipient.send({
+            content: `Your purchase of **${pkg.name}** is confirmed. Thank you! Your files are attached below.`,
+            files: pkg.files.map((file) => ({ attachment: file.url, name: file.name })),
+        });
+        paymentPool.release(guildId, String(itemId));
+        console.log(`[purchaseMonitor] Automatically delivered package #${pkg.id} to Discord user ${recipientId}.`);
     } catch (err) {
-        console.error('[purchaseMonitor] Failed to send purchase log:', err.message);
+        console.error(`[purchaseMonitor] Could not DM package #${pkg.id} to Discord user ${recipientId}:`, err.message);
     }
 }
 
@@ -101,7 +127,7 @@ function start(client) {
         queue.push(async () => {
             for (const [guildId, guild] of client.guilds.cache) {
                 const cfg = config.getConfig(guildId);
-                if (!cfg.robloxGroupId || !cfg.purchaseLogChannelId) continue;
+                if (!cfg.robloxGroupId) continue;
 
                 try {
                     const transactions = await noblox.getGroupTransactions(cfg.robloxGroupId, 'Sale');

@@ -52,8 +52,8 @@ function defaultConfig() {
         rulesChannelId: null,
         orderQueueChannelId: null,     // where /order add job postings are announced
         orderRequestsChannelId: null,  // where designer "Request" clicks go for supervisor accept/deny
+        packageBundleChannelId: null,  // forum/text channel where package and bundle review threads are created
         bundleReviewChannelId: null,   // where /bundle request goes for approval
-        bundleThreadId: null,          // approved bundles get auto-posted here
         packageReviewChannelId: null,  // where /package request goes for approval
         payoutRequestsChannelId: null, // where /payout request goes for the payout team to fulfill
         qcChannelId: null,             // where /qc submit posts submissions for review

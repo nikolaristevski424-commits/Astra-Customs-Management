@@ -212,10 +212,6 @@ async function handleButton(interaction) {
         const buttons = bundleCmd.buildButtons(updated);
         await interaction.update({ embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] });
 
-        if (approve && cfg.bundleThreadId) {
-            const thread = await interaction.client.channels.fetch(cfg.bundleThreadId).catch(() => null);
-            if (thread) await thread.send({ embeds: [embed] }).catch(() => {});
-        }
         return;
     }
 

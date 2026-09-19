@@ -25,7 +25,7 @@ function isExpired(record, ttlMs) {
 }
 
 /** Reserve and return the first free (or expired-reservation) gamepass ID from the pool. Null if none available. */
-function pickAvailable(guildId, note, ttlMs = DEFAULT_TTL_MS) {
+function pickAvailable(guildId, note, ttlMs = DEFAULT_TTL_MS, metadata = {}) {
     const poolIds = getPoolIds();
     if (!poolIds.length) return null;
 
@@ -33,7 +33,7 @@ function pickAvailable(guildId, note, ttlMs = DEFAULT_TTL_MS) {
     store.update(STORE, guildId, {}, (state) => {
         for (const id of poolIds) {
             if (isExpired(state[id], ttlMs)) {
-                state[id] = { reservedAt: Date.now(), note: note || null };
+                state[id] = { reservedAt: Date.now(), note: note || null, ...metadata };
                 picked = id;
                 break;
             }
@@ -41,6 +41,11 @@ function pickAvailable(guildId, note, ttlMs = DEFAULT_TTL_MS) {
         return state;
     });
     return picked;
+}
+
+function findReservation(guildId, gamePassId, ttlMs = DEFAULT_TTL_MS) {
+    const record = getState(guildId)[gamePassId];
+    return isExpired(record, ttlMs) ? null : { gamePassId, ...record };
 }
 
 function release(guildId, gamePassId) {
@@ -66,4 +71,4 @@ function listStatus(guildId, ttlMs = DEFAULT_TTL_MS) {
     });
 }
 
-module.exports = { getPoolIds, pickAvailable, release, listStatus, DEFAULT_TTL_MS };
+module.exports = { getPoolIds, pickAvailable, findReservation, release, listStatus, DEFAULT_TTL_MS };

@@ -4,6 +4,7 @@ const perms = require('../utils/permissions');
 const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
 const discounts = require('../utils/discounts');
+const packages = require('../utils/packages');
 
 function formatSince(ts) {
     return `<t:${Math.floor(ts / 1000)}:R>`;
@@ -18,6 +19,8 @@ module.exports = {
                 .setName('request')
                 .setDescription('Auto-pick a free game pass, set its price, and get the payment link')
                 .addIntegerOption((o) => o.setName('price').setDescription('Price in Robux').setRequired(true).setMinValue(0))
+                .addIntegerOption((o) => o.setName('package_id').setDescription('Approved package to deliver after payment').setAutocomplete(true))
+                .addUserOption((o) => o.setName('customer').setDescription('Discord customer who should receive the files'))
                 .addStringOption((o) => o.setName('discount_code').setDescription('Optional discount code').setMaxLength(32))
                 .addStringOption((o) => o.setName('note').setDescription('What this payment is for (shown in /payment pool)'))
         )
@@ -57,6 +60,12 @@ module.exports = {
         if (!perms.isManager(interaction.member, cfg)) return interaction.respond([]);
 
         const focused = interaction.options.getFocused().toLowerCase();
+        if (sub === 'request' && interaction.options.getFocused(true).name === 'package_id') {
+            const approved = packages.list(guildId, 'approved')
+                .filter((pkg) => pkg.files?.length && (`${pkg.id}`.includes(focused) || pkg.name.toLowerCase().includes(focused)))
+                .slice(0, 25);
+            return interaction.respond(approved.map((pkg) => ({ name: `#${pkg.id} ${pkg.name} (${pkg.files.length} files)`, value: pkg.id })));
+        }
         const statuses = pool.listStatus(guildId);
         const relevant = sub === 'release' ? statuses.filter((s) => s.reserved) : statuses;
         const filtered = relevant.filter((s) => s.gamePassId.includes(focused)).slice(0, 25);
@@ -126,6 +135,18 @@ module.exports = {
             }
 
             const price = interaction.options.getInteger('price', true);
+            const packageId = interaction.options.getInteger('package_id');
+            const customer = interaction.options.getUser('customer');
+            let packageRecord = null;
+            if (packageId) {
+                packageRecord = packages.find(guildId, packageId);
+                if (!packageRecord || packageRecord.status !== 'approved') {
+                    return interaction.reply({ content: 'That package does not exist or is not approved yet.', ephemeral: true });
+                }
+                if (!packageRecord.files?.length) {
+                    return interaction.reply({ content: 'That package has no delivery files attached. Edit the package and add its files before creating a payment link.', ephemeral: true });
+                }
+            }
             const discountCode = interaction.options.getString('discount_code');
             const note = interaction.options.getString('note') || `Requested by ${interaction.user.tag}`;
 
@@ -141,7 +162,10 @@ module.exports = {
                 if (finalPrice < 1) return interaction.reply({ content: 'That discount makes the payment price less than R$1. Use a smaller discount or a higher subtotal.', ephemeral: true });
             }
 
-            const gamePassId = pool.pickAvailable(guildId, note);
+            const gamePassId = pool.pickAvailable(guildId, note, undefined, {
+                packageId: packageRecord?.id || null,
+                customerDiscordId: customer?.id || null,
+            });
             if (!gamePassId) {
                 return interaction.reply({ content: 'Every payment game pass is currently reserved. Free one up with `/payment release`, or check `/payment pool`.', ephemeral: true });
             }
