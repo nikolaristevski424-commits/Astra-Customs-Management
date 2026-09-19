@@ -73,6 +73,7 @@ const ENV_FIELD_MAP = [
 
     // Channels
     ['TICKET_CATEGORY_ID', 'ticketCategoryId', 'string'],
+    ['ORDER_CATEGORY_ID', 'orderCategoryId', 'string'],
     ['TRANSCRIPT_CHANNEL_ID', 'transcriptChannelId', 'string'],
     ['ORDER_LOG_CHANNEL_ID', 'orderLogChannelId', 'string'],
     ['PURCHASE_LOG_CHANNEL_ID', 'purchaseLogChannelId', 'string'],

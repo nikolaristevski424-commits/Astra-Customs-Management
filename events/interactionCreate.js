@@ -406,6 +406,17 @@ async function handleButton(interaction) {
     }
 
     // ---- Dashboard: Help (open ticket) ----
+    if (customId === 'order_open') {
+        const modal = new ModalBuilder().setCustomId('order_open_modal').setTitle('New Order');
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('product').setLabel('What would you like designed?').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deadline').setLabel('Deadline').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('budget').setLabel('Budget in Robux').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(50)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('details').setLabel('Order details and references').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1500)),
+        );
+        return interaction.showModal(modal);
+    }
+
     if (customId === 'help_ticket_open') {
         const modal = new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Open a Ticket');
         const reasonInput = new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
@@ -472,19 +483,32 @@ async function handleButton(interaction) {
         const ticket = tickets.get(guildId, channelId);
         if (!ticket) return interaction.reply({ content: 'This ticket is no longer tracked.', ephemeral: true });
         const updated = tickets.update(guildId, channelId, { claimedBy: interaction.user.id, claimedAt: Date.now() });
+        const embed = ticket.type === 'order'
+            ? {
+                  title: 'New Order',
+                  description: 'Please send any references in this channel. A designer will review your request as soon as possible.',
+                  color: 0x2d2d31,
+                  fields: [
+                      { name: 'Product', value: ticket.product, inline: false },
+                      { name: 'Deadline', value: ticket.deadline, inline: true },
+                      { name: 'Budget', value: ticket.budget, inline: true },
+                      { name: 'Order Information', value: ticket.details, inline: false },
+                      { name: 'Claimed by', value: `<@${updated.claimedBy}>`, inline: true },
+                  ],
+                  footer: { text: `Order ticket • claimed by ${interaction.user.tag}` },
+              }
+            : {
+                  title: 'Support Ticket',
+                  description: updated.reason,
+                  color: 0x2d2d31,
+                  fields: [
+                      { name: 'Opened by', value: `<@${updated.userId}>`, inline: true },
+                      { name: 'Claimed by', value: `<@${updated.claimedBy}>`, inline: true },
+                  ],
+                  footer: { text: `Ticket ID: ${channelId}` },
+              };
         await interaction.update({
-            embeds: [
-                {
-                    title: 'Support Ticket',
-                    description: updated.reason,
-                    color: 0x2d2d31,
-                    fields: [
-                        { name: 'Opened by', value: `<@${updated.userId}>`, inline: true },
-                        { name: 'Claimed by', value: `<@${updated.claimedBy}>`, inline: true },
-                    ],
-                    footer: { text: `Ticket ID: ${channelId}` },
-                },
-            ],
+            embeds: [embed],
             components: interaction.message.components,
         });
         return;
@@ -564,6 +588,59 @@ async function handleModal(interaction) {
     const { customId } = interaction;
     const guildId = interaction.guildId;
     const cfg = config.getConfig(guildId);
+
+    if (customId === 'order_open_modal') {
+        const product = interaction.fields.getTextInputValue('product');
+        const deadline = interaction.fields.getTextInputValue('deadline');
+        const budget = interaction.fields.getTextInputValue('budget');
+        const details = interaction.fields.getTextInputValue('details');
+
+        if (!cfg.orderCategoryId) {
+            return interaction.reply({ content: 'Ordering is not configured yet. Ask an administrator to set `ORDER_CATEGORY_ID` in `.env`.', ephemeral: true });
+        }
+
+        const existing = tickets.findOpenForUser(guildId, interaction.user.id);
+        if (existing) return interaction.reply({ content: `You already have an open ticket: <#${existing.channelId}>`, ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+        const ticketStaffRoleIds = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds;
+        const overwrites = [
+            { id: interaction.guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            ...ticketStaffRoleIds.map((roleId) => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] })),
+        ];
+        const channel = await interaction.guild.channels.create({
+            name: `order-${interaction.user.username}`.slice(0, 90),
+            type: ChannelType.GuildText,
+            parent: cfg.orderCategoryId,
+            permissionOverwrites: overwrites,
+        });
+
+        const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details });
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
+        );
+        await channel.send({
+            content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
+            embeds: [{
+                title: 'New Order',
+                description: 'Please send any references in this channel. A designer will review your request as soon as possible.',
+                color: 0x2d2d31,
+                fields: [
+                    { name: 'Product', value: product, inline: false },
+                    { name: 'Deadline', value: deadline, inline: true },
+                    { name: 'Budget', value: budget, inline: true },
+                    { name: 'Order Information', value: details, inline: false },
+                    { name: 'Status', value: 'Open', inline: true },
+                ],
+                footer: { text: `Order ticket • ${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : ''}` },
+            }],
+            components: [row],
+            allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
+        });
+        return interaction.editReply(`Your order channel is ready: <#${channel.id}>`);
+    }
 
     if (customId === 'ticket_open_modal') {
         const reason = interaction.fields.getTextInputValue('reason');

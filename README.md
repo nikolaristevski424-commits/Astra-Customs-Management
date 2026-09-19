@@ -79,7 +79,7 @@ instance) and click:
   (reopens it).
 - **Delete** — removes that instance (staff or whoever posted the job).
 
-This is a separate system from `/order request|log|status|update|view|history|reset`,
+This is a separate system from `/order log|status|update|view|history|reset`,
 which is the money/tax sales ledger below.
 
 ## Sales ledger & commission
@@ -88,10 +88,11 @@ which is the money/tax sales ledger below.
 tax). It computes the designer's earning using `COMMISSION_RATES`:
 whichever of the logging staff member's roles has the highest
 configured rate determines what % of the after-tax price they keep.
-`/order request` lets customers send a structured request to the configured
-ordering channel. `/order status` checks an order's current status for any
-user. `/order update` sets Paid/Void/etc. for staff and refreshes the original
-order-log message. `/order view`, `/order history`, `/order reset`, and
+The dashboard's **Order Now** button opens a form and creates a private order
+channel under `ORDER_CATEGORY_ID`. Customers can provide the product, deadline,
+budget, details, and references directly in that channel. `/order status` checks
+an order's current status for any user. `/order update` sets Paid/Void/etc. for
+staff and refreshes the original order-log message. `/order view`, `/order history`, `/order reset`, and
 `/earnings` round out the ledger. `/paymentrequest` is a richer
 version of the same idea matching a payment-link-style workflow
 (payment link, Roblox usernames, price breakdown, Paid/Decline).

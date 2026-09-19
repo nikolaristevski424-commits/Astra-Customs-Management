@@ -124,14 +124,6 @@ module.exports = {
         .addSubcommand((sub) => sub.setName('list').setDescription('Browse open jobs available to claim.'))
         .addSubcommand((sub) =>
             sub
-                .setName('request')
-                .setDescription('Send a customer order request to the ordering channel.')
-                .addStringOption((o) => o.setName('service').setDescription('Service or product you want').setRequired(true))
-                .addIntegerOption((o) => o.setName('quantity').setDescription('Number of items').setRequired(true).setMinValue(1).setMaxValue(100))
-                .addStringOption((o) => o.setName('details').setDescription('Brief, references, or delivery notes').setRequired(true).setMaxLength(1000))
-        )
-        .addSubcommand((sub) =>
-            sub
                 .setName('log')
                 .setDescription('Log a completed sale.')
                 .addUserOption((o) => o.setName('customer').setDescription('Customer').setRequired(true))
@@ -241,38 +233,6 @@ module.exports = {
                 await interaction.followUp({ embeds: [jobInstanceEmbed(cfg, job, instance)], components: [row], ephemeral: true });
             }
             return;
-        }
-
-        if (sub === 'request') {
-            const service = interaction.options.getString('service', true);
-            const quantity = interaction.options.getInteger('quantity', true);
-            const details = interaction.options.getString('details', true);
-            const targetChannelId = cfg.orderingChannelId || interaction.channelId;
-            const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
-            if (!channel) {
-                return interaction.reply({ content: 'The ordering channel is not configured or reachable. Please contact staff.', ephemeral: true });
-            }
-
-            const requestEmbed = new EmbedBuilder()
-                .setColor(parseColor(cfg.accentColor))
-                .setTitle('New Customer Order Request')
-                .setDescription(`${service} requested by <@${interaction.user.id}>`)
-                .addFields(
-                    { name: 'Customer', value: `<@${interaction.user.id}>`, inline: true },
-                    { name: 'Service', value: service, inline: true },
-                    { name: 'Quantity', value: `${quantity}`, inline: true },
-                    { name: 'Details', value: details },
-                    { name: 'Next step', value: 'Staff will review this request and open a support ticket if more details are needed.' },
-                )
-                .setFooter({ text: 'Order request • use /order status after staff logs the sale' })
-                .setTimestamp();
-
-            const sent = await channel.send({
-                content: `<@${interaction.user.id}>`,
-                embeds: [requestEmbed],
-                allowedMentions: { users: [interaction.user.id] },
-            });
-            return interaction.reply({ content: `Your order request was sent to <#${sent.channelId}>. Staff will follow up there.`, ephemeral: true });
         }
 
         // ---- Sales ledger ----

@@ -35,6 +35,7 @@ function defaultConfig() {
 
         // Channels
         ticketCategoryId: null,
+        orderCategoryId: null,
         transcriptChannelId: null,
         orderLogChannelId: null,
         purchaseLogChannelId: null,
