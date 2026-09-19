@@ -1,0 +1,207 @@
+const {
+    SlashCommandBuilder,
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
+    MediaGalleryBuilder,
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ChannelType,
+    MessageFlags,
+} = require('discord.js');
+const config = require('../utils/config');
+const perms = require('../utils/permissions');
+const affiliations = require('./affiliate');
+const portfolio = require('../utils/portfolio');
+const pricelistCmd = require('./pricelist');
+const { ICONS: SERVICE_ICONS } = require('./service');
+const { parseColor } = require('../utils/embeds');
+const { sendAsPanel } = require('../utils/respond');
+
+const DEFAULT_SERVICES = { Liveries: 'available', Clothing: 'available', Graphics: 'available', Photography: 'available', Discord: 'available' };
+
+function baseContainer(cfg) {
+    const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+    if (cfg.bannerUrl) container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl } }]));
+    return container;
+}
+
+function withFooter(container, cfg) {
+    if (cfg.footerUrl) container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.footerUrl } }]));
+    return container;
+}
+
+function dashboardPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName}\n\n${cfg.text.dashboardIntro}`));
+    container.addSeparatorComponents(new SeparatorBuilder());
+
+    container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('dashboard_menu')
+                .setPlaceholder('View our Dashboard')
+                .addOptions(
+                    { label: 'Guidelines', value: 'guidelines', emoji: '📘' },
+                    { label: 'Order Status', value: 'order-status', emoji: '🛡️' },
+                    { label: 'Price List', value: 'pricelist', emoji: '💰' },
+                    { label: 'Portfolio', value: 'portfolio', emoji: '🖼️' },
+                    { label: 'Affiliations', value: 'affiliations', emoji: '🤝' },
+                )
+        )
+    );
+
+    withFooter(container, cfg);
+
+    const buttons = [new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎧')];
+    buttons.push(new ButtonBuilder().setCustomId('dashboard_apply').setLabel('Apply').setStyle(ButtonStyle.Secondary).setEmoji('🚀'));
+    buttons.push(new ButtonBuilder().setCustomId('dashboard_loa').setLabel('Request LOA').setStyle(ButtonStyle.Secondary).setEmoji('🌴'));
+    if (cfg.groupUrl) buttons.push(new ButtonBuilder().setLabel('Group').setStyle(ButtonStyle.Link).setURL(cfg.groupUrl).setEmoji('🔗'));
+
+    return { components: [container, new ActionRowBuilder().addComponents(buttons)] };
+}
+
+function guidelinesPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Discord Guidelines\n\n${cfg.text.dashboardIntro}`));
+    container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('guidelines_view_guidelines').setLabel('Guidelines').setStyle(ButtonStyle.Primary).setEmoji('📘'),
+            new ButtonBuilder().setCustomId('guidelines_view_orderRegulations').setLabel('Order Regulations').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
+            new ButtonBuilder().setCustomId('guidelines_view_careers').setLabel('Careers').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
+        )
+    );
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function orderStatusPanel(cfg) {
+    const services = Object.keys(cfg.serviceStatus || {}).length ? cfg.serviceStatus : DEFAULT_SERVICES;
+    const container = baseContainer(cfg);
+    const lines = ['## Order Status', '', 'Below is the current availability of all order statuses.', ''];
+    for (const [name, status] of Object.entries(services)) {
+        lines.push(`**${name}:** ${SERVICE_ICONS[status] || '❓'}`);
+    }
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function ticketsPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            `## ${cfg.brandName} Assistance\n\nHere, you can request support with any questions, issues, or concerns you may have. Please remain **respectful and patient** while communicating with our support team. Disrespectful behavior may result in moderation action. Once your ticket has been submitted, please allow a support agent time to review your request and assist you.`
+        )
+    );
+    container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎫'))
+    );
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function affiliationsPanel(cfg, guildId) {
+    const container = baseContainer(cfg);
+    const all = affiliations.list(guildId);
+    const lines = ['## Affiliations', '', cfg.text.affiliationsIntro, ''];
+    lines.push(all.length ? all.map((a) => `**${a.name}** — ${a.invite}`).join('\n') : '*No current affiliations.*');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function honeypotPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+            [
+                '## 🍯 Do Not Type Here',
+                '',
+                '🚫 **DO NOT TYPE IN THIS CHANNEL.**',
+                '',
+                `Any message sent here will result in an automatic **softban** — you'll be banned and instantly unbanned, and your last hour of messages will be deleted.`,
+                '',
+                `Softbanned: ${cfg.honeypot?.count || 0}`,
+            ].join('\n')
+        )
+    );
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function portfolioPanel(cfg, guildId) {
+    const pieces = portfolio.list(guildId).slice(-10).reverse();
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Portfolio`));
+    if (pieces.length) {
+        container.addSeparatorComponents(new SeparatorBuilder());
+        container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(pieces.map((p) => ({ media: { url: p.url }, description: p.caption || undefined }))));
+    } else {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent('The portfolio is empty. Staff can add pieces with `/portfolio add`.'));
+    }
+    return { components: [container] };
+}
+
+const BUILDERS = {
+    dashboard: (cfg, guildId) => dashboardPanel(cfg),
+    guidelines: (cfg) => guidelinesPanel(cfg),
+    'order-status': (cfg) => orderStatusPanel(cfg),
+    tickets: (cfg) => ticketsPanel(cfg),
+    affiliations: (cfg, guildId) => affiliationsPanel(cfg, guildId),
+    honeypot: (cfg) => honeypotPanel(cfg),
+    portfolio: (cfg, guildId) => portfolioPanel(cfg, guildId),
+};
+
+module.exports = {
+    BUILDERS,
+
+    data: new SlashCommandBuilder()
+        .setName('panel')
+        .setDescription('Send a styled panel to a channel.')
+        .addStringOption((o) =>
+            o
+                .setName('type')
+                .setDescription('Which panel')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Dashboard', value: 'dashboard' },
+                    { name: 'Guidelines', value: 'guidelines' },
+                    { name: 'Order Status', value: 'order-status' },
+                    { name: 'Tickets', value: 'tickets' },
+                    { name: 'Price List', value: 'pricelist' },
+                    { name: 'Portfolio', value: 'portfolio' },
+                    { name: 'Affiliations', value: 'affiliations' },
+                    { name: 'Honeypot', value: 'honeypot' },
+                )
+        )
+        .addChannelOption((o) => o.setName('channel').setDescription('Channel to send to (defaults to here)').addChannelTypes(ChannelType.GuildText)),
+
+    async execute(interaction) {
+        const guildId = interaction.guildId;
+        const cfg = config.getConfig(guildId);
+
+        if (!perms.isStaff(interaction.member, cfg)) {
+            return interaction.reply({ content: 'You do not have permission to send panels.', ephemeral: true });
+        }
+
+        const type = interaction.options.getString('type', true);
+        const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+
+        if (type === 'pricelist') {
+            return sendAsPanel(interaction, { embeds: [pricelistCmd.buildPricelistEmbed({ ...cfg, _guildId: guildId })] }, targetChannel);
+        }
+
+        const builder = BUILDERS[type];
+        if (!builder) return interaction.reply({ content: 'Unknown panel type.', ephemeral: true });
+
+        const payload = builder(cfg, guildId);
+        const sent = await sendAsPanel(interaction, { flags: MessageFlags.IsComponentsV2, ...payload }, targetChannel);
+
+        if (type === 'honeypot' && sent) {
+            config.setNested(guildId, 'honeypot', { channelId: sent.channelId, messageId: sent.id });
+        }
+    },
+};
