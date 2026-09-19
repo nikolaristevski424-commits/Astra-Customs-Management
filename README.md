@@ -199,6 +199,13 @@ decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
 dashboard also has a **Request LOA** button (same as `/loa request`, just as a
 modal instead of typing dates as command options).
 
+## Guidelines and advertising
+
+`/panel guidelines` posts the complete server guidelines and provides buttons
+for the guidelines, order regulations, and careers information. `/ad` posts a
+branded Astra Customs advertisement with buttons for ordering, staff and
+designer applications, and joining the Discord. `/ad` is restricted to staff.
+
 ## Fun
 
 - `/release` — post a free download (a PSD, a template, whatever) that

@@ -53,6 +53,7 @@ const ENV_FIELD_MAP = [
     ['FOOTER_URL', 'footerUrl', 'string'],
     ['PREFIX', 'prefix', 'string'],
     ['GROUP_URL', 'groupUrl', 'string'],
+    ['DISCORD_INVITE_URL', 'discordInviteUrl', 'string'],
     ['WATERMARK_TEXT', 'watermarkText', 'string'],
 
     // Roles

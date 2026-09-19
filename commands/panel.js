@@ -75,7 +75,7 @@ function dashboardPanel(cfg) {
 
 function guidelinesPanel(cfg) {
     const container = baseContainer(cfg);
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Discord Guidelines\n\n${cfg.text.dashboardIntro}`));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Discord Guidelines\n\n${cfg.text.guidelines}`));
     container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('guidelines_view_guidelines').setLabel('Guidelines').setStyle(ButtonStyle.Primary).setEmoji('📘'),

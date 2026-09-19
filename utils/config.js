@@ -71,6 +71,7 @@ function defaultConfig() {
         packageCollectorId: null,
         packageCollectorTag: null,
         groupUrl: null,
+        discordInviteUrl: 'https://discord.gg/pap89wQJpk',
         orderCounterStart: 1000,      // cosmetic — first /order add job gets this number
         autoCreditPercent: 0,         // % of each detected purchase auto-awarded as store credit (0 = off)
 
@@ -80,8 +81,35 @@ function defaultConfig() {
 
         // Free-text panel content, edited via /text edit (opens a modal)
         text: {
-            guidelines: 'No guidelines have been set yet. Staff can set these with `/text edit type:guidelines`.',
-            orderRegulations: 'No order regulations have been set yet.',
+            guidelines: [
+                '# Server Guidelines',
+                '',
+                '> **1. Orders**\n> Please do not ping a designer. Designers have many other orders and will respond when available.',
+                '> **2. Misuse**\n> Use all channels appropriately and use tickets only for their intended purposes.',
+                '> **3. Advertising**\n> Advertising is not allowed, including unsolicited DMs. Advertising is only permitted for approved affiliates.',
+                '> **4. English**\n> English is the main language of this server so everyone can collaborate effectively.',
+                '> **5. Alts**\n> Alternate accounts are strictly prohibited. Do not use an alt to bypass a punishment.',
+                '> **6. Drama**\n> Do not create or bring drama into the server. Help us keep the community calm and welcoming.',
+                '> **7. Profanity**\n> Do not bypass the profanity filter or use profanity in server channels.',
+                '> **8. Respect**\n> Treat others as you want to be treated. Do not troll or intentionally disrupt the community.',
+                '> **9. Account**\n> Your Discord username must match your Roblox username. Alternate accounts are not allowed.',
+                '> **10. NSFW**\n> Nudity, graphic content, hateful content, and similar messages or images are strictly prohibited.',
+                '> **11. Voice Channels**\n> Use voice channels for their intended purposes. Follow PTS in RP VCs and RTO in RTO channels.',
+                '> **12. Pinging**\n> Do not ping high ranks or members without a valid reason. Contact HR only when the matter is important.',
+            ].join('\n\n'),
+            orderRegulations: [
+                '# Order Regulations',
+                '',
+                '> **1. Refund Policy**\n> Completed payments are non-refundable unless the assigned designer explicitly agrees otherwise before work begins.',
+                '> **2. Reviews & Reputation**\n> Review previous commissions and designer feedback before placing an order.',
+                '> **3. Order Completion**\n> The timeframe provided by the designer is final. Avoid unnecessary pings unless you have important updates.',
+                '> **4. Cancellation Policy**\n> Cancelling after work begins may result in a blacklist. Responsible cancellations require early notice and a 15% cancellation fee.',
+                '> **5. Advance Payments**\n> Advance payment requirements and percentages are at the designer\'s discretion.',
+                '> **6. Completion Acceptance**\n> Once the customer and designer confirm completion, further complaints, revisions, or disputes will not be accepted.',
+                '> **7. Customer-Designer Agreement**\n> Before work begins, the designer must explain pricing, revisions, delivery expectations, and terms. Proceeding means the customer accepts them.',
+                '',
+                '*Confirm everything twice before proceeding. Refusing payment after completion does not resolve an order.*',
+            ].join('\n\n'),
             careers: 'No careers information has been set yet.',
             dashboardIntro: 'Welcome to our dashboard. This is your go-to destination for important information, services, and resources.',
             affiliationsIntro: 'Welcome to our Affiliations! Explore our handpicked affiliate communities below.',
