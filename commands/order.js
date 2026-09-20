@@ -12,7 +12,7 @@ const config = require('../utils/config');
 const orders = require('../utils/orders');
 const jobs = require('../utils/jobs');
 const perms = require('../utils/permissions');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed, parseColor } = require('../utils/embeds');
 
 // ============================================================
 // Sales ledger (log / status / view / history / reset) — money
@@ -38,11 +38,10 @@ function orderButtons(order) {
 function orderEmbed(cfg, order) {
     const designerTag = order.designerId ? `<@${order.designerId}>` : 'Unknown';
     const customerTag = order.customerId ? `<@${order.customerId}>` : 'Unknown';
-    return new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle('Order Log')
-        .setDescription(`Order for **${order.product}** logged by ${designerTag}.`)
-        .addFields(
+    return baseEmbed(cfg, {
+        title: 'Astra Customs | Order Log',
+        description: `Order for **${order.product}** logged by ${designerTag}.`,
+        fields: [
             { name: 'Designer', value: designerTag, inline: true },
             { name: 'Customer', value: customerTag, inline: true },
             { name: 'Product', value: order.product, inline: true },
@@ -50,9 +49,10 @@ function orderEmbed(cfg, order) {
             { name: 'Price (with tax)', value: `R$${order.price}`, inline: true },
             { name: 'Designer Earning', value: `R$${order.designerEarning}`, inline: true },
             { name: 'Status', value: order.status, inline: true },
-        )
-        .setFooter({ text: `Order ID: #${order.id}` })
-        .setTimestamp(order.createdAt);
+        ],
+        footer: `Order ID: #${order.id}`,
+        timestamp: order.createdAt,
+    });
 }
 
 async function refreshOrderMessage(client, cfg, order) {
@@ -85,16 +85,17 @@ function jobInstanceButtons(job, instance) {
 }
 
 function jobInstanceEmbed(cfg, job, instance) {
-    return new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .addFields(
+    return baseEmbed(cfg, {
+        title: `Astra Customs | Design Job ${job.orderNumber}`,
+        fields: [
             { name: 'Order', value: `${job.orderNumber}`, inline: true },
             { name: 'Instance', value: `${instance.instance}/${job.instances.length}`, inline: true },
             { name: 'Type', value: job.type, inline: true },
             { name: 'Channel', value: job.channelId ? `<#${job.channelId}>` : '#unknown', inline: true },
             { name: 'Designer Type', value: job.designerRoleId ? `<@&${job.designerRoleId}>` : 'Any', inline: true },
             { name: 'Notes', value: job.notes || 'None' },
-        );
+            ],
+            });
 }
 
 module.exports = {

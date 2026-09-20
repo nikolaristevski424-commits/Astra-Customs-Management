@@ -56,9 +56,10 @@ function baseEmbed(config, opts = {}) {
     if (opts.title) embed.setTitle(opts.title);
     if (opts.description) embed.setDescription(opts.description);
     if (opts.fields) embed.addFields(opts.fields);
-    if (opts.image) embed.setImage(opts.image);
-    if (opts.footer) embed.setFooter({ text: opts.footer });
+    if (opts.image || config.bannerUrl) embed.setImage(opts.image || config.bannerUrl);
+    if (opts.footer || config.footerUrl) embed.setFooter({ text: opts.footer || config.brandName, ...(config.footerUrl ? { iconURL: config.footerUrl } : {}) });
     if (opts.thumbnail) embed.setThumbnail(opts.thumbnail);
+    if (opts.timestamp) embed.setTimestamp(opts.timestamp);
     return embed;
 }
 

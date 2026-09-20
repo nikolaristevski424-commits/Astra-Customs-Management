@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const giveaways = require('../utils/giveaways');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 
 const PING_CHOICES = [
     { name: 'No ping', value: 'none' },
@@ -13,16 +13,16 @@ const PING_CHOICES = [
 
 function buildEmbed(cfg, giveaway) {
     const ended = giveaway.status === 'ended';
-    const embed = new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle(ended ? '🎉 Giveaway Ended' : giveaway.sponsor ? `🎉 Giveaway — Sponsored by ${giveaway.sponsor}` : '🎉 Giveaway')
-        .setDescription(`**Prize:** ${giveaway.prize}`)
-        .addFields(
+    const embed = baseEmbed(cfg, {
+        title: ended ? 'Giveaway Ended' : giveaway.sponsor ? `Giveaway | Sponsored by ${giveaway.sponsor}` : 'Giveaway',
+        description: `**Prize:** ${giveaway.prize}`,
+        fields: [
             { name: 'Winners', value: `${giveaway.winnerCount}`, inline: true },
             { name: 'Entrants', value: `${giveaway.entrantIds.length}`, inline: true },
             { name: 'Hosted by', value: userMention(giveaway.hostedBy), inline: true },
-        )
-        .setFooter({ text: `Giveaway #${giveaway.id}` });
+        ],
+        footer: `Giveaway #${giveaway.id}`,
+    });
 
     if (giveaway.sponsor) {
         embed.addFields({ name: 'Sponsored by', value: giveaway.sponsorInvite ? `[${giveaway.sponsor}](${giveaway.sponsorInvite})` : giveaway.sponsor, inline: true });

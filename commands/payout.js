@@ -2,22 +2,22 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const config = require('../utils/config');
 const { isExecutive } = require('../utils/env');
 const payoutRequests = require('../utils/payoutRequests');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 
 function buildEmbed(cfg, record) {
-    return new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle('Robux Payout Request')
-        .addFields(
+    return baseEmbed(cfg, {
+        title: 'Astra Customs | Robux Payout Request',
+        fields: [
             { name: 'Requested by', value: userMention(record.requestedBy), inline: true },
             { name: 'Amount', value: `R$${record.amount}`, inline: true },
             { name: 'Roblox username', value: record.robloxUsername, inline: true },
             { name: 'Reason', value: record.reason },
             { name: 'Status', value: record.status, inline: true },
             ...(record.paidBy ? [{ name: 'Paid by', value: userMention(record.paidBy), inline: true }] : []),
-        )
-        .setFooter({ text: `Payout request #${record.id}` })
-        .setTimestamp(record.createdAt);
+            ],
+            footer: `Payout request #${record.id}`,
+            timestamp: record.createdAt,
+            });
 }
 
 function buildButtons(record) {

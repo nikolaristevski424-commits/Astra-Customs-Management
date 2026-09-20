@@ -3,20 +3,20 @@ const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const bundles = require('../utils/bundles');
 const { createCatalogThread } = require('../utils/catalogThreads');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 
 function buildEmbed(cfg, record) {
-    return new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle('VD | Bundle Request')
-        .addFields(
+    return baseEmbed(cfg, {
+        title: 'Astra Customs | Bundle Request',
+        fields: [
             { name: 'Bundle type', value: record.bundleType },
             { name: 'Designer', value: userMention(record.designerId) },
             { name: 'Total after tax', value: `${record.totalAfterTax}` },
             { name: 'Notes', value: record.notes || 'None' },
             { name: 'Status', value: record.status },
-        )
-        .setFooter({ text: `Bundle request #${record.id}` });
+        ],
+        footer: `Bundle request #${record.id}`,
+    });
 }
 
 function buildButtons(record) {
