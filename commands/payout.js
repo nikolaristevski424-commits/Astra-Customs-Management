@@ -7,6 +7,7 @@ const { baseEmbed } = require('../utils/embeds');
 function buildEmbed(cfg, record) {
     return baseEmbed(cfg, {
         title: 'Astra Customs | Robux Payout Request',
+        bannerKey: 'payout',
         fields: [
             { name: 'Requested by', value: userMention(record.requestedBy), inline: true },
             { name: 'Amount', value: `R$${record.amount}`, inline: true },

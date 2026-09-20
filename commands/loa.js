@@ -2,7 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const config = require('../utils/config');
 const loa = require('../utils/loa');
 const perms = require('../utils/permissions');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 
 function parseDate(str) {
     const ms = Date.parse(str.includes('T') ? str : `${str}T00:00:00Z`);
@@ -10,8 +10,8 @@ function parseDate(str) {
 }
 
 /**
- * Shared by /loa request and the dashboard's "Request LOA" button/modal.
- * Returns a user-facing result message; the caller decides how to reply.
+ * Shared by /loa request. Returns a user-facing result message; the caller
+ * decides how to reply.
  */
 async function submitRequest(interaction, { startInput, endInput, reason }) {
     const guildId = interaction.guildId;
@@ -34,16 +34,17 @@ async function submitRequest(interaction, { startInput, endInput, reason }) {
     }
 
     const channel = await interaction.client.channels.fetch(cfg.loaChannelId).catch(() => null);
-    const embed = new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle('Leave of Absence Request')
-        .addFields(
+    const embed = baseEmbed(cfg, {
+        title: 'Leave of Absence Request',
+        bannerKey: 'loa',
+        fields: [
             { name: 'User', value: userMention(interaction.user.id), inline: true },
             { name: 'Start', value: `<t:${Math.floor(startDate / 1000)}:D>`, inline: true },
             { name: 'End', value: `<t:${Math.floor(endDate / 1000)}:D>`, inline: true },
             { name: 'Reason', value: reason },
-        )
-        .setFooter({ text: `LOA ID: ${record.id}` });
+        ],
+        footer: `LOA ID: ${record.id}`,
+    });
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`loa_approve_${record.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),

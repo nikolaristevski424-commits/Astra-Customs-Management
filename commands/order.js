@@ -40,6 +40,7 @@ function orderEmbed(cfg, order) {
     const customerTag = order.customerId ? `<@${order.customerId}>` : 'Unknown';
     return baseEmbed(cfg, {
         title: 'Astra Customs | Order Log',
+        bannerKey: 'order',
         description: `Order for **${order.product}** logged by ${designerTag}.`,
         fields: [
             { name: 'Designer', value: designerTag, inline: true },
@@ -87,6 +88,7 @@ function jobInstanceButtons(job, instance) {
 function jobInstanceEmbed(cfg, job, instance) {
     return baseEmbed(cfg, {
         title: `Astra Customs | Design Job ${job.orderNumber}`,
+        bannerKey: 'order',
         fields: [
             { name: 'Order', value: `${job.orderNumber}`, inline: true },
             { name: 'Instance', value: `${instance.instance}/${job.instances.length}`, inline: true },

@@ -19,6 +19,7 @@ const { ICONS: SERVICE_ICONS } = require('./service');
 const { parseColor } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const { isExecutive } = require('../utils/env');
+const { banner, FOOTER } = require('../utils/brandAssets');
 
 const DEFAULT_SERVICES = { Liveries: 'available', Clothing: 'available', Graphics: 'available', Photography: 'available', Discord: 'available' };
 
@@ -28,12 +29,12 @@ function addPanelChannel(subcommand) {
 
 function baseContainer(cfg) {
     const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
-    if (cfg.bannerUrl) container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl } }]));
+    container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl || banner('dashboard') } }]));
     return container;
 }
 
 function withFooter(container, cfg) {
-    if (cfg.footerUrl) container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.footerUrl } }]));
+    container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.footerUrl || FOOTER } }]));
     return container;
 }
 
@@ -62,7 +63,6 @@ function dashboardPanel(cfg) {
     const primaryButtons = [
         new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
         new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎧'),
-        new ButtonBuilder().setCustomId('dashboard_loa').setLabel('Request LOA').setStyle(ButtonStyle.Secondary).setEmoji('🌴'),
     ];
     const applicationButtons = [
         new ButtonBuilder().setCustomId('application_staff_open').setLabel('Staff Application').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),

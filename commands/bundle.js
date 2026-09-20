@@ -8,6 +8,7 @@ const { baseEmbed } = require('../utils/embeds');
 function buildEmbed(cfg, record) {
     return baseEmbed(cfg, {
         title: 'Astra Customs | Bundle Request',
+        bannerKey: 'bundle',
         fields: [
             { name: 'Bundle type', value: record.bundleType },
             { name: 'Designer', value: userMention(record.designerId) },

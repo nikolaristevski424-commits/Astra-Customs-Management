@@ -15,6 +15,7 @@ function buildEmbed(cfg, giveaway) {
     const ended = giveaway.status === 'ended';
     const embed = baseEmbed(cfg, {
         title: ended ? 'Giveaway Ended' : giveaway.sponsor ? `Giveaway | Sponsored by ${giveaway.sponsor}` : 'Giveaway',
+        bannerKey: 'giveaway',
         description: `**Prize:** ${giveaway.prize}`,
         fields: [
             { name: 'Winners', value: `${giveaway.winnerCount}`, inline: true },

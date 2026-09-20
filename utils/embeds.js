@@ -5,6 +5,7 @@ const {
     SeparatorBuilder,
     EmbedBuilder,
 } = require('discord.js');
+const { banner, FOOTER } = require('./brandAssets');
 
 /** Parse "#2d2d31" (or "2d2d31") into a numeric color, falling back safely. */
 function parseColor(hex, fallback = 0x2d2d31) {
@@ -24,9 +25,9 @@ function parseColor(hex, fallback = 0x2d2d31) {
 function buildPanel(config, { heading, body, extraBlocks = [] } = {}) {
     const container = new ContainerBuilder().setAccentColor(parseColor(config.accentColor));
 
-    if (config.bannerUrl) {
+    if (config.bannerUrl || banner('dashboard')) {
         container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: config.bannerUrl } }])
+            new MediaGalleryBuilder().addItems([{ media: { url: config.bannerUrl || banner('dashboard') } }])
         );
     }
 
@@ -41,9 +42,9 @@ function buildPanel(config, { heading, body, extraBlocks = [] } = {}) {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(block));
     }
 
-    if (config.footerUrl) {
+    if (config.footerUrl || FOOTER) {
         container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: config.footerUrl } }])
+            new MediaGalleryBuilder().addItems([{ media: { url: config.footerUrl || FOOTER } }])
         );
     }
 
@@ -56,8 +57,8 @@ function baseEmbed(config, opts = {}) {
     if (opts.title) embed.setTitle(opts.title);
     if (opts.description) embed.setDescription(opts.description);
     if (opts.fields) embed.addFields(opts.fields);
-    if (opts.image || config.bannerUrl) embed.setImage(opts.image || config.bannerUrl);
-    if (opts.footer || config.footerUrl) embed.setFooter({ text: opts.footer || config.brandName, ...(config.footerUrl ? { iconURL: config.footerUrl } : {}) });
+    if (opts.image || config.bannerUrl || opts.bannerKey) embed.setImage(opts.image || config.bannerUrl || banner(opts.bannerKey));
+    embed.setFooter({ text: opts.footer || config.brandName, iconURL: config.footerUrl || FOOTER });
     if (opts.thumbnail) embed.setThumbnail(opts.thumbnail);
     if (opts.timestamp) embed.setTimestamp(opts.timestamp);
     return embed;

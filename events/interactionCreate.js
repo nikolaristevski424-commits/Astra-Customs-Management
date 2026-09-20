@@ -420,20 +420,6 @@ async function handleButton(interaction) {
         return interaction.showModal(modal);
     }
 
-    // ---- Dashboard: Request LOA ----
-    if (customId === 'dashboard_loa') {
-        if (!perms.isStaff(interaction.member, cfg)) {
-            return interaction.reply({ content: 'Leave of Absence requests are for staff members.', ephemeral: true });
-        }
-        const modal = new ModalBuilder().setCustomId('loa_request_modal').setTitle('Request a Leave of Absence');
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('start').setLabel('Start date (YYYY-MM-DD)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('end').setLabel('End date (YYYY-MM-DD)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500)),
-        );
-        return interaction.showModal(modal);
-    }
-
     // ---- Dashboard: staff/designer applications ----
     if (customId === 'application_staff_open' || customId === 'application_designer_open') {
         const type = customId === 'application_staff_open' ? 'staff' : 'designer';
