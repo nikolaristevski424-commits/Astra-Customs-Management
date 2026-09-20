@@ -108,13 +108,20 @@ function ticketsPanel(cfg) {
     );
     container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
             new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Help').setStyle(ButtonStyle.Danger).setEmoji('🎫'),
         ),
+    );
+    withFooter(container, cfg);
+    return { components: [container] };
+}
+
+function orderPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Ordering\n\nStart an order request here. Your answers create a private order channel for the customer and staff team.`));
+    container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('application_staff_open').setLabel('Staff Application').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
-            new ButtonBuilder().setCustomId('application_designer_open').setLabel('Designer Application').setStyle(ButtonStyle.Primary).setEmoji('🎨'),
-        ),
+            new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
+        )
     );
     withFooter(container, cfg);
     return { components: [container] };
@@ -167,6 +174,7 @@ const BUILDERS = {
     guidelines: (cfg) => guidelinesPanel(cfg),
     'order-status': (cfg) => orderStatusPanel(cfg),
     tickets: (cfg) => ticketsPanel(cfg),
+    order: (cfg) => orderPanel(cfg),
     affiliations: (cfg, guildId) => affiliationsPanel(cfg, guildId),
     honeypot: (cfg) => honeypotPanel(cfg),
     portfolio: (cfg, guildId) => portfolioPanel(cfg, guildId),
@@ -181,7 +189,8 @@ module.exports = {
         .addSubcommand((sub) => addPanelChannel(sub.setName('dashboard').setDescription('Send the main dashboard panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('guidelines').setDescription('Send the guidelines panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('order-status').setDescription('Send the service status panel.')))
-        .addSubcommand((sub) => addPanelChannel(sub.setName('tickets').setDescription('Send the ticket and order panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('tickets').setDescription('Send the support ticket panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('order').setDescription('Send the customer order panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('prices').setDescription('Send the Robux price list.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('portfolio').setDescription('Send the portfolio panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('affiliations').setDescription('Send the affiliations panel.')))

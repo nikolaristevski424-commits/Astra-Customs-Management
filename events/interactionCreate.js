@@ -114,6 +114,7 @@ async function handleButton(interaction) {
         const updated = orders.updateOrder(guildId, id, { status: newStatus });
 
         await interaction.update({ embeds: [orderCmd.orderEmbed(cfg, updated)], components: [new ActionRowBuilder().addComponents(orderCmd.orderButtons(updated))] });
+        if (newStatus === 'Void') await interaction.followUp({ content: `Order **#${id}** has been marked **VOIDED** by <@${interaction.user.id}>.`, allowedMentions: { users: [interaction.user.id] } });
         return;
     }
 

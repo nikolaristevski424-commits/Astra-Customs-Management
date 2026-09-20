@@ -201,13 +201,12 @@ function buildLinkMessage(cfg, gamePassId, price, discount = null) {
         roblox.gamePassLink(gamePassId),
     ].filter(Boolean);
     if (cfg.gamePlaceId) {
-        lines.push('', `If the buyer is under 13 and the link above doesn't work for them, have them join the game directly and buy it in-game:`, roblox.gamePlaceLink(cfg.gamePlaceId));
+        lines.push('', 'If you are under 13 and the purchase link is locked, request access from staff. Do not join the game to bypass the purchase restriction.');
     }
     return lines.join('\n');
 }
 
 function buildLinkButtons(cfg, gamePassId) {
     const buttons = [new ButtonBuilder().setLabel('Payment Link').setStyle(ButtonStyle.Link).setURL(roblox.gamePassLink(gamePassId))];
-    if (cfg.gamePlaceId) buttons.push(new ButtonBuilder().setLabel('Join Game').setStyle(ButtonStyle.Link).setURL(roblox.gamePlaceLink(cfg.gamePlaceId)));
     return new ActionRowBuilder().addComponents(buttons);
 }

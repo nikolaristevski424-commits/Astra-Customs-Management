@@ -59,7 +59,7 @@ module.exports = {
                             `**Promotion ID** \`-\` ${promotion.promotionId}`,
                         ],
                     });
-                    await channel.send({ flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions: { parse: [] } });
+                    await channel.send({ content: `<@${user.id}>`, flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions: { users: [user.id] } });
                 }
             }
 
