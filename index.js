@@ -1,7 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
 
 if (!process.env.BOT_TOKEN) {
     console.error('Missing BOT_TOKEN in .env — copy .env.example to .env and fill it in.');
@@ -40,6 +40,23 @@ for (const file of fs.readdirSync(eventsDir).filter((f) => f.endsWith('.js'))) {
 }
 console.log(`[index] Loaded event handlers.`);
 
+async function deployGuildCommands() {
+    if (!process.env.CLIENT_ID || !process.env.GUILD_ID || process.env.CLIENT_ID === 'your_application_id_here' || process.env.GUILD_ID === 'your_test_server_id_here') {
+        console.warn('[index] CLIENT_ID/GUILD_ID missing or still placeholder; slash commands were not deployed.');
+        return;
+    }
+
+    const rest = new REST().setToken(process.env.BOT_TOKEN);
+    try {
+        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), {
+            body: [...client.commands.values()].map((command) => command.data.toJSON()),
+        });
+        console.log(`[index] Deployed ${client.commands.size} slash command(s) to guild ${process.env.GUILD_ID}.`);
+    } catch (error) {
+        console.error('[index] Slash-command deployment failed:', error.message);
+    }
+}
+
 process.on('unhandledRejection', (err) => console.error('[index] Unhandled promise rejection:', err));
 
-client.login(process.env.BOT_TOKEN);
+deployGuildCommands().finally(() => client.login(process.env.BOT_TOKEN));
