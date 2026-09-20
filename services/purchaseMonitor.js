@@ -111,8 +111,8 @@ function start(client) {
     let noblox;
     try {
         noblox = require('noblox.js');
-    } catch {
-        console.log('[purchaseMonitor] noblox.js not installed — purchase monitoring disabled.');
+    } catch (error) {
+        console.error('[purchaseMonitor] Could not load noblox.js; purchase monitoring disabled:', error.message);
         return;
     }
 
