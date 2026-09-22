@@ -27,9 +27,9 @@ function addPanelChannel(subcommand) {
     return subcommand.addChannelOption((o) => o.setName('channel').setDescription('Channel to send the panel to').addChannelTypes(ChannelType.GuildText));
 }
 
-function baseContainer(cfg) {
+function baseContainer(cfg, key = 'dashboard') {
     const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
-    container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl || banner('dashboard') } }]));
+    container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems([{ media: { url: cfg.bannerUrl || banner(key) } }]));
     return container;
 }
 
@@ -39,7 +39,7 @@ function withFooter(container, cfg) {
 }
 
 function dashboardPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'dashboard');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName}\n\n${cfg.text.dashboardIntro}`));
     container.addSeparatorComponents(new SeparatorBuilder());
 
@@ -74,7 +74,7 @@ function dashboardPanel(cfg) {
 }
 
 function guidelinesPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'guidelines');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Discord Guidelines\n\n${cfg.text.guidelines}`));
     container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -89,7 +89,7 @@ function guidelinesPanel(cfg) {
 
 function orderStatusPanel(cfg) {
     const services = Object.keys(cfg.serviceStatus || {}).length ? cfg.serviceStatus : DEFAULT_SERVICES;
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'status');
     const lines = ['## Order Status', '', 'Below is the current availability of all order statuses.', ''];
     for (const [name, status] of Object.entries(services)) {
         lines.push(`**${name}:** ${SERVICE_ICONS[status] || '❓'}`);
@@ -100,7 +100,7 @@ function orderStatusPanel(cfg) {
 }
 
 function ticketsPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'dashboard');
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
             `## ${cfg.brandName} Assistance\n\nHere, you can request support with any questions, issues, or concerns you may have. Please remain **respectful and patient** while communicating with our support team. Disrespectful behavior may result in moderation action. Once your ticket has been submitted, please allow a support agent time to review your request and assist you.`
@@ -116,7 +116,7 @@ function ticketsPanel(cfg) {
 }
 
 function orderPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'order');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Ordering\n\nStart an order request here. Your answers create a private order channel for the customer and staff team.`));
     container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -128,7 +128,7 @@ function orderPanel(cfg) {
 }
 
 function affiliationsPanel(cfg, guildId) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'dashboard');
     const all = affiliations.list(guildId);
     const lines = ['## Affiliations', '', cfg.text.affiliationsIntro, ''];
     lines.push(all.length ? all.map((a) => `**${a.name}** — ${a.invite}`).join('\n') : '*No current affiliations.*');
@@ -138,7 +138,7 @@ function affiliationsPanel(cfg, guildId) {
 }
 
 function honeypotPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'default');
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
             [
@@ -158,7 +158,7 @@ function honeypotPanel(cfg) {
 
 function portfolioPanel(cfg, guildId) {
     const pieces = portfolio.list(guildId).slice(-10).reverse();
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'portfolio');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Portfolio`));
     if (pieces.length) {
         container.addSeparatorComponents(new SeparatorBuilder());

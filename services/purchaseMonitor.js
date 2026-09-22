@@ -31,12 +31,7 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
         ? `<@${discordId}> ([${buyerName}](https://www.roblox.com/users/${buyerId}/profile))`
         : `[${buyerName}](https://www.roblox.com/users/${buyerId}/profile)`;
 
-    const descriptionLines = [
-        `**Buyer:** ${buyerLine}`,
-        `**Item:** ${purchasedLink ? `[${itemName}](${purchasedLink})` : itemName}`,
-        `**Amount After Tax:** R$${price}`,
-        `**Purchased:** <t:${unixTimestamp}:R>`,
-    ];
+    const descriptionLines = [];
 
     if (discordId && cfg.autoCreditPercent > 0) {
         const awarded = Math.floor(price * (cfg.autoCreditPercent / 100));
@@ -46,7 +41,17 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
         }
     }
 
-    const embed = baseEmbed(cfg, { title: 'Purchase Log', description: descriptionLines.join('\n') });
+    const embed = baseEmbed(cfg, {
+        title: 'Purchase Confirmed',
+        bannerKey: 'order',
+        description: descriptionLines.length ? descriptionLines.join('\n') : 'A Roblox purchase was detected and recorded.',
+        fields: [
+            { name: 'Buyer', value: buyerLine, inline: true },
+            { name: 'Item', value: purchasedLink ? `[${itemName}](${purchasedLink})` : itemName, inline: true },
+            { name: 'Amount After Tax', value: `R$${price}`, inline: true },
+        ],
+        timestamp: transaction.created,
+    });
 
     if (cfg.purchaseLogChannelId) {
         try {
@@ -57,7 +62,22 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
         }
     }
 
-    const reservation = itemId ? paymentPool.findReservation(guildId, String(itemId)) : null;
+    let reservation = null;
+    if (itemId) {
+        reservation = paymentPool.findReservation(guildId, String(itemId));
+        if (reservation) {
+            paymentPool.release(guildId, String(itemId));
+        }
+    }
+
+    if (!reservation && transaction.details?.gamepassId) {
+        const gamePassId = String(transaction.details.gamepassId);
+        reservation = paymentPool.findReservation(guildId, gamePassId);
+        if (reservation) {
+            paymentPool.release(guildId, gamePassId);
+        }
+    }
+
     if (!reservation?.packageId) return;
 
     const pkg = packages.find(guildId, reservation.packageId);
@@ -75,7 +95,6 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
             content: `Your purchase of **${pkg.name}** is confirmed. Thank you! Your files are attached below.`,
             files: pkg.files.map((file) => ({ attachment: file.url, name: file.name })),
         });
-        paymentPool.release(guildId, String(itemId));
         console.log(`[purchaseMonitor] Automatically delivered package #${pkg.id} to Discord user ${recipientId}.`);
     } catch (err) {
         console.error(`[purchaseMonitor] Could not DM package #${pkg.id} to Discord user ${recipientId}:`, err.message);

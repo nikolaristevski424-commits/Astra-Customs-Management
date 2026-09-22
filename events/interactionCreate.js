@@ -46,14 +46,14 @@ module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         try {
-            if (interaction.isChatInputCommand()) return handleSlash(interaction);
-            if (interaction.isAutocomplete()) return handleAutocomplete(interaction);
-            if (interaction.isButton()) return handleButton(interaction);
-            if (interaction.isStringSelectMenu()) return handleSelect(interaction);
-            if (interaction.isModalSubmit()) return handleModal(interaction);
+            if (interaction.isChatInputCommand()) return await handleSlash(interaction);
+            if (interaction.isAutocomplete()) return await handleAutocomplete(interaction);
+            if (interaction.isButton()) return await handleButton(interaction);
+            if (interaction.isStringSelectMenu()) return await handleSelect(interaction);
+            if (interaction.isModalSubmit()) return await handleModal(interaction);
         } catch (err) {
             console.error('[interactionCreate] Unhandled error:', err);
-            const payload = { content: 'Something went wrong handling that. Check the bot console.', ephemeral: true };
+            const payload = { content: 'Something went wrong handling that. Check the bot console.', flags: MessageFlags.Ephemeral };
             if (interaction.deferred || interaction.replied) {
                 await interaction.followUp(payload).catch(() => {});
             } else if (interaction.isRepliable?.()) {
@@ -323,10 +323,17 @@ async function handleButton(interaction) {
             try {
                 const buffer = await releaseCmd.downloadFile(finalRelease.fileUrl);
                 const file = new AttachmentBuilder(buffer, { name: finalRelease.fileName });
-                await interaction.channel.send({ content: '🎉 Goal reached! Download:', files: [file] });
+                await interaction.channel.send({
+                    content: '<@&1511583479240986674> 🎉 Goal reached! The free release is unlocked. Download below:',
+                    files: [file],
+                    allowedMentions: { roles: ['1511583479240986674'] },
+                });
             } catch (err) {
                 console.error('[release] Failed to re-post file:', err.message);
-                await interaction.channel.send({ content: `🎉 Goal reached! Download: ${finalRelease.fileUrl}` }).catch(() => {});
+                await interaction.channel.send({
+                    content: `<@&1511583479240986674> 🎉 Goal reached! Download: ${finalRelease.fileUrl}`,
+                    allowedMentions: { roles: ['1511583479240986674'] },
+                }).catch(() => {});
             }
             return;
         }
@@ -406,10 +413,12 @@ async function handleButton(interaction) {
     if (customId === 'order_open') {
         const modal = new ModalBuilder().setCustomId('order_open_modal').setTitle('New Order');
         modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('product').setLabel('What would you like designed?').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deadline').setLabel('Deadline').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('budget').setLabel('Budget in Robux').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(50)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('details').setLabel('Order details and references').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1500)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('product').setLabel('What would you like designed?').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(120)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('style').setLabel('Design style / vibe').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(120)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deadline').setLabel('Deadline / preferred finish date').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(120)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('budget').setLabel('Budget in Robux').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('references').setLabel('Any references / examples?').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('details').setLabel('Tell us more about the order').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1800)),
         );
         return interaction.showModal(modal);
     }
@@ -605,8 +614,10 @@ async function handleModal(interaction) {
 
     if (customId === 'order_open_modal') {
         const product = interaction.fields.getTextInputValue('product');
+        const style = interaction.fields.getTextInputValue('style') || 'Not specified';
         const deadline = interaction.fields.getTextInputValue('deadline');
         const budget = interaction.fields.getTextInputValue('budget');
+        const references = interaction.fields.getTextInputValue('references') || 'None provided';
         const details = interaction.fields.getTextInputValue('details');
 
         if (!cfg.orderCategoryId) {
@@ -630,7 +641,7 @@ async function handleModal(interaction) {
             permissionOverwrites: overwrites,
         });
 
-        const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details });
+        const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details, style, references });
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
@@ -638,22 +649,25 @@ async function handleModal(interaction) {
         await channel.send({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
             embeds: [{
-                title: 'New Order',
-                description: 'Please send any references in this channel. A designer will review your request as soon as possible.',
-                color: 0x2d2d31,
+                title: 'New Order Request',
+                description: 'A designer will review this request and respond in this channel as soon as possible.',
+                color: 0x1e90ff,
                 fields: [
-                    { name: 'Product', value: product, inline: false },
-                    { name: 'Deadline', value: deadline, inline: true },
-                    { name: 'Budget', value: budget, inline: true },
-                    { name: 'Order Information', value: details, inline: false },
+                    { name: 'Product', value: product || 'Not specified', inline: false },
+                    { name: 'Style / Vibe', value: style || 'Not specified', inline: true },
+                    { name: 'Deadline', value: deadline || 'Not specified', inline: true },
+                    { name: 'Budget', value: budget || 'Not specified', inline: true },
+                    { name: 'References', value: references || 'None provided', inline: false },
+                    { name: 'Details', value: details || 'No extra details provided', inline: false },
                     { name: 'Status', value: 'Open', inline: true },
                 ],
                 footer: { text: `Order ticket • ${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : ''}` },
+                timestamp: new Date().toISOString(),
             }],
             components: [row],
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
         });
-        return interaction.editReply(`Your order channel is ready: <#${channel.id}>`);
+        return interaction.editReply(`Your order request is ready: <#${channel.id}>`);
     }
 
     if (customId === 'ticket_open_modal') {
@@ -720,12 +734,16 @@ async function handleModal(interaction) {
         const answers = Object.fromEntries(['why_join', 'activity', 'experience', 'difficult_customer', 'roblox_username', 'portfolio', 'software', 'specialties']
             .map((field) => [field, interaction.fields.fields.has(field) ? interaction.fields.getTextInputValue(field) : null]));
 
+        await interaction.deferReply({ ephemeral: true });
+
         if (!cfg.applicationsChannelId) {
-            return interaction.reply({ content: 'Applications are not configured yet. Ask an administrator to set `APPLICATIONS_CHANNEL_ID` in `.env`.', ephemeral: true });
+            return interaction.editReply('Applications are not configured yet. Ask an administrator to set `APPLICATIONS_CHANNEL_ID` in `.env`.');
         }
 
         const channel = await interaction.client.channels.fetch(cfg.applicationsChannelId).catch(() => null);
-        if (!channel) return interaction.reply({ content: 'The configured applications channel could not be reached. Please contact an administrator.', ephemeral: true });
+        if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
+            return interaction.editReply('The configured applications channel is not a usable server text channel. Please contact an administrator.');
+        }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`app_accept_${type}_${interaction.user.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
@@ -750,16 +768,21 @@ async function handleModal(interaction) {
                 { name: 'Specialties', value: answers.specialties },
             );
         }
-        await channel.send({
-            content: cfg.applicationReviewerRoleId ? `<@&${cfg.applicationReviewerRoleId}>` : undefined,
-            embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
-            components: [row],
-            allowedMentions: { roles: cfg.applicationReviewerRoleId ? [cfg.applicationReviewerRoleId] : [] },
-        });
+        try {
+            await channel.send({
+                content: cfg.applicationReviewerRoleId ? `<@&${cfg.applicationReviewerRoleId}>` : undefined,
+                embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
+                components: [row],
+                allowedMentions: { roles: cfg.applicationReviewerRoleId ? [cfg.applicationReviewerRoleId] : [] },
+            });
+        } catch (error) {
+            console.error('[applications] Failed to send application:', error.message);
+            return interaction.editReply('Your application could not be delivered. Please contact an administrator to check the applications channel permissions.');
+        }
 
         await interaction.user.send(`Your **${type} application** was submitted to **${cfg.brandName}**. The team will review it and DM you when a decision is made.`).catch(() => {});
 
-        return interaction.reply({ content: 'Your application has been submitted!', ephemeral: true });
+        return interaction.editReply('Your application has been submitted!');
     }
 
     if (customId.startsWith('text_edit_')) {

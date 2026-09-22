@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { downloadBuffer } = require('../utils/http');
+const { Jimp, loadFont, measureText } = require('jimp');
+const path = require('path');
 
 const WIDTH = 700;
 const HEIGHT = 900;
@@ -31,6 +33,23 @@ function buildTextSvg({ username, reward }) {
     </svg>`;
 }
 
+function fontPath(size) {
+    return path.join(__dirname, '..', 'node_modules', '@jimp', 'plugin-print', 'dist', 'fonts', 'open-sans', `open-sans-${size}-white`, `open-sans-${size}-white.fnt`);
+}
+
+function drawBorder(image, x, y, width, height, thickness, color) {
+    for (let line = 0; line < thickness; line += 1) {
+        for (let px = x + line; px < x + width - line; px += 1) {
+            image.setPixelColor(color, px, y + line);
+            image.setPixelColor(color, px, y + height - line - 1);
+        }
+        for (let py = y + line; py < y + height - line; py += 1) {
+            image.setPixelColor(color, x + line, py);
+            image.setPixelColor(color, x + width - line - 1, py);
+        }
+    }
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('wanted')
@@ -39,13 +58,6 @@ module.exports = {
         .addIntegerOption((o) => o.setName('reward').setDescription('Reward amount to show, e.g. 500').setMinValue(0)),
 
     async execute(interaction) {
-        let sharp;
-        try {
-            sharp = require('sharp');
-        } catch {
-            return interaction.reply({ content: 'The `sharp` package is not installed on this bot. Run `npm install` and restart.', ephemeral: true });
-        }
-
         const target = interaction.options.getUser('user') || interaction.user;
         const reward = interaction.options.getInteger('reward');
 
@@ -54,17 +66,29 @@ module.exports = {
         try {
             const avatarUrl = target.displayAvatarURL({ extension: 'png', size: 512 });
             const avatarBuffer = await downloadBuffer(avatarUrl);
-            const avatarResized = await sharp(avatarBuffer).resize(FRAME.size, FRAME.size).png().toBuffer();
+            const poster = new Jimp({ width: WIDTH, height: HEIGHT, color: 0xe8d3a0ff });
+            const avatar = await Jimp.read(avatarBuffer);
+            avatar.resize({ w: FRAME.size, h: FRAME.size });
+            poster.composite(avatar, FRAME.x, FRAME.y);
 
-            const poster = await sharp(Buffer.from(buildBaseSvg()))
-                .composite([
-                    { input: avatarResized, top: FRAME.y, left: FRAME.x },
-                    { input: Buffer.from(buildTextSvg({ username: target.username, reward })), top: 0, left: 0 },
-                ])
-                .png()
-                .toBuffer();
+            const brown = 0x4a3320ff;
+            drawBorder(poster, 20, 20, WIDTH - 40, HEIGHT - 40, 8, brown);
+            drawBorder(poster, 36, 36, WIDTH - 72, HEIGHT - 72, 2, brown);
+            drawBorder(poster, FRAME.x - 10, FRAME.y - 10, FRAME.size + 20, FRAME.size + 20, 6, brown);
+            drawBorder(poster, FRAME.x - 4, FRAME.y - 4, FRAME.size + 8, FRAME.size + 8, 2, brown);
 
-            const file = new AttachmentBuilder(poster, { name: 'wanted.png' });
+            const titleFont = await loadFont(fontPath(64));
+            const bodyFont = await loadFont(fontPath(32));
+            const smallFont = await loadFont(fontPath(16));
+            const printCentered = (font, text, y) => poster.print({ font, x: (WIDTH - measureText(font, text)) / 2, y, text });
+            printCentered(titleFont, 'WANTED', 70);
+            printCentered(bodyFont, 'DEAD OR ALIVE', 690);
+            if (reward) printCentered(bodyFont, `REWARD: R$${reward}`, 735);
+            printCentered(smallFont, target.username, 800);
+
+            const posterBuffer = await poster.getBuffer('image/png');
+
+            const file = new AttachmentBuilder(posterBuffer, { name: 'wanted.png' });
             await interaction.editReply({ files: [file] });
         } catch (err) {
             console.error('[wanted] error:', err);

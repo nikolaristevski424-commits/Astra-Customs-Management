@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420" role="img" aria-label="Astra Customs Portfolio banner">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop offset="0%" stop-color="#010b1b"/>
+      <stop offset="40%" stop-color="#03162d"/>
+      <stop offset="100%" stop-color="#020b14"/>
+    </linearGradient>
+    <radialGradient id="panelGlow" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#0d2d5c"/>
+      <stop offset="70%" stop-color="#071d39"/>
+      <stop offset="100%" stop-color="#010b16"/>
+    </radialGradient>
+    <linearGradient id="strokeGrad" x1="0" x2="1">
+      <stop offset="0%" stop-color="#36d4ff"/>
+      <stop offset="50%" stop-color="#1e9eff"/>
+      <stop offset="100%" stop-color="#38d2ff"/>
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0" x2="1">
+      <stop offset="0%" stop-color="#a0edff"/>
+      <stop offset="40%" stop-color="#4fdcff"/>
+      <stop offset="100%" stop-color="#1877ff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#3ad5ff" flood-opacity="0.8"/>
+    </filter>
+    <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="10" cy="10" r="2" fill="#3ed7ff" opacity="0.25"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="420" fill="url(#bg)"/>
+  <g opacity="0.5">
+    <path d="M -10 270 C 220 150, 360 130, 520 220 S 880 330, 1160 170 S 1500 90, 1620 200" stroke="#0a6ae8" stroke-width="16" fill="none" opacity="0.68"/>
+    <path d="M 120 440 C 280 250, 520 210, 690 320 S 1030 450, 1280 250 S 1450 120, 1630 260" stroke="#0d7ef5" stroke-width="12" fill="none" opacity="0.6"/>
+  </g>
+
+  <g>
+    <rect x="40" y="35" width="1520" height="350" rx="50" fill="url(#panelGlow)" stroke="url(#strokeGrad)" stroke-width="8" filter="url(#glow)"/>
+    <path d="M 165 55 H 280 L 310 70 H 170 Z" fill="#0b3a6d"/>
+    <path d="M 1330 55 H 1450 L 1450 70 L 1325 70 Z" fill="#0b3a6d"/>
+    <path d="M 120 360 H 250 L 280 383 H 90 Z" fill="#0b3a6d"/>
+    <path d="M 1320 360 H 1500 L 1510 383 H 1300 Z" fill="#0b3a6d"/>
+    <rect x="1450" y="150" width="55" height="123" fill="url(#dots)" opacity="0.8"/>
+  </g>
+
+  <g transform="translate(66 38)">
+    <circle cx="170" cy="180" r="142" fill="url(#iconGrad)" opacity="0.92"/>
+    <circle cx="170" cy="180" r="121" fill="#061933" opacity="0.92" stroke="#4de1ff" stroke-width="10"/>
+    <circle cx="170" cy="180" r="92" fill="url(#iconGrad)" opacity="0.98"/>
+    <circle cx="170" cy="180" r="58" fill="#041829" opacity="0.7"/>
+    <circle cx="100" cy="135" r="17" fill="#effcff" opacity="0.9"/>
+    <circle cx="170" cy="85" r="17" fill="#effcff" opacity="0.9"/>
+    <circle cx="240" cy="135" r="17" fill="#effcff" opacity="0.9"/>
+    <circle cx="100" cy="225" r="17" fill="#effcff" opacity="0.9"/>
+    <circle cx="240" cy="225" r="17" fill="#effcff" opacity="0.9"/>
+    <path d="M 80 180 L 170 80 L 260 180 L 230 180 L 170 112 L 110 180 Z" fill="#edfaff" opacity="0.85"/>
+    <path d="M 170 90 L 216 180 L 186 180 L 170 146 L 154 180 L 124 180 Z" fill="#edfaff" opacity="0.36"/>
+  </g>
+
+  <g>
+    <text x="500" y="185" font-family="Arial Black, Impact, sans-serif" font-size="110" font-weight="900" fill="#f3f8ff" letter-spacing="2">Astra Customs</text>
+    <text x="500" y="300" font-family="Arial Black, Impact, sans-serif" font-size="82" font-weight="800" fill="#49dfff" letter-spacing="2">Portfolio</text>
+  </g>
+</svg>

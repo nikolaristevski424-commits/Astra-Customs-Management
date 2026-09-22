@@ -38,9 +38,11 @@ function orderButtons(order) {
 function orderEmbed(cfg, order) {
     const designerTag = order.designerId ? `<@${order.designerId}>` : 'Unknown';
     const customerTag = order.customerId ? `<@${order.customerId}>` : 'Unknown';
+    const statusColors = { Open: 0x3498db, Paid: 0x2ecc71, Void: 0xe74c3c };
     return baseEmbed(cfg, {
         title: 'Astra Customs | Order Log',
         bannerKey: 'order',
+        color: statusColors[order.status] || cfg.accentColor,
         description: `Order for **${order.product}** logged by ${designerTag}.`,
         fields: [
             { name: 'Designer', value: designerTag, inline: true },

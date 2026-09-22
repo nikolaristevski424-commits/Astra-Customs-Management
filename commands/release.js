@@ -1,9 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, userMention } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
 const { downloadBuffer } = require('../utils/http');
 const perms = require('../utils/permissions');
 const releases = require('../utils/releases');
 const { parseColor } = require('../utils/embeds');
+const { watermarkImageBuffer } = require('./watermark');
 
 function buildEmbed(cfg, release) {
     const reached = release.status === 'reached';
@@ -14,6 +15,7 @@ function buildEmbed(cfg, release) {
         .addFields(
             { name: 'Reaction Goal', value: `🎉 ${release.reactedUserIds.length}/${release.goal}`, inline: true },
             { name: 'Released By', value: userMention(release.releasedBy), inline: true },
+            { name: 'File', value: reached ? release.fileName : `🔒 Unlocks at ${release.goal} reactions`, inline: false },
         )
         .setFooter({ text: `Release #${release.id}` });
     if (reached) embed.setAuthor({ name: '🎉 Goal reached!' });
@@ -56,11 +58,26 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to post a release.', ephemeral: true });
         }
 
+        await interaction.deferReply({ ephemeral: true });
+
         const title = interaction.options.getString('title', true);
         const description = interaction.options.getString('description', true);
         const goal = interaction.options.getInteger('goal', true);
         const file = interaction.options.getAttachment('file', true);
         const previewImage = interaction.options.getAttachment('preview_image');
+        const imageSource = previewImage || (file.contentType?.startsWith('image/') ? file : null);
+        let previewBuffer = null;
+        let previewName = null;
+
+        if (imageSource) {
+            try {
+                const originalPreview = await module.exports.downloadFile(imageSource.url);
+                previewBuffer = await watermarkImageBuffer(originalPreview, `${cfg.brandName || 'Astra Customs'} • PREVIEW`, { opacity: 0.58, spacing: 2.8 });
+                previewName = `release-preview-${Date.now()}.png`;
+            } catch (error) {
+                console.error('[release] Failed to create watermarked preview:', error.message);
+            }
+        }
 
         const release = releases.create(guildId, {
             title,
@@ -68,13 +85,15 @@ module.exports = {
             goal,
             fileUrl: file.url,
             fileName: file.name,
-            previewImageUrl: previewImage?.url || (file.contentType?.startsWith('image/') ? file.url : null),
+            previewImageUrl: previewName ? `attachment://${previewName}` : null,
             releasedBy: interaction.user.id,
         });
 
-        const sent = await interaction.channel.send({ embeds: [buildEmbed(cfg, release)], components: [buildRow(release)] });
+        const payload = { embeds: [buildEmbed(cfg, release)], components: [buildRow(release)] };
+        if (previewBuffer && previewName) payload.files = [new AttachmentBuilder(previewBuffer, { name: previewName })];
+        const sent = await interaction.channel.send(payload);
         releases.attachMessage(guildId, release.id, sent.id, sent.channelId);
 
-        return interaction.reply({ content: `Release \`#${release.id}\` posted — needs ${goal} reactions to unlock.`, ephemeral: true });
+        return interaction.editReply(`Release \`#${release.id}\` posted — needs ${goal} reactions to unlock.`);
     },
 };

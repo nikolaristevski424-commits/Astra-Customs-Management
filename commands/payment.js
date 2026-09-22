@@ -1,13 +1,30 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
 const discounts = require('../utils/discounts');
 const packages = require('../utils/packages');
+const { parseColor } = require('../utils/embeds');
 
 function formatSince(ts) {
     return `<t:${Math.floor(ts / 1000)}:R>`;
+}
+
+function buildOwnershipEmbed(cfg, { username, assetType, assetId, owned, link }) {
+    const title = owned ? 'Asset Ownership Confirmed' : 'Ownership Check Result';
+    const color = owned ? 0x2ecc71 : 0xe74c3c;
+    return new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setDescription(owned ? `**${username}** owns this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.` : `**${username}** does not currently own this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.`)
+        .addFields(
+            { name: 'Username', value: username, inline: true },
+            { name: 'Asset Type', value: assetType === 'gamepass' ? 'Game Pass' : 'Shirt', inline: true },
+            { name: 'Asset ID', value: String(assetId), inline: true },
+        )
+        .setURL(link)
+        .setFooter({ text: `${cfg.brandName || 'Astra Customs'} • ownership verification` });
 }
 
 module.exports = {
@@ -91,18 +108,20 @@ module.exports = {
             const username = interaction.options.getString('username', true).trim();
             if (!/^\d+$/.test(assetId)) return interaction.reply({ content: 'Asset ID must contain numbers only.', ephemeral: true });
 
-            await interaction.deferReply({ ephemeral: true });
             const user = await roblox.resolveUsername(username);
-            if (!user.success) return interaction.editReply(user.reason === 'user_not_found' ? `No Roblox user was found for **${username}**.` : 'Roblox could not resolve that username right now. Try again shortly.');
+            if (!user.success) return interaction.reply({ content: user.reason === 'user_not_found' ? `No Roblox user was found for **${username}**.` : 'Roblox could not resolve that username right now. Try again shortly.', allowedMentions: { parse: [] } });
 
             const ownership = await roblox.checkAssetOwnership({ userId: user.id, assetId, assetType });
             if (!ownership.success) {
-                return interaction.editReply(ownership.reason === 'inventory_private' ? `Roblox did not allow an ownership check for **${user.name}**. The inventory may be private.` : 'Roblox could not complete the ownership check right now. Try again shortly.');
+                return interaction.reply({ content: ownership.reason === 'inventory_private' ? `Roblox did not allow an ownership check for **${user.name}**. The inventory may be private.` : 'Roblox could not complete the ownership check right now. Try again shortly.', allowedMentions: { parse: [] } });
             }
-            if (!ownership.owned) return interaction.editReply(`**${user.name}** does not own that ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}. No payment link was sent.`);
 
             const link = roblox.assetLink(assetId, assetType);
-            return interaction.editReply(`**${user.name}** owns that ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.\n${link}`);
+            const embed = buildOwnershipEmbed(cfg, { username: user.name, assetType, assetId, owned: ownership.owned, link });
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setLabel(assetType === 'gamepass' ? 'Open Game Pass' : 'Open Asset').setStyle(ButtonStyle.Link).setURL(link)
+            );
+            return interaction.reply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
         }
 
         if (!pool.getPoolIds().length) {

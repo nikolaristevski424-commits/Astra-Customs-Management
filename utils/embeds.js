@@ -10,6 +10,7 @@ const { banner, FOOTER } = require('./brandAssets');
 /** Parse "#2d2d31" (or "2d2d31") into a numeric color, falling back safely. */
 function parseColor(hex, fallback = 0x2d2d31) {
     if (!hex) return fallback;
+    if (typeof hex === 'number' && Number.isFinite(hex)) return hex;
     const clean = hex.toString().replace('#', '');
     const n = parseInt(clean, 16);
     return Number.isNaN(n) ? fallback : n;
@@ -53,12 +54,13 @@ function buildPanel(config, { heading, body, extraBlocks = [] } = {}) {
 
 /** Standard branded embed (for logs, DMs, etc. where Components V2 would be overkill). */
 function baseEmbed(config, opts = {}) {
-    const embed = new EmbedBuilder().setColor(parseColor(config.accentColor));
+    const embed = new EmbedBuilder().setColor(parseColor(opts.color || config.accentColor));
     if (opts.title) embed.setTitle(opts.title);
     if (opts.description) embed.setDescription(opts.description);
     if (opts.fields) embed.addFields(opts.fields);
     if (opts.image || config.bannerUrl || opts.bannerKey) embed.setImage(opts.image || config.bannerUrl || banner(opts.bannerKey));
-    embed.setFooter({ text: opts.footer || config.brandName, iconURL: config.footerUrl || FOOTER });
+    if (config.brandName) embed.setAuthor({ name: config.brandName, iconURL: config.footerUrl || FOOTER });
+    embed.setFooter({ text: opts.footer || config.brandName || 'Astra Customs', iconURL: config.footerUrl || FOOTER });
     if (opts.thumbnail) embed.setThumbnail(opts.thumbnail);
     if (opts.timestamp) embed.setTimestamp(opts.timestamp);
     return embed;

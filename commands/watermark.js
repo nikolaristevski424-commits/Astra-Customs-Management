@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const config = require('../utils/config');
@@ -12,14 +12,14 @@ function escapeXml(text) {
 }
 
 /**
- * Build a diagonal, tiled, semi-transparent white text watermark as an SVG
- * the exact size of the target image. sharp can composite SVG directly.
+ * Build a diagonal, tiled, semi-transparent white text watermark as an SVG.
+ * This remains exported for compatibility; runtime image processing uses Jimp.
  */
-function buildTextWatermarkSvg(width, height, text) {
+function buildTextWatermarkSvg(width, height, text, { opacity = 0.35, spacing = 4 } = {}) {
     const safeText = escapeXml(text);
     const fontSize = Math.max(18, Math.round(Math.min(width, height) / 12));
     const tileW = fontSize * (safeText.length * 0.6 + 4);
-    const tileH = fontSize * 4;
+    const tileH = fontSize * spacing;
 
     const cols = Math.ceil(width / tileW) + 2;
     const rows = Math.ceil(height / tileH) + 2;
@@ -29,14 +29,45 @@ function buildTextWatermarkSvg(width, height, text) {
         for (let c = -1; c < cols; c++) {
             const x = c * tileW;
             const y = r * tileH;
-            tiles += `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="${fontSize}" fill="white" fill-opacity="0.35" transform="rotate(-30 ${x} ${y})">${safeText}</text>`;
+            tiles += `<text x="${x}" y="${y}" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="${fontSize}" fill="white" fill-opacity="${opacity}" transform="rotate(-30 ${x} ${y})">${safeText}</text>`;
         }
     }
 
     return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${tiles}</svg>`;
 }
 
+async function watermarkImageBuffer(imageBuffer, text, options = {}) {
+    const { Jimp, loadFont, measureText } = require('jimp');
+    const image = await Jimp.read(imageBuffer);
+    const fontSize = Math.min(image.width, image.height) >= 900 ? 64 : Math.min(image.width, image.height) >= 450 ? 32 : 16;
+    const fontPath = path.join(__dirname, '..', 'node_modules', '@jimp', 'plugin-print', 'dist', 'fonts', 'open-sans', `open-sans-${fontSize}-white`, `open-sans-${fontSize}-white.fnt`);
+    const font = await loadFont(fontPath);
+    const overlay = new Jimp({ width: image.width, height: image.height, color: 0x00000000 });
+    const watermarkWidth = measureText(font, text) + fontSize * 3;
+    const rowHeight = fontSize * (options.spacing || 3);
+
+    for (let y = -rowHeight; y < image.height + rowHeight; y += rowHeight) {
+        for (let x = -watermarkWidth; x < image.width + watermarkWidth; x += watermarkWidth) {
+            overlay.print({ font, x, y, text });
+        }
+    }
+
+    overlay.opacity(options.opacity ?? 0.58);
+    image.composite(overlay, 0, 0);
+
+    if (options.logoBuffer) {
+        const logo = await Jimp.read(options.logoBuffer);
+        logo.resize({ w: image.width, h: image.height });
+        logo.opacity(0.35);
+        image.composite(logo, 0, 0);
+    }
+
+    return image.getBuffer('image/png');
+}
+
 module.exports = {
+    buildTextWatermarkSvg,
+    watermarkImageBuffer,
     data: new SlashCommandBuilder()
         .setName('watermark')
         .setDescription('Stamp an image with the shop watermark.')
@@ -52,55 +83,41 @@ module.exports = {
     async execute(interaction) {
         const cfg = config.getConfig(interaction.guildId);
         if (!perms.isStaff(interaction.member, cfg)) {
-            return interaction.reply({ content: 'Only staff can stamp the shop watermark onto an image.', ephemeral: true });
+            return interaction.reply({ content: 'Only staff can stamp the shop watermark onto an image.', flags: MessageFlags.Ephemeral });
         }
 
         const attachment = interaction.options.getAttachment('image', true);
         const style = interaction.options.getString('style') || 'text';
-        if (!attachment.contentType || !attachment.contentType.startsWith('image/')) {
-            return interaction.reply({ content: 'Please provide a valid image.', ephemeral: true });
+        const imageType = attachment.contentType || '';
+        if (imageType && !imageType.startsWith('image/')) {
+            return interaction.reply({ content: 'Please provide a valid image.', flags: MessageFlags.Ephemeral });
         }
 
-        let sharp;
         try {
-            sharp = require('sharp');
-        } catch {
-            return interaction.reply({ content: 'The `sharp` package is not installed on this bot. Run `npm install` and restart.', ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } catch (error) {
+            console.error('[watermark] Could not acknowledge interaction:', error.message);
+            return;
         }
-
-        await interaction.deferReply();
 
         try {
             const imageBuffer = await downloadBuffer(attachment.url);
-            const metadata = await sharp(imageBuffer).metadata();
-
-            let overlay;
+            const text = interaction.options.getString('text') || cfg.watermarkText || cfg.brandName || 'Watermark';
+            const options = { opacity: 0.58, spacing: 2.8 };
             if (style === 'logo') {
                 if (!fs.existsSync(LOGO_WATERMARK_PATH)) {
-                    return interaction.editReply('No logo watermark is configured. Drop a PNG at `assets/watermark.png`, or just omit `style:` to use the text watermark.');
+                    await interaction.editReply('No logo watermark is configured. Drop a PNG at `assets/watermark.png`, or use the default tiled-text style.').catch(() => {});
+                    return;
                 }
-                overlay = await sharp(fs.readFileSync(LOGO_WATERMARK_PATH))
-                    .resize(metadata.width, metadata.height, { fit: 'cover' })
-                    .ensureAlpha()
-                    .png()
-                    .toBuffer();
-            } else {
-                const text = interaction.options.getString('text') || cfg.watermarkText || cfg.brandName || 'Watermark';
-                const svg = buildTextWatermarkSvg(metadata.width, metadata.height, text);
-                overlay = Buffer.from(svg);
+                options.logoBuffer = fs.readFileSync(LOGO_WATERMARK_PATH);
             }
-
-            const watermarkedBuffer = await sharp(imageBuffer)
-                .ensureAlpha()
-                .composite([{ input: overlay, blend: 'over' }])
-                .png()
-                .toBuffer();
+            const watermarkedBuffer = await watermarkImageBuffer(imageBuffer, text, options);
 
             const file = new AttachmentBuilder(watermarkedBuffer, { name: 'watermarked.png' });
-            await interaction.editReply({ files: [file] });
+            await interaction.editReply({ files: [file] }).catch((error) => console.error('[watermark] Could not send result:', error.message));
         } catch (err) {
             console.error('[watermark] error:', err);
-            await interaction.editReply('Failed to apply the watermark. Check the bot console for details.');
+            await interaction.editReply('Failed to apply the watermark. Check the bot console for details.').catch(() => {});
         }
     },
 };

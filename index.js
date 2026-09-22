@@ -18,6 +18,8 @@ const client = new Client({
     partials: [Partials.Channel],
 });
 
+client.on('error', (error) => console.error('[index] Discord client error:', error));
+
 // ---- Load commands ----
 client.commands = new Collection();
 const commandsDir = path.join(__dirname, 'commands');
