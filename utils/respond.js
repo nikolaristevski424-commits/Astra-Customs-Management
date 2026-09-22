@@ -36,6 +36,11 @@ function collectAttachmentFiles(value, files = [], seen = new Set()) {
         return files;
     }
 
+    if (typeof value.toJSON === 'function') {
+        collectAttachmentFiles(value.toJSON(), files, seen);
+        return files;
+    }
+
     if (typeof value === 'object') {
         for (const entry of Object.values(value)) collectAttachmentFiles(entry, files, seen);
     }
@@ -59,4 +64,4 @@ async function sendAsPanel(interaction, payload, targetChannel = null) {
     return destination.send(messagePayload);
 }
 
-module.exports = { sendAsPanel };
+module.exports = { collectAttachmentFiles, sendAsPanel };

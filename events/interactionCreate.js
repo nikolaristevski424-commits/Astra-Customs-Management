@@ -27,6 +27,7 @@ const giveawaysUtil = require('../utils/giveaways');
 const qualityControlUtil = require('../utils/qualityControl');
 const { isExecutive } = require('../utils/env');
 const { disableAllButtons } = require('../utils/components');
+const { collectAttachmentFiles } = require('../utils/respond');
 
 const orderCmd = require('../commands/order');
 const bundleCmd = require('../commands/bundle');
@@ -89,7 +90,8 @@ async function handleSelect(interaction) {
         const builder = panelCmd.BUILDERS[value];
         if (!builder) return interaction.reply({ content: 'Unknown option.', ephemeral: true });
         const payload = builder(cfg, guildId);
-        return interaction.reply({ ...payload, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+        const files = collectAttachmentFiles(payload);
+        return interaction.reply({ ...payload, files: files.length ? files : undefined, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
     }
 
     if (customId.startsWith('quote_sel_')) {

@@ -166,6 +166,7 @@ function portfolioPanel(cfg, guildId) {
     } else {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent('The portfolio is empty. Staff can add pieces with `/portfolio add`.'));
     }
+    withFooter(container, cfg);
     return { components: [container] };
 }
 
