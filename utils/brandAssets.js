@@ -10,13 +10,14 @@ const BANNERS = Object.freeze({
     status: `${ASSET_BASE}status-banner.png`,
     prices: `${ASSET_BASE}prices-banner.png`,
     portfolio: `${ASSET_BASE}portfolio-banner.png`,
+    'designer-info': `${ASSET_BASE}designer-info-banner.png`,
     bundle: `${ASSET_BASE}default-banner.png`,
     payout: `${ASSET_BASE}default-banner.png`,
     giveaway: `${ASSET_BASE}default-banner.png`,
     loa: `${ASSET_BASE}default-banner.png`,
 });
 
-const FOOTER = `${ASSET_BASE}default-banner.png`;
+const FOOTER = `${ASSET_BASE}footer-banner.png`;
 
 function banner(key = 'default') {
     return BANNERS[key] || BANNERS.default;
