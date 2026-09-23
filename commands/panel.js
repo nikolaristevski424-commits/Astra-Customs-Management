@@ -66,9 +66,11 @@ function ticketsPanel(cfg) {
 
 function orderPanel(cfg) {
     const container = baseContainer(cfg);
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | New Order\n\nTell us what you want designed and our team will review the request in a private order channel.`));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## 🛒 Services\n\nAt ${cfg.brandName}, our team turns ideas into polished, custom work. Choose the service that best matches what you need, then start a private order request.`));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Have these ready**\n- Product or service\n- Style and references\n- Deadline\n- Budget\n- Any important specifications'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '**🚗 Livery Designs**\nStart an order for liveries.\n\n**👕 Uniform Designs**\nStart an order for uniforms and clothing.\n\n**🎨 Graphics & ELS**\nRequest graphics, ELS work, logos, or related assets.\n\n**💬 Discord Designs**\nRequest Discord setup, branding, or custom bot work.\n\n**Before you start**\nHave your references, deadline, budget, and key specifications ready.'
+    ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('order_open').setLabel('Start Order Request').setStyle(ButtonStyle.Success).setEmoji('🛒'),
         new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Need Help First').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
@@ -79,15 +81,15 @@ function orderPanel(cfg) {
 function applicationsPanel(cfg) {
     const container = baseContainer(cfg);
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        `## ${cfg.brandName} | Applications\n\nJoin the team and help us deliver great service. Choose the path that best matches your strengths, then complete the application with honest, specific answers.`
+        `## Employee Applications\n\n*${cfg.brandName} is hiring!* If you want to join a dedicated team, review the requirements below and choose the application that fits you best. We would love to see you help us improve the shop and its systems.`
     ));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        '**Staff team**\nSupport customers, keep the community organized, and help with moderation or operations. Reliability, communication, and good judgment matter.\n\n**Designer team**\nCreate client work and contribute design skills to the shop. A portfolio, strong communication, and attention to detail are important.'
+        '**Creative Team Requirements**\n> <:OpenedEmoji1:1545902291469467668> Must have past experience\n> <:OpenedEmoji1:1545902291469467668> Must be 13+\n> <:OpenedEmoji1:1545902291469467668> Must be active\n> <:OpenedEmoji1:1545902291469467668> Must be dedicated\n> <:OpenedEmoji1:1545902291469467668> Must be professional\n\n**Customer Support Requirements**\n> <:OpenedEmoji1:1545902291469467668> Must be dedicated\n> <:OpenedEmoji1:1545902291469467668> Must be 13+\n> <:OpenedEmoji1:1545902291469467668> Must be active\n> <:OpenedEmoji1:1545902291469467668> Must be willing to do at least 3 tickets a week'
     ));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        '**Before you apply**\n- Be ready to share your Roblox username.\n- Give thoughtful answers rather than one-word responses.\n- Designers should prepare portfolio links and list their software or specialties.\n- Applications are reviewed by the team; submitting does not guarantee acceptance.\n\n**How it works**\n1. Choose an application below.\n2. Complete every required question.\n3. The review team checks your submission.\n4. You receive the decision by direct message when the review is complete.'
+        '**Before you apply**\nPlease answer every question honestly and with useful detail. Designers should prepare portfolio links and list their software or specialties. Applications are reviewed by the team; submitting does not guarantee acceptance.'
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('application_staff_open').setLabel('Apply for Staff').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
