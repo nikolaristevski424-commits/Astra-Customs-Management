@@ -1,23 +1,24 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, userMention } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
 const { downloadBuffer } = require('../utils/http');
 const perms = require('../utils/permissions');
 const releases = require('../utils/releases');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 const { watermarkImageBuffer } = require('./watermark');
 
 function buildEmbed(cfg, release) {
     const reached = release.status === 'reached';
-    const embed = new EmbedBuilder()
-        .setColor(parseColor(cfg.accentColor))
-        .setTitle(release.title)
-        .setDescription(release.description)
-        .addFields(
+    const embed = baseEmbed(cfg, {
+        color: reached ? 0x2ecc71 : cfg.accentColor,
+        title: release.title,
+        description: release.description,
+        fields: [
             { name: 'Reaction Goal', value: `🎉 ${release.reactedUserIds.length}/${release.goal}`, inline: true },
             { name: 'Released By', value: userMention(release.releasedBy), inline: true },
             { name: 'File', value: reached ? release.fileName : `🔒 Unlocks at ${release.goal} reactions`, inline: false },
-        )
-        .setFooter({ text: `Release #${release.id}` });
+        ],
+        footer: `Free Release #${release.id}`,
+    });
     if (reached) embed.setAuthor({ name: '🎉 Goal reached!' });
     if (release.previewImageUrl) embed.setImage(release.previewImageUrl);
     if (reached) embed.addFields({ name: 'Download', value: release.fileName });

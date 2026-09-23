@@ -1,11 +1,11 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
 const discounts = require('../utils/discounts');
 const packages = require('../utils/packages');
-const { parseColor } = require('../utils/embeds');
+const { baseEmbed } = require('../utils/embeds');
 
 function formatSince(ts) {
     return `<t:${Math.floor(ts / 1000)}:R>`;
@@ -14,17 +14,17 @@ function formatSince(ts) {
 function buildOwnershipEmbed(cfg, { username, assetType, assetId, owned, link }) {
     const title = owned ? 'Asset Ownership Confirmed' : 'Ownership Check Result';
     const color = owned ? 0x2ecc71 : 0xe74c3c;
-    return new EmbedBuilder()
-        .setColor(color)
-        .setTitle(title)
-        .setDescription(owned ? `**${username}** owns this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.` : `**${username}** does not currently own this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.`)
-        .addFields(
+    return baseEmbed(cfg, {
+        color,
+        title: `${cfg.brandName || 'Astra Customs'} | ${title}`,
+        description: owned ? `**${username}** owns this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.` : `**${username}** does not currently own this ${assetType === 'gamepass' ? 'Game Pass' : 'Shirt'}.`,
+        fields: [
             { name: 'Username', value: username, inline: true },
             { name: 'Asset Type', value: assetType === 'gamepass' ? 'Game Pass' : 'Shirt', inline: true },
             { name: 'Asset ID', value: String(assetId), inline: true },
-        )
-        .setURL(link)
-        .setFooter({ text: `${cfg.brandName || 'Astra Customs'} • ownership verification` });
+        ],
+        footer: 'Ownership verification',
+    }).setURL(link);
 }
 
 module.exports = {

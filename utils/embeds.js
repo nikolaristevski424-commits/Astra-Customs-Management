@@ -58,9 +58,9 @@ function baseEmbed(config, opts = {}) {
     if (opts.title) embed.setTitle(opts.title);
     if (opts.description) embed.setDescription(opts.description);
     if (opts.fields) embed.addFields(opts.fields);
-    if (opts.image || config.bannerUrl || opts.bannerKey) embed.setImage(opts.image || config.bannerUrl || banner(opts.bannerKey));
-    if (config.brandName) embed.setAuthor({ name: config.brandName, iconURL: config.footerUrl || FOOTER });
-    embed.setFooter({ text: opts.footer || config.brandName || 'Astra Customs', iconURL: config.footerUrl || FOOTER });
+    if (opts.image) embed.setImage(opts.image);
+    if (config.brandName) embed.setAuthor({ name: config.brandName });
+    embed.setFooter({ text: opts.footer || config.brandName || 'Astra Customs' });
     if (opts.thumbnail) embed.setThumbnail(opts.thumbnail);
     if (opts.timestamp) embed.setTimestamp(opts.timestamp);
     return embed;
