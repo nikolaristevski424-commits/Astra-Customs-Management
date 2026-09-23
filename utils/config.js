@@ -76,7 +76,7 @@ function defaultConfig() {
         autoCreditPercent: 0,         // % of each detected purchase auto-awarded as store credit (0 = off)
 
         // Runtime state (not meaningfully settable from .env)
-        serviceStatus: {}, // e.g. { "Liveries": "unavailable", "Clothing": "limited" }
+        serviceStatus: {}, // e.g. { "Liveries": "open", "Clothing": "delayed" }
         honeypot: { count: 0, messageId: null, channelId: null },
 
         // Free-text panel content, edited via /text edit (opens a modal)

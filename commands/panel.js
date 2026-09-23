@@ -15,7 +15,7 @@ const { parseColor } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const { isExecutive } = require('../utils/env');
 
-const DEFAULT_SERVICES = { Liveries: 'available', Clothing: 'available', Graphics: 'available', Photography: 'available', Discord: 'available' };
+const DEFAULT_SERVICES = { Liveries: 'open', Clothing: 'open', Graphics: 'open', Photography: 'open', Discord: 'open' };
 const PANEL_CHANNELS = Object.freeze({
     guidelines: '1488378243697606713',
     dashboard: '1497063428487909548',
@@ -36,7 +36,8 @@ function orderStatusPanel(cfg) {
     const container = baseContainer(cfg);
     const lines = [`## ${cfg.brandName} | Order Status`, '', 'Current availability for each service:', ''];
     for (const [name, status] of Object.entries(services)) {
-        lines.push(`**${name}:** ${SERVICE_ICONS[status] || '❓'}`);
+        const normalizedStatus = { available: 'open', limited: 'delayed', unavailable: 'closed' }[status] || status;
+        lines.push(`**${name}:** ${SERVICE_ICONS[normalizedStatus] || '❓'}`);
     }
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
     container.addSeparatorComponents(new SeparatorBuilder());

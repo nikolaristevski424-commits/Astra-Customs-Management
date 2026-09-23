@@ -2,7 +2,12 @@ const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 
-const ICONS = { available: '✅', limited: '🕒', unavailable: '❌' };
+const ICONS = {
+    open: '<:StatusEMOJIGreen:1545902027299627018><:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>',
+    delayed: '<:StatusEmojiYellow:1545902089186705459>',
+    closed: '<:StatusEmojiRed:1545902134258827294><:ClosedEmoji1:1545902477621072022><:ClosedEmoji2:1545902533703245914><:ClosedEmoji3:1545902589403594903>',
+    premium: '<:boost_1:1492387526613143683>',
+};
 
 module.exports = {
     ICONS,
@@ -16,7 +21,7 @@ module.exports = {
                 .setName('status')
                 .setDescription('Availability')
                 .setRequired(true)
-                .addChoices({ name: 'Available', value: 'available' }, { name: 'Limited', value: 'limited' }, { name: 'Unavailable', value: 'unavailable' })
+                .addChoices({ name: 'Open', value: 'open' }, { name: 'Delayed', value: 'delayed' }, { name: 'Closed', value: 'closed' }, { name: 'Premium / Boosters Only', value: 'premium' })
         ),
 
     async execute(interaction) {

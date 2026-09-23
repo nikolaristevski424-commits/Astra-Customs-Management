@@ -16,7 +16,7 @@ const CATEGORIES = [
     { name: '🎉 Fun', value: '`/release`, `/giveaway start|reroll`, `/fact`, `/reverse`, `/wanted`, `/8ball`, `/coinflip`, `/roll`, `/rps`, `/ship`, `/wouldyourather`, `/avatar`' },
     { name: '🛠️ Staff & HR', value: '`/addstaff`, `/infract issue|void`, `/promote issue|void`, `/logs`, `/loa request|return|list`' },
     { name: '🖌️ Design Tools', value: '`/watermark`, `/say`' },
-    { name: '📋 Panels', value: '`/panel dashboard|guidelines|order-status|tickets|prices|portfolio|affiliations|honeypot`, `/ad`, `/affiliate`, `/service`, `/text edit`' },
+    { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications`, `/status`, `/service`, `/text edit`' },
     { name: '🤖 Bot Info', value: '`/help`, `/ping`' },
 ];
 
