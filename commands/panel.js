@@ -18,6 +18,12 @@ function addPanelChannel(subcommand) {
     return subcommand.addChannelOption((o) => o.setName('channel').setDescription('Channel to send the panel to').addChannelTypes(ChannelType.GuildText));
 }
 
+const PANEL_CHANNELS = Object.freeze({
+    'order-status': '1497063428487909548',
+    tickets: '1497580809752805456',
+    order: '1507174314485612708',
+});
+
 function baseContainer(cfg) {
     return new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
 }
@@ -85,6 +91,7 @@ const BUILDERS = {
 
 module.exports = {
     BUILDERS,
+    PANEL_CHANNELS,
 
     data: new SlashCommandBuilder()
         .setName('panel')
@@ -103,7 +110,8 @@ module.exports = {
         }
 
         const type = interaction.options.getSubcommand();
-        const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+        const configuredChannel = PANEL_CHANNELS[type] ? await interaction.client.channels.fetch(PANEL_CHANNELS[type]).catch(() => null) : null;
+        const targetChannel = interaction.options.getChannel('channel') || configuredChannel || interaction.channel;
 
         const builder = BUILDERS[type];
         if (!builder) return interaction.reply({ content: 'Unknown panel type.', ephemeral: true });
