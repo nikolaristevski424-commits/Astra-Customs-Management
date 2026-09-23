@@ -78,11 +78,15 @@ function orderPanel(cfg) {
 function applicationsPanel(cfg) {
     const container = baseContainer(cfg);
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        `## ${cfg.brandName} | Applications\n\nWant to join the team? Choose the application that matches what you do. Please answer every question honestly and include useful, specific details.`
+        `## ${cfg.brandName} | Applications\n\nJoin the team and help us deliver great service. Choose the path that best matches your strengths, then complete the application with honest, specific answers.`
     ));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        '**Staff**\nModeration, support, operations, and community responsibilities.\n\n**Designer**\nDesign services, portfolio work, and creative production.'
+        '**Staff team**\nSupport customers, keep the community organized, and help with moderation or operations. Reliability, communication, and good judgment matter.\n\n**Designer team**\nCreate client work and contribute design skills to the shop. A portfolio, strong communication, and attention to detail are important.'
+    ));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '**Before you apply**\n- Be ready to share your Roblox username.\n- Give thoughtful answers rather than one-word responses.\n- Designers should prepare portfolio links and list their software or specialties.\n- Applications are reviewed by the team; submitting does not guarantee acceptance.\n\n**How it works**\n1. Choose an application below.\n2. Complete every required question.\n3. The review team checks your submission.\n4. You receive the decision by direct message when the review is complete.'
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('application_staff_open').setLabel('Apply for Staff').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
