@@ -2,7 +2,6 @@ const { Events, MessageFlags } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const panelCmd = require('../commands/panel');
-const pricelistCmd = require('../commands/pricelist');
 
 const SHORTCUTS = {
     orderstatus: 'order-status',
@@ -10,6 +9,9 @@ const SHORTCUTS = {
     ticketpanel: 'tickets',
     order: 'order',
     applications: 'applications',
+    portfolio: 'portfolio',
+    affiliations: 'affiliations',
+    honeypot: 'honeypot',
 };
 
 module.exports = {
@@ -33,6 +35,15 @@ module.exports = {
             const newCount = (cfg.honeypot?.count || 0) + 1;
             config.setNested(guildId, 'honeypot', { count: newCount });
 
+            if (cfg.honeypot?.channelId && cfg.honeypot?.messageId) {
+                const panelChannel = await message.client.channels.fetch(cfg.honeypot.channelId).catch(() => null);
+                const panelMessage = await panelChannel?.messages.fetch(cfg.honeypot.messageId).catch(() => null);
+                if (panelMessage) {
+                    const updatedCfg = config.getConfig(guildId);
+                    await panelMessage.edit({ flags: MessageFlags.IsComponentsV2, ...panelCmd.BUILDERS.honeypot(updatedCfg) }).catch(() => {});
+                }
+            }
+
             return;
         }
 
@@ -46,10 +57,6 @@ module.exports = {
         if (!member || !perms.isStaff(member, cfg)) return;
 
         await message.delete().catch(() => {});
-
-        if (type === 'pricelist' || command === 'pricelist') {
-            return message.channel.send({ embeds: [pricelistCmd.buildPricelistEmbed({ ...cfg, _guildId: guildId })] });
-        }
 
         const builder = panelCmd.BUILDERS[type];
         if (!builder) return;

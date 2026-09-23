@@ -10,6 +10,8 @@ const {
     MessageFlags,
 } = require('discord.js');
 const config = require('../utils/config');
+const affiliations = require('./affiliate');
+const portfolio = require('../utils/portfolio');
 const { parseColor } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const { isExecutive } = require('../utils/env');
@@ -82,11 +84,48 @@ function applicationsPanel(cfg) {
     return { components: [container] };
 }
 
+function portfolioPanel(cfg, guildId) {
+    const pieces = portfolio.list(guildId).slice(-10).reverse();
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Portfolio\n\nA selection of recent work from our creative team.`));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        pieces.length ? pieces.map((piece) => `**${piece.caption || 'Featured work'}**\n${piece.url}`).join('\n\n') : 'The portfolio is currently being updated. Check back soon or open a ticket to request examples of relevant work.'
+    ));
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('order_open').setLabel('Start an Order').setStyle(ButtonStyle.Success).setEmoji('🛒'),
+        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Ask About Work').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
+    ));
+    return { components: [container] };
+}
+
+function affiliationsPanel(cfg, guildId) {
+    const entries = affiliations.list(guildId);
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Affiliations\n\nCommunities and partners connected with ${cfg.brandName}.`));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        entries.length ? entries.map((entry) => `**${entry.name}**\n${entry.invite}`).join('\n\n') : 'There are no active affiliations listed right now.'
+    ));
+    return { components: [container] };
+}
+
+function honeypotPanel(cfg) {
+    const container = baseContainer(cfg);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        `## ${cfg.brandName} | Protected Channel\n\nThis channel is monitored. Do not send messages here.\n\n**Messages may trigger automatic moderation.**\n\nRecorded softbans: **${cfg.honeypot?.count || 0}**`
+    ));
+    return { components: [container] };
+}
+
 const BUILDERS = {
     'order-status': (cfg) => orderStatusPanel(cfg),
     tickets: (cfg) => ticketsPanel(cfg),
     order: (cfg) => orderPanel(cfg),
     applications: (cfg) => applicationsPanel(cfg),
+    portfolio: (cfg, guildId) => portfolioPanel(cfg, guildId),
+    affiliations: (cfg, guildId) => affiliationsPanel(cfg, guildId),
+    honeypot: (cfg) => honeypotPanel(cfg),
 };
 
 module.exports = {
@@ -99,7 +138,10 @@ module.exports = {
         .addSubcommand((sub) => addPanelChannel(sub.setName('order-status').setDescription('Send the service status panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('tickets').setDescription('Send the support panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('order').setDescription('Send the order panel.')))
-        .addSubcommand((sub) => addPanelChannel(sub.setName('applications').setDescription('Send the applications panel.'))),
+        .addSubcommand((sub) => addPanelChannel(sub.setName('applications').setDescription('Send the applications panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('portfolio').setDescription('Send the portfolio panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('affiliations').setDescription('Send the affiliations panel.')))
+        .addSubcommand((sub) => addPanelChannel(sub.setName('honeypot').setDescription('Send the protected-channel panel.'))),
 
     async execute(interaction) {
         const guildId = interaction.guildId;
@@ -118,6 +160,10 @@ module.exports = {
 
         const payload = builder(cfg, guildId);
         const sent = await sendAsPanel(interaction, { flags: MessageFlags.IsComponentsV2, ...payload }, targetChannel);
+
+        if (type === 'honeypot' && sent) {
+            config.setNested(guildId, 'honeypot', { channelId: sent.channelId, messageId: sent.id });
+        }
 
         return sent;
     },
