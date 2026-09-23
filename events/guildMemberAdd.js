@@ -1,6 +1,12 @@
 const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
-const { PANEL_CHANNELS } = require('../commands/panel');
+
+const WELCOME_CHANNELS = Object.freeze({
+    guidelines: '1488378243697606713',
+    dashboard: '1497063428487909548',
+    tickets: '1497580809752805456',
+    order: '1507174314485612708',
+});
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -16,6 +22,7 @@ module.exports = {
         if (!channel) return;
 
         const channelUrl = (channelId) => `https://discord.com/channels/${member.guild.id}/${channelId}`;
+        const shopChannelId = cfg.orderingChannelId || WELCOME_CHANNELS.order;
         const embed = new EmbedBuilder()
             .setColor(0x2d8cff)
             .setTitle(`Welcome to ${cfg.brandName}`)
@@ -23,10 +30,11 @@ module.exports = {
             .addFields({ name: 'Start here', value: 'Read the guidelines, explore the dashboard, ask for assistance, or submit an order.' })
             .setFooter({ text: cfg.brandName });
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setLabel('Guidelines').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.guidelines)),
-            new ButtonBuilder().setLabel('Dashboard').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.dashboard)),
-            new ButtonBuilder().setLabel('Assistance').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.tickets)),
-            new ButtonBuilder().setLabel('Order Here').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.order)),
+            new ButtonBuilder().setLabel('Guidelines').setStyle(ButtonStyle.Link).setURL(channelUrl(WELCOME_CHANNELS.guidelines)),
+            new ButtonBuilder().setLabel('Dashboard').setStyle(ButtonStyle.Link).setURL(channelUrl(WELCOME_CHANNELS.dashboard)),
+            new ButtonBuilder().setLabel('Assistance').setStyle(ButtonStyle.Link).setURL(channelUrl(WELCOME_CHANNELS.tickets)),
+            new ButtonBuilder().setLabel('Order Here').setStyle(ButtonStyle.Link).setURL(channelUrl(WELCOME_CHANNELS.order)),
+            new ButtonBuilder().setLabel('Shop').setStyle(ButtonStyle.Link).setURL(channelUrl(shopChannelId)),
         );
         await channel
             .send({ embeds: [embed], components: [row], allowedMentions: { users: [member.id] } })
