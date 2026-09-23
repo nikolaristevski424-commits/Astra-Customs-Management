@@ -27,7 +27,6 @@ const giveawaysUtil = require('../utils/giveaways');
 const qualityControlUtil = require('../utils/qualityControl');
 const { isExecutive } = require('../utils/env');
 const { disableAllButtons } = require('../utils/components');
-const { collectAttachmentFiles } = require('../utils/respond');
 
 const orderCmd = require('../commands/order');
 const bundleCmd = require('../commands/bundle');
@@ -37,8 +36,6 @@ const payoutCmd = require('../commands/payout');
 const releaseCmd = require('../commands/release');
 const giveawayCmd = require('../commands/giveaway');
 const loaCmd = require('../commands/loa');
-const panelCmd = require('../commands/panel');
-const pricelistCmd = require('../commands/pricelist');
 const quoteCmd = require('../commands/quote');
 const paymentRequestCmd = require('../commands/paymentrequest');
 const textCmd = require('../commands/text');
@@ -78,21 +75,6 @@ async function handleAutocomplete(interaction) {
 
 async function handleSelect(interaction) {
     const { customId } = interaction;
-
-    if (customId === 'dashboard_menu') {
-        const guildId = interaction.guildId;
-        const cfg = config.getConfig(guildId);
-        const value = interaction.values[0];
-
-        if (value === 'pricelist') {
-            return interaction.reply({ embeds: [pricelistCmd.buildPricelistEmbed({ ...cfg, _guildId: guildId })], ephemeral: true });
-        }
-        const builder = panelCmd.BUILDERS[value];
-        if (!builder) return interaction.reply({ content: 'Unknown option.', ephemeral: true });
-        const payload = builder(cfg, guildId);
-        const files = collectAttachmentFiles(payload);
-        return interaction.reply({ ...payload, files: files.length ? files : undefined, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
-    }
 
     if (customId.startsWith('quote_sel_')) {
         return quoteCmd.handleSelect(interaction);

@@ -5,16 +5,11 @@ const panelCmd = require('../commands/panel');
 const pricelistCmd = require('../commands/pricelist');
 
 const SHORTCUTS = {
-    dashboard: 'dashboard',
-    guidelines: 'guidelines',
     orderstatus: 'order-status',
     tickets: 'tickets',
     ticketpanel: 'tickets',
-    portfolio: 'portfolio',
-    affiliations: 'affiliations',
-    honeypot: 'honeypot',
-    pricelist: 'pricelist',
-    prices: 'pricelist',
+    order: 'order',
+    applications: 'applications',
 };
 
 module.exports = {
@@ -38,15 +33,6 @@ module.exports = {
             const newCount = (cfg.honeypot?.count || 0) + 1;
             config.setNested(guildId, 'honeypot', { count: newCount });
 
-            if (cfg.honeypot?.channelId && cfg.honeypot?.messageId) {
-                const panelChannel = await message.client.channels.fetch(cfg.honeypot.channelId).catch(() => null);
-                const panelMessage = await panelChannel?.messages.fetch(cfg.honeypot.messageId).catch(() => null);
-                if (panelMessage) {
-                    const updatedCfg = config.getConfig(guildId);
-                    const payload = panelCmd.BUILDERS.honeypot(updatedCfg);
-                    await panelMessage.edit({ flags: MessageFlags.IsComponentsV2, ...payload }).catch(() => {});
-                }
-            }
             return;
         }
 

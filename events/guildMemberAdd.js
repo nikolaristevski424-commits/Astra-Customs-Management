@@ -1,6 +1,6 @@
-const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
-const { buildPanel } = require('../utils/embeds');
+const { PANEL_CHANNELS } = require('../commands/panel');
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -15,20 +15,21 @@ module.exports = {
         const channel = await member.guild.channels.fetch(cfg.welcomeChannelId).catch(() => null);
         if (!channel) return;
 
-        const container = buildPanel(cfg, {
-            heading: `Welcome to ${cfg.brandName}!`,
-            body: `Hey <@${member.id}>, thanks for joining! Check out the dashboard below to get started.`,
-        });
-
-        const row = cfg.dashboardChannelId
-            ? [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Go to Dashboard').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${member.guild.id}/${cfg.dashboardChannelId}`))]
-            : [];
-
-        const { MessageFlags } = require('discord.js');
-        // Components V2 messages can't also set `content` — the @mention lives
-        // inside the container's text instead (see `body` above).
+        const channelUrl = (channelId) => `https://discord.com/channels/${member.guild.id}/${channelId}`;
+        const embed = new EmbedBuilder()
+            .setColor(0x2d8cff)
+            .setTitle(`Welcome to ${cfg.brandName}`)
+            .setDescription(`Hey <@${member.id}>! Use the links below to find your way around the server.`)
+            .addFields({ name: 'Start here', value: 'Read the guidelines, explore the dashboard, ask for assistance, or submit an order.' })
+            .setFooter({ text: cfg.brandName });
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setLabel('Guidelines').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.guidelines)),
+            new ButtonBuilder().setLabel('Dashboard').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.dashboard)),
+            new ButtonBuilder().setLabel('Assistance').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.tickets)),
+            new ButtonBuilder().setLabel('Order Here').setStyle(ButtonStyle.Link).setURL(channelUrl(PANEL_CHANNELS.order)),
+        );
         await channel
-            .send({ flags: MessageFlags.IsComponentsV2, components: [container, ...row], allowedMentions: { users: [member.id] } })
+            .send({ embeds: [embed], components: [row], allowedMentions: { users: [member.id] } })
             .catch((err) => console.error('[welcome] Failed to send welcome message:', err.message));
     },
 };
