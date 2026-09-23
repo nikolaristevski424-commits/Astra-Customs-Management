@@ -16,7 +16,8 @@ const CATEGORIES = [
     { name: '🎉 Fun', value: '`/release`, `/giveaway start|reroll`, `/fact`, `/reverse`, `/wanted`, `/8ball`, `/coinflip`, `/roll`, `/rps`, `/ship`, `/wouldyourather`, `/avatar`' },
     { name: '🛠️ Staff & HR', value: '`/addstaff`, `/infract issue|void`, `/promote issue|void`, `/logs`, `/loa request|return|list`' },
     { name: '🖌️ Design Tools', value: '`/watermark`, `/say`' },
-    { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications`, `/status`, `/service`, `/text edit`' },
+    { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications|portfolio|affiliations|honeypot`, `/status`, `/service`, `/text edit`' },
+    { name: '📈 Activity', value: '`/activity check` — executive role activity check with live reactions' },
     { name: '🤖 Bot Info', value: '`/help`, `/ping`' },
 ];
 

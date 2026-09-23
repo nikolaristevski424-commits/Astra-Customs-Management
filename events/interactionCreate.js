@@ -39,6 +39,8 @@ const loaCmd = require('../commands/loa');
 const quoteCmd = require('../commands/quote');
 const paymentRequestCmd = require('../commands/paymentrequest');
 const textCmd = require('../commands/text');
+const activityUtil = require('../utils/activity');
+const activityCmd = require('../commands/activity');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -85,6 +87,19 @@ async function handleButton(interaction) {
     const { customId } = interaction;
     const guildId = interaction.guildId;
     const cfg = config.getConfig(guildId);
+
+    if (customId.startsWith('activity_react_')) {
+        const id = customId.replace('activity_react_', '');
+        const record = activityUtil.find(guildId, id);
+        if (!record) return interaction.reply({ content: 'This activity check no longer exists.', ephemeral: true });
+        if (!interaction.member.roles.cache.has(record.roleId)) return interaction.reply({ content: 'Only members with the selected role can react to this activity check.', ephemeral: true });
+        if (record.voterIds.includes(interaction.user.id)) return interaction.reply({ content: 'You have already counted your activity on this check.', ephemeral: true });
+
+        const updated = activityUtil.addVote(guildId, id, interaction.user.id);
+        const memberCount = await activityCmd.roleMemberCount(interaction.guild, record.roleId);
+        await interaction.update({ embeds: [activityCmd.buildEmbed(cfg, updated, memberCount)], components: [activityCmd.buildRow(updated)] });
+        return;
+    }
 
     // ---- Order paid/void/unvoid ----
     if (customId.startsWith('order_paid_') || customId.startsWith('order_void_') || customId.startsWith('order_unvoid_')) {

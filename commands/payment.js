@@ -33,8 +33,8 @@ module.exports = {
         .setDescription('Get a payment link with an auto-picked game pass from the pool.')
         .addSubcommand((sub) =>
             sub
-                .setName('request')
-                .setDescription('Auto-pick a free game pass, set its price, and get the payment link')
+                .setName('create')
+                .setDescription('Create a payment link and reserve a game pass')
                 .addIntegerOption((o) => o.setName('price').setDescription('Price in Robux').setRequired(true).setMinValue(0))
                 .addIntegerOption((o) => o.setName('package_id').setDescription('Approved package to deliver after payment').setAutocomplete(true))
                 .addUserOption((o) => o.setName('customer').setDescription('Discord customer who should receive the files'))
@@ -47,21 +47,21 @@ module.exports = {
                 .setDescription('Free up a reserved game pass so it goes back in the pool')
                 .addStringOption((o) => o.setName('gamepass_id').setDescription('Game pass ID').setRequired(true).setAutocomplete(true))
         )
-        .addSubcommand((sub) => sub.setName('pool').setDescription('See the status of every configured payment game pass'))
+        .addSubcommand((sub) => sub.setName('status').setDescription('View payment game pass availability'))
         .addSubcommandGroup((group) =>
             group
-                .setName('link')
-                .setDescription('Create or verify Roblox payment links')
+                .setName('verify')
+                .setDescription('Open or verify Roblox payment assets')
                 .addSubcommand((sub) =>
                     sub
-                        .setName('get')
-                        .setDescription('Get a configured payment game pass link')
+                        .setName('link')
+                        .setDescription('Open a configured payment game pass link')
                         .addStringOption((o) => o.setName('gamepass_id').setDescription('Game pass ID').setRequired(true).setAutocomplete(true))
                 )
                 .addSubcommand((sub) =>
                     sub
-                        .setName('check')
-                        .setDescription('Check whether a Roblox user owns an asset')
+                        .setName('ownership')
+                        .setDescription('Publicly verify whether a Roblox user owns an asset')
                         .addStringOption((o) => o.setName('asset_type').setDescription('Roblox asset type').setRequired(true).addChoices({ name: 'Game Pass', value: 'gamepass' }, { name: 'Shirt', value: 'shirt' }))
                         .addStringOption((o) => o.setName('asset_id').setDescription('Game Pass or Shirt asset ID').setRequired(true).setMaxLength(20))
                         .addStringOption((o) => o.setName('username').setDescription('Roblox username to check').setRequired(true).setMaxLength(20))
@@ -73,11 +73,11 @@ module.exports = {
         const cfg = config.getConfig(guildId);
         const group = interaction.options.getSubcommandGroup(false);
         const sub = interaction.options.getSubcommand();
-        if (group === 'link' && sub === 'check') return interaction.respond([]);
+        if (group === 'verify' && sub === 'ownership') return interaction.respond([]);
         if (!perms.isManager(interaction.member, cfg)) return interaction.respond([]);
 
         const focused = interaction.options.getFocused().toLowerCase();
-        if (sub === 'request' && interaction.options.getFocused(true).name === 'package_id') {
+        if (sub === 'create' && interaction.options.getFocused(true).name === 'package_id') {
             const approved = packages.list(guildId, 'approved')
                 .filter((pkg) => pkg.files?.length && (`${pkg.id}`.includes(focused) || pkg.name.toLowerCase().includes(focused)))
                 .slice(0, 25);
@@ -97,7 +97,7 @@ module.exports = {
 
         const sub = interaction.options.getSubcommand();
         const group = interaction.options.getSubcommandGroup(false);
-        const isOwnershipCheck = group === 'link' && sub === 'check';
+        const isOwnershipCheck = group === 'verify' && sub === 'ownership';
         if (isOwnershipCheck ? !perms.isStaff(interaction.member, cfg) : !perms.isManager(interaction.member, cfg)) {
             return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
         }
@@ -106,14 +106,15 @@ module.exports = {
             const assetType = interaction.options.getString('asset_type', true);
             const assetId = interaction.options.getString('asset_id', true).trim();
             const username = interaction.options.getString('username', true).trim();
-            if (!/^\d+$/.test(assetId)) return interaction.reply({ content: 'Asset ID must contain numbers only.', ephemeral: true });
+            await interaction.deferReply();
+            if (!/^\d+$/.test(assetId)) return interaction.editReply('Asset ID must contain numbers only.');
 
             const user = await roblox.resolveUsername(username);
-            if (!user.success) return interaction.reply({ content: user.reason === 'user_not_found' ? `No Roblox user was found for **${username}**.` : 'Roblox could not resolve that username right now. Try again shortly.', allowedMentions: { parse: [] } });
+            if (!user.success) return interaction.editReply({ content: user.reason === 'user_not_found' ? `No Roblox user was found for **${username}**.` : 'Roblox could not resolve that username right now. Try again shortly.', allowedMentions: { parse: [] } });
 
             const ownership = await roblox.checkAssetOwnership({ userId: user.id, assetId, assetType });
             if (!ownership.success) {
-                return interaction.reply({ content: ownership.reason === 'inventory_private' ? `Roblox did not allow an ownership check for **${user.name}**. The inventory may be private.` : 'Roblox could not complete the ownership check right now. Try again shortly.', allowedMentions: { parse: [] } });
+                return interaction.editReply({ content: ownership.reason === 'inventory_private' ? `Roblox did not allow an ownership check for **${user.name}**. The inventory may be private.` : 'Roblox could not complete the ownership check right now. Try again shortly.', allowedMentions: { parse: [] } });
             }
 
             const link = roblox.assetLink(assetId, assetType);
@@ -121,14 +122,14 @@ module.exports = {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setLabel(assetType === 'gamepass' ? 'Open Game Pass' : 'Open Asset').setStyle(ButtonStyle.Link).setURL(link)
             );
-            return interaction.reply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
+            return interaction.editReply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
         }
 
         if (!pool.getPoolIds().length) {
             return interaction.reply({ content: 'No payment game passes are configured. Add `PAYMENT_GAMEPASS_IDS=id1,id2,...` to `.env` and restart the bot.', ephemeral: true });
         }
 
-        if (sub === 'pool') {
+        if (sub === 'status') {
             const statuses = pool.listStatus(guildId);
             const lines = statuses.map((s) => (s.reserved ? `🔒 \`${s.gamePassId}\` — reserved ${formatSince(s.reservedAt)}${s.note ? ` — ${s.note}` : ''}` : `🟢 \`${s.gamePassId}\` — free`));
             return interaction.reply({ content: lines.join('\n'), ephemeral: true });
@@ -140,12 +141,12 @@ module.exports = {
             return interaction.reply({ content: released ? `Released \`${id}\` back into the pool.` : `\`${id}\` wasn't reserved.`, ephemeral: true });
         }
 
-        if (group === 'link' && sub === 'get') {
+        if (group === 'verify' && sub === 'link') {
             const id = interaction.options.getString('gamepass_id', true);
             return interaction.reply({ content: buildLinkMessage(cfg, id), components: [buildLinkButtons(cfg, id)] });
         }
 
-        if (sub === 'request') {
+        if (sub === 'create') {
             if (!cfg.robloxUniverseId) {
                 return interaction.reply({ content: 'No Roblox universe ID is configured. Set `ROBLOX_UNIVERSE_ID` in `.env` first (this is the game ID that owns your game passes).', ephemeral: true });
             }
