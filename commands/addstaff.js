@@ -18,10 +18,11 @@ module.exports = {
         }
 
         const user = interaction.options.getUser('user', true);
+        await interaction.deferReply({ ephemeral: true });
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
-        if (!member) return interaction.reply({ content: 'Could not find that member in this server.', ephemeral: true });
+        if (!member) return interaction.editReply('Could not find that member in this server.');
 
         await member.roles.add(cfg.staffRoleIds[0]);
-        return interaction.reply({ content: `Gave <@&${cfg.staffRoleIds[0]}> to ${user}.`, allowedMentions: { users: [] } });
+        return interaction.editReply({ content: `Gave <@&${cfg.staffRoleIds[0]}> to ${user}.`, allowedMentions: { users: [] } });
     },
 };

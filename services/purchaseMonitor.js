@@ -127,6 +127,11 @@ function start(client) {
         return;
     }
 
+    if (typeof globalThis.File === 'undefined') {
+        const { File } = require('node:buffer');
+        if (File) globalThis.File = File;
+    }
+
     let noblox;
     try {
         noblox = require('noblox.js');

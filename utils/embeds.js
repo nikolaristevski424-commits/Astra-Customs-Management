@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const {
     ContainerBuilder,
     MediaGalleryBuilder,
@@ -6,6 +8,8 @@ const {
     EmbedBuilder,
 } = require('discord.js');
 const { banner, FOOTER } = require('./brandAssets');
+
+const BANNERS_DIR = path.join(__dirname, '..', 'assets', 'banners');
 
 /** Parse "#2d2d31" (or "2d2d31") into a numeric color, falling back safely. */
 function parseColor(hex, fallback = 0x2d2d31) {
@@ -23,18 +27,20 @@ function parseColor(hex, fallback = 0x2d2d31) {
  * still needs to add any buttons/select menus and send it with
  * `flags: MessageFlags.IsComponentsV2`.
  */
-function buildPanel(config, { heading, body, extraBlocks = [] } = {}) {
+function buildPanel(config, { heading, body, extraBlocks = [], mention } = {}) {
     const container = new ContainerBuilder().setAccentColor(parseColor(config.accentColor));
+    const bannerUrl = config.bannerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'dashboard-banner.png')) ? banner('dashboard') : null);
+    const footerUrl = config.footerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'footer-banner.png')) ? FOOTER : null);
 
-    if (config.bannerUrl || banner('dashboard')) {
+    if (bannerUrl) {
         container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: config.bannerUrl || banner('dashboard') } }])
+            new MediaGalleryBuilder().addItems([{ media: { url: bannerUrl } }])
         );
     }
 
-    if (heading || body) {
+    if (mention || heading || body) {
         container.addTextDisplayComponents(
-            new TextDisplayBuilder().setContent([heading ? `## ${heading}` : null, body].filter(Boolean).join('\n\n'))
+            new TextDisplayBuilder().setContent([mention, heading ? `## ${heading}` : null, body].filter(Boolean).join('\n\n'))
         );
     }
 
@@ -43,9 +49,9 @@ function buildPanel(config, { heading, body, extraBlocks = [] } = {}) {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(block));
     }
 
-    if (config.footerUrl || FOOTER) {
+    if (footerUrl) {
         container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: config.footerUrl || FOOTER } }])
+            new MediaGalleryBuilder().addItems([{ media: { url: footerUrl } }])
         );
     }
 

@@ -48,20 +48,23 @@ function collectAttachmentFiles(value, files = [], seen = new Set()) {
     return files;
 }
 
-async function sendAsPanel(interaction, payload, targetChannel = null) {
-    const destination = targetChannel || interaction.channel;
+async function sendWithAttachments(destination, payload) {
     const files = collectAttachmentFiles(payload);
     const messagePayload = files.length ? { ...payload, files } : payload;
+    return destination.send(messagePayload);
+}
 
+async function sendAsPanel(interaction, payload, targetChannel = null) {
+    const destination = targetChannel || interaction.channel;
     try {
         await interaction.deferReply({ ephemeral: true });
         await interaction.deleteReply();
     } catch {
         // If we couldn't defer/delete for some reason, fall back to a normal reply
         // rather than losing the response entirely.
-        return destination.send(messagePayload);
+        return sendWithAttachments(destination, payload);
     }
-    return destination.send(messagePayload);
+    return sendWithAttachments(destination, payload);
 }
 
-module.exports = { collectAttachmentFiles, sendAsPanel };
+module.exports = { collectAttachmentFiles, sendWithAttachments, sendAsPanel };

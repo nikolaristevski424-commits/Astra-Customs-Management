@@ -216,8 +216,8 @@ if set, then deletes the channel.
 The dashboard has separate **Staff Application** and **Designer Application**
 buttons. Each opens a tailored five-question form and posts the result to
 `APPLICATIONS_CHANNEL_ID`. Reviewers are pinged using
-`APPLICATION_REVIEWER_ROLE_ID`; only that role (or an administrator) can
-Accept/Deny. Accepted applicants receive the matching role from
+`APPLICATION_REVIEWER_ROLE_ID` (comma-separated for multiple roles); only
+those roles (or an administrator) can Accept/Deny. Accepted applicants receive the matching role from
 `STAFF_APPLICATION_ACCEPT_ROLE_ID` or `DESIGNER_APPLICATION_ACCEPT_ROLE_ID`.
 Every submission receives a confirmation DM, every decision receives a DM, and
 decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The

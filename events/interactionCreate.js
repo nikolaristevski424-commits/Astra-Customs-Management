@@ -10,6 +10,7 @@ const {
     ChannelType,
     PermissionsBitField,
     AttachmentBuilder,
+    OverwriteType,
 } = require('discord.js');
 
 const config = require('../utils/config');
@@ -457,7 +458,7 @@ async function handleButton(interaction) {
         const parts = customId.split('_');
         const type = parts[2];
         const applicantId = parts[3];
-        const canReview = perms.isAdmin(interaction.member) || interaction.member.roles.cache.has(cfg.applicationReviewerRoleId);
+        const canReview = perms.isAdmin(interaction.member) || cfg.applicationReviewerRoleIds.some((roleId) => interaction.member.roles.cache.has(roleId));
         if (!canReview) return interaction.reply({ content: 'Only the configured application reviewers can decide applications.', ephemeral: true });
 
         const accept = customId.startsWith('app_accept_');
@@ -629,9 +630,9 @@ async function handleModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const ticketStaffRoleIds = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds;
         const overwrites = [
-            { id: interaction.guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-            { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-            ...ticketStaffRoleIds.map((roleId) => ({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] })),
+            { id: interaction.guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: interaction.user.id, type: OverwriteType.Member, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            ...ticketStaffRoleIds.map((roleId) => ({ id: roleId, type: OverwriteType.Role, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] })),
         ];
         const channel = await interaction.guild.channels.create({
             name: `order-${interaction.user.username}`.slice(0, 90),
@@ -684,12 +685,12 @@ async function handleModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
 
         const overwrites = [
-            { id: interaction.guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-            { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            { id: interaction.guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: interaction.user.id, type: OverwriteType.Member, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
         ];
         const ticketStaffRoleIds = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds;
         for (const roleId of ticketStaffRoleIds) {
-            overwrites.push({ id: roleId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
+            overwrites.push({ id: roleId, type: OverwriteType.Role, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
         }
 
         const channel = await interaction.guild.channels.create({
@@ -769,10 +770,10 @@ async function handleModal(interaction) {
         }
         try {
             await channel.send({
-                content: cfg.applicationReviewerRoleId ? `<@&${cfg.applicationReviewerRoleId}>` : undefined,
+                content: cfg.applicationReviewerRoleIds.length ? cfg.applicationReviewerRoleIds.map((roleId) => `<@&${roleId}>`).join(' ') : undefined,
                 embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
                 components: [row],
-                allowedMentions: { roles: cfg.applicationReviewerRoleId ? [cfg.applicationReviewerRoleId] : [] },
+                allowedMentions: { roles: cfg.applicationReviewerRoleIds },
             });
         } catch (error) {
             console.error('[applications] Failed to send application:', error.message);

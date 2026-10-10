@@ -188,6 +188,7 @@ module.exports = {
                 .filter(Boolean)
                 .map((a) => a.url);
 
+            await interaction.deferReply({ ephemeral: true });
             const job = jobs.createJob(guildId, {
                 type,
                 quantity,
@@ -205,6 +206,7 @@ module.exports = {
                 container.addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(
                         [
+                            `<@&${designerRole.id}> <@${interaction.user.id}>`,
                             '## 📋 New Order Added!',
                             `> **Order number:** ${job.orderNumber}`,
                             `> **Type:** ${type}`,
@@ -215,14 +217,13 @@ module.exports = {
                     )
                 );
                 await channel.send({
-                    content: `<@&${designerRole.id}> <@${interaction.user.id}>`,
                     flags: MessageFlags.IsComponentsV2,
                     components: [container],
                     allowedMentions: { roles: [designerRole.id], users: [interaction.user.id] },
                 });
             }
 
-            return interaction.reply({ content: `Job \`${job.orderNumber}\` posted with ${quantity} open instance(s).`, ephemeral: true });
+            return interaction.editReply(`Job \`${job.orderNumber}\` posted with ${quantity} open instance(s).`);
         }
 
         // ---- Job queue: list (browse open instances) ----
@@ -251,6 +252,7 @@ module.exports = {
             const quantity = interaction.options.getInteger('quantity', true);
             const price = interaction.options.getInteger('price', true);
 
+            await interaction.deferReply({ ephemeral: true });
             const rate = perms.commissionRate(interaction.member, cfg);
             const afterTax = price * 0.7;
             const designerEarning = Math.round(afterTax * (rate / 100));
@@ -267,14 +269,14 @@ module.exports = {
             const targetChannelId = cfg.orderLogChannelId || interaction.channelId;
             const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
             if (!channel) {
-                return interaction.reply({ content: 'Order saved, but the order-log channel is not set or not reachable. Set `ORDER_LOG_CHANNEL_ID` in `.env`.', ephemeral: true });
+                return interaction.editReply('Order saved, but the order-log channel is not set or not reachable. Set `ORDER_LOG_CHANNEL_ID` in `.env`.');
             }
 
             const row = new ActionRowBuilder().addComponents(orderButtons(created));
             const sent = await channel.send({ embeds: [orderEmbed(cfg, created)], components: [row] });
             orders.updateOrder(guildId, created.id, { channelId: sent.channelId, messageId: sent.id });
 
-            return interaction.reply({ content: `Order \`#${created.id}\` logged. Designer earning: R$${designerEarning}.`, ephemeral: true });
+            return interaction.editReply(`Order \`#${created.id}\` logged. Designer earning: R$${designerEarning}.`);
         }
 
         if (sub === 'update') {

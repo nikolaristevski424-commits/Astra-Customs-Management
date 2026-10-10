@@ -7,6 +7,7 @@ const config = require('../utils/config');
 const hr = require('../utils/hr');
 const perms = require('../utils/permissions');
 const { buildPanel } = require('../utils/embeds');
+const { sendWithAttachments } = require('../utils/respond');
 
 const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Under Investigation', 'Termination', 'Staff Blacklist'];
 
@@ -52,6 +53,7 @@ module.exports = {
                 const channel = await interaction.client.channels.fetch(cfg.infractionsChannelId).catch(() => null);
                 if (channel) {
                     const container = buildPanel(cfg, {
+                        mention: `<@${user.id}>`,
                         heading: 'Staff Punishment',
                         body: `This user has received a punishment from the HR team.\n**Staff Username** \`-\` ${userMention(user.id)}`,
                         extraBlocks: [
@@ -61,7 +63,7 @@ module.exports = {
                             `**Infraction ID** \`-\` ${infraction.infractionId}`,
                         ],
                     });
-                    await channel.send({ content: `<@${user.id}>`, flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions: { users: [user.id] } });
+                    await sendWithAttachments(channel, { flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions: { users: [user.id] } });
                 }
             }
 

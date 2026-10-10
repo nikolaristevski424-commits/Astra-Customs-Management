@@ -25,7 +25,7 @@ function defaultConfig() {
         qcRoleIds: [],                // can accept/deny /qc submissions
         ticketStaffRoleIds: [],       // can claim/close tickets — falls back to staffRoleIds if empty
         welcomeRoleId: null,
-        applicationReviewerRoleId: null, // role allowed to accept/deny applications
+        applicationReviewerRoleIds: [], // roles allowed to accept/deny applications
         staffApplicationAcceptRoleId: null,
         designerApplicationAcceptRoleId: null,
 
