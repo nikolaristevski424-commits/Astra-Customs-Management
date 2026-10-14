@@ -210,15 +210,26 @@ channel. Claiming and closing a ticket is restricted to
 `TICKET_STAFF_ROLE_IDS` — set this to a dedicated ticket-support role
 if you want it separate from general `STAFF_ROLE_IDS` (leave it blank
 to just use `STAFF_ROLE_IDS`). The ticket's own opener can also close
-it themselves. Closing posts a transcript to `TRANSCRIPT_CHANNEL_ID`
-if set, then deletes the channel.
+it themselves and can invite other server members with `/add` in the
+ticket; ticket staff can also use the command. Closing posts a transcript
+to `TRANSCRIPT_CHANNEL_ID` if set, then deletes the channel.
+
+## Activity checks
+
+`/activity check` snapshots the selected role's members when posted.
+Members have 24 hours to click the response button; after the deadline,
+any snapshot members who did not respond receive a **Notice** infraction.
+The check then closes and its response button is disabled.
+
+## Applications
 
 The dashboard has separate **Staff Application** and **Designer Application**
 buttons. Each opens a tailored five-question form and posts the result to
 `APPLICATIONS_CHANNEL_ID`. Reviewers are pinged using
 `APPLICATION_REVIEWER_ROLE_ID` (comma-separated for multiple roles); only
-those roles (or an administrator) can Accept/Deny. Accepted applicants receive the matching role from
-`STAFF_APPLICATION_ACCEPT_ROLE_ID` or `DESIGNER_APPLICATION_ACCEPT_ROLE_ID`.
+those roles (or an administrator) can Accept/Deny. Accepted applicants
+receive the matching role from `STAFF_APPLICATION_ACCEPT_ROLE_ID` or
+`DESIGNER_APPLICATION_ACCEPT_ROLE_ID`.
 Every submission receives a confirmation DM, every decision receives a DM, and
 decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
 dashboard also has a **Request LOA** button (same as `/loa request`, just as a
@@ -308,10 +319,12 @@ Open Cloud game-passes API, which supports either an Open Cloud API
 key (recommended, scope it narrowly) or a cookie. This one isn't
 subject to the same 2FA-challenge issue as payouts.
 
-**Purchase monitoring** polls the group's transaction feed every 30
-seconds using `noblox.js` — needs `ROBLOX_COOKIE` and `ROBLOX_GROUP_ID`
-set, plus `PURCHASE_LOG_CHANNEL_ID`. It does not replay a group's full
-sales history the first time it runs.
+**Purchase monitoring** checks each unique configured group at most once
+per minute, requests only the 100 newest transactions, and backs off on
+Roblox rate limits. It needs `ROBLOX_COOKIE` and `ROBLOX_GROUP_ID` set,
+plus `PURCHASE_LOG_CHANNEL_ID`. The transaction watermark is persisted so
+restarts do not replay sales already processed; it does not replay the
+group's existing transaction history when first enabled.
 
 **Everything is stored in flat JSON files** under `/data`, one file
 per data type, keyed by server ID. Fine for a single shop's scale;

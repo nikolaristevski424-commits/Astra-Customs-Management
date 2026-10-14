@@ -17,6 +17,12 @@ function listPromotions(guildId, userId) {
 function issueInfraction(guildId, data) {
     let created;
     store.update(INFRACTIONS, guildId, [], (all) => {
+        if (data.sourceActivityCheckId) {
+            created = all.find((infraction) =>
+                infraction.sourceActivityCheckId === data.sourceActivityCheckId && infraction.userId === data.userId
+            );
+            if (created) return all;
+        }
         const id = generateId(all.map((i) => i.infractionId));
         created = { infractionId: id, createdAt: Date.now(), voided: false, ...data };
         all.push(created);

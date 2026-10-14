@@ -6,16 +6,74 @@
 // that can view the group's transactions) and, optionally, BLOXLINK_API_KEY.
 // Requires in .env: ROBLOX_GROUP_ID, BLOXLINK_GUILD_ID.
 
+const axios = require('axios');
 const config = require('../utils/config');
 const { baseEmbed } = require('../utils/embeds');
 const { robloxToDiscord } = require('../utils/bloxlink');
 const credits = require('../utils/credits');
 const packages = require('../utils/packages');
 const paymentPool = require('../utils/paymentPool');
+const store = require('../utils/store');
 
-const POLL_INTERVAL_MS = 30_000;
-const queue = [];
-let isProcessing = false;
+const POLL_INTERVAL_MS = 60_000;
+const TRANSACTION_LIMIT = 100;
+const MAX_SEEN_TRANSACTION_IDS = 500;
+const STATE_STORE = 'purchaseMonitor';
+const retryAfter = new Map();
+const consecutiveFailures = new Map();
+let isStarted = false;
+let lastRobloxRequestAt = 0;
+let hasLoadedRobloxRequestAt = false;
+
+function getGroupState(groupId) {
+    const all = store.get(STATE_STORE, 'global', {});
+    return all[String(groupId)] || { initialized: false, lastSeenAt: 0, seenIds: [], nextRequestAt: 0 };
+}
+
+function saveGroupState(groupId, state) {
+    store.update(STATE_STORE, 'global', {}, (all) => {
+        all[String(groupId)] = state;
+        return all;
+    });
+}
+
+function saveLastRobloxRequestAt(timestamp) {
+    store.update(STATE_STORE, 'global', {}, (all) => {
+        all.lastRobloxRequestAt = timestamp;
+        return all;
+    });
+}
+
+function transactionKey(transaction) {
+    if (transaction.id !== undefined && transaction.id !== null) return String(transaction.id);
+    return [
+        transaction.created instanceof Date ? transaction.created.getTime() : new Date(transaction.created).getTime(),
+        transaction.agent?.id || '',
+        transaction.details?.id || transaction.details?.gamepassId || '',
+        transaction.currency?.amount || 0,
+    ].join(':');
+}
+
+async function fetchRecentTransactions(groupId, cookie) {
+    const { data } = await axios.get(`https://economy.roblox.com/v2/groups/${groupId}/transactions`, {
+        params: { transactionType: 'Sale', limit: TRANSACTION_LIMIT, sortOrder: 'Desc' },
+        headers: { Cookie: `.ROBLOSECURITY=${cookie}` },
+        timeout: 20_000,
+    });
+    if (!Array.isArray(data?.data)) throw new Error('Roblox returned an invalid group-transactions response.');
+    return data.data;
+}
+
+function backoffDuration(error, failureCount) {
+    const retryHeader = error.response?.headers?.['retry-after'];
+    if (retryHeader) {
+        const seconds = Number(retryHeader);
+        if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+        const retryAt = Date.parse(retryHeader);
+        if (Number.isFinite(retryAt)) return Math.max(retryAt - Date.now(), POLL_INTERVAL_MS);
+    }
+    return Math.min(POLL_INTERVAL_MS * (2 ** Math.min(failureCount, 4)), 15 * 60_000);
+}
 
 async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
     const itemName = transaction.details?.name || 'Unknown Item';
@@ -24,8 +82,6 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
     const buyerName = transaction.agent?.name || 'Unknown';
     const price = transaction.currency?.amount || 0;
     const purchasedLink = itemId ? `https://www.roblox.com/catalog/${itemId}` : null;
-    const unixTimestamp = Math.floor(new Date(transaction.created).getTime() / 1000);
-
     const discordId = buyerId ? await robloxToDiscord(cfg.discordServerIdForBloxlink, buyerId) : null;
     const buyerLine = discordId
         ? `<@${discordId}> ([${buyerName}](https://www.roblox.com/users/${buyerId}/profile))`
@@ -50,7 +106,7 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
             { name: 'Item', value: purchasedLink ? `[${itemName}](${purchasedLink})` : itemName, inline: true },
             { name: 'Amount After Tax', value: `R$${price}`, inline: true },
         ],
-        timestamp: transaction.created,
+        timestamp: transaction.created instanceof Date ? transaction.created : new Date(transaction.created),
     });
 
     if (cfg.purchaseLogChannelId) {
@@ -101,18 +157,90 @@ async function sendPurchaseEmbed(client, guildId, cfg, transaction) {
     }
 }
 
-function processQueue() {
-    if (isProcessing) return;
-    isProcessing = true;
+async function processGroup(client, groupId, destinations, transactions) {
+    const state = getGroupState(groupId);
+    const seenIds = new Set(state.seenIds || []);
+    const createdAt = (transaction) => new Date(transaction.created).getTime();
+    const newestAt = transactions.reduce((latest, transaction) => Math.max(latest, createdAt(transaction) || 0), state.lastSeenAt || 0);
 
-    (async () => {
-        while (queue.length > 0) {
-            const task = queue.shift();
-            await task();
-            await new Promise((r) => setTimeout(r, 3000));
+    if (!state.initialized) {
+        saveGroupState(groupId, {
+            initialized: true,
+            lastSeenAt: newestAt,
+            seenIds: transactions.map(transactionKey).slice(0, MAX_SEEN_TRANSACTION_IDS),
+        });
+        console.log(`[purchaseMonitor] Initialized transaction tracking for Roblox group ${groupId}.`);
+        return;
+    }
+
+    const pending = transactions
+        .filter((transaction) => {
+            const timestamp = createdAt(transaction);
+            return Number.isFinite(timestamp) && timestamp >= state.lastSeenAt && !seenIds.has(transactionKey(transaction));
+        })
+        .sort((a, b) => createdAt(a) - createdAt(b));
+
+    for (const transaction of pending) {
+        for (const { guildId, cfg } of destinations) {
+            await sendPurchaseEmbed(client, guildId, cfg, transaction);
         }
-        isProcessing = false;
-    })();
+        seenIds.add(transactionKey(transaction));
+        saveGroupState(groupId, {
+            initialized: true,
+            lastSeenAt: Math.max(state.lastSeenAt, createdAt(transaction)),
+            seenIds: [...seenIds].slice(-MAX_SEEN_TRANSACTION_IDS),
+        });
+        state.lastSeenAt = Math.max(state.lastSeenAt, createdAt(transaction));
+    }
+}
+
+async function pollGroups(client, cookie) {
+    if (!hasLoadedRobloxRequestAt) {
+        lastRobloxRequestAt = store.get(STATE_STORE, 'global', {}).lastRobloxRequestAt || 0;
+        hasLoadedRobloxRequestAt = true;
+    }
+
+    const groupedDestinations = new Map();
+    for (const [guildId] of client.guilds.cache) {
+        const cfg = config.getConfig(guildId);
+        if (!cfg.robloxGroupId) continue;
+        const groupId = String(cfg.robloxGroupId);
+        if (!groupedDestinations.has(groupId)) groupedDestinations.set(groupId, []);
+        groupedDestinations.get(groupId).push({ guildId, cfg });
+    }
+
+    for (const [groupId, destinations] of groupedDestinations) {
+        const state = getGroupState(groupId);
+        const allowedAt = Math.max(retryAfter.get(groupId) || 0, state.nextRequestAt || 0);
+        if (Date.now() < allowedAt) continue;
+
+        try {
+            const rateLimitWait = lastRobloxRequestAt + POLL_INTERVAL_MS - Date.now();
+            if (rateLimitWait > 0) await new Promise((resolve) => setTimeout(resolve, rateLimitWait));
+            lastRobloxRequestAt = Date.now();
+            saveLastRobloxRequestAt(lastRobloxRequestAt);
+            const transactions = await fetchRecentTransactions(groupId, cookie);
+            await processGroup(client, groupId, destinations, transactions);
+            const updatedState = getGroupState(groupId);
+            updatedState.nextRequestAt = 0;
+            saveGroupState(groupId, updatedState);
+            retryAfter.delete(groupId);
+            consecutiveFailures.delete(groupId);
+        } catch (error) {
+            const failures = (consecutiveFailures.get(groupId) || 0) + 1;
+            consecutiveFailures.set(groupId, failures);
+            const delay = backoffDuration(error, failures);
+            retryAfter.set(groupId, Date.now() + delay);
+            const failedState = getGroupState(groupId);
+            failedState.nextRequestAt = Date.now() + delay;
+            saveGroupState(groupId, failedState);
+            if (error.response?.status === 429) {
+                console.warn(`[purchaseMonitor] Roblox rate-limited group ${groupId}; retrying in ${Math.ceil(delay / 1000)} seconds.`);
+            } else {
+                console.error(`[purchaseMonitor] Error fetching transactions for group ${groupId}; retrying in ${Math.ceil(delay / 1000)} seconds:`, error.message);
+            }
+        }
+    }
 }
 
 /**
@@ -121,65 +249,26 @@ function processQueue() {
  * without it (rather than crashing the whole bot).
  */
 function start(client) {
+    if (isStarted) return;
     const cookie = process.env.ROBLOX_COOKIE;
     if (!cookie) {
         console.log('[purchaseMonitor] ROBLOX_COOKIE not set — purchase monitoring disabled.');
         return;
     }
 
-    if (typeof globalThis.File === 'undefined') {
-        const { File } = require('node:buffer');
-        if (File) globalThis.File = File;
-    }
+    isStarted = true;
+    console.log(`[purchaseMonitor] Polling each unique Roblox group at most once every ${POLL_INTERVAL_MS / 1000} seconds (up to ${TRANSACTION_LIMIT} transactions per request).`);
 
-    let noblox;
-    try {
-        noblox = require('noblox.js');
-    } catch (error) {
-        console.error('[purchaseMonitor] Could not load noblox.js; purchase monitoring disabled:', error.message);
-        return;
-    }
-
-    noblox
-        .setCookie(cookie)
-        .then(() => console.log('[purchaseMonitor] Logged into Roblox for purchase monitoring.'))
-        .catch((err) => console.error('[purchaseMonitor] Failed to log into Roblox:', err.message));
-
-    const lastSeen = new Map(); // guildId -> last transaction Date seen
-
-    setInterval(() => {
-        queue.push(async () => {
-            for (const [guildId, guild] of client.guilds.cache) {
-                const cfg = config.getConfig(guildId);
-                if (!cfg.robloxGroupId) continue;
-
-                try {
-                    const transactions = await noblox.getGroupTransactions(cfg.robloxGroupId, 'Sale');
-                    const firstRunForGuild = !lastSeen.has(guildId);
-                    const since = lastSeen.get(guildId) || new Date(0);
-                    let newest = since;
-
-                    for (const transaction of transactions) {
-                        const created = new Date(transaction.created);
-                        if (created > since) {
-                            // Don't replay a group's entire sales history the first time we see it.
-                            if (!firstRunForGuild) await sendPurchaseEmbed(client, guildId, cfg, transaction);
-                            if (created > newest) newest = created;
-                        }
-                    }
-                    lastSeen.set(guildId, newest > since ? newest : new Date());
-                } catch (err) {
-                    if (err.message?.includes('429')) {
-                        console.log('[purchaseMonitor] Rate limited, backing off.');
-                        await new Promise((r) => setTimeout(r, 60_000));
-                    } else {
-                        console.error(`[purchaseMonitor] Error fetching transactions for guild ${guildId}:`, err.message);
-                    }
-                }
-            }
-        });
-        processQueue();
-    }, POLL_INTERVAL_MS);
+    const poll = async () => {
+        try {
+            await pollGroups(client, cookie);
+        } catch (error) {
+            console.error('[purchaseMonitor] Polling loop failed:', error.message);
+        } finally {
+            setTimeout(poll, POLL_INTERVAL_MS);
+        }
+    };
+    poll();
 }
 
-module.exports = { start };
+module.exports = { start, fetchRecentTransactions, processGroup, pollGroups, transactionKey };

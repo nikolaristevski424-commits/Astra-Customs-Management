@@ -93,11 +93,18 @@ async function handleButton(interaction) {
         const id = customId.replace('activity_react_', '');
         const record = activityUtil.find(guildId, id);
         if (!record) return interaction.reply({ content: 'This activity check no longer exists.', ephemeral: true });
-        if (!interaction.member.roles.cache.has(record.roleId)) return interaction.reply({ content: 'Only members with the selected role can react to this activity check.', ephemeral: true });
+        if (record.status === 'completed' || Date.now() >= (record.deadlineAt || record.createdAt + activityUtil.CHECK_DURATION_MS)) {
+            return interaction.reply({ content: 'This activity check is closed. Responses were due within 24 hours of posting.', ephemeral: true });
+        }
+        const isEligible = record.targetIds
+            ? record.targetIds.includes(interaction.user.id)
+            : interaction.member.roles.cache.has(record.roleId);
+        if (!isEligible) return interaction.reply({ content: 'Only members who had the selected role when this check was posted can react.', ephemeral: true });
         if (record.voterIds.includes(interaction.user.id)) return interaction.reply({ content: 'You have already counted your activity on this check.', ephemeral: true });
 
         const updated = activityUtil.addVote(guildId, id, interaction.user.id);
-        const memberCount = await activityCmd.roleMemberCount(interaction.guild, record.roleId);
+        if (!updated) return interaction.reply({ content: 'This activity check is closed.', ephemeral: true });
+        const memberCount = record.targetIds?.length || 0;
         await interaction.update({ embeds: [activityCmd.buildEmbed(cfg, updated, memberCount)], components: [activityCmd.buildRow(updated)] });
         return;
     }

@@ -4,9 +4,9 @@ const { isExecutive } = require('../utils/env');
 const activity = require('../utils/activity');
 const { baseEmbed } = require('../utils/embeds');
 
-async function roleMemberCount(guild, roleId) {
-    await guild.members.fetch().catch(() => {});
-    return guild.members.cache.filter((member) => member.roles.cache.has(roleId)).size;
+async function roleMembers(guild, roleId) {
+    const members = await guild.members.fetch();
+    return [...members.values()].filter((member) => !member.user.bot && member.roles.cache.has(roleId));
 }
 
 function buildEmbed(cfg, record, memberCount) {
@@ -19,7 +19,7 @@ function buildEmbed(cfg, record, memberCount) {
             { name: 'Members with role', value: `${memberCount}`, inline: true },
             { name: 'Reacted', value: `${record.voterIds.length}`, inline: true },
             { name: 'Participation', value: memberCount ? `${Math.round((record.voterIds.length / memberCount) * 100)}%` : '0%', inline: true },
-            { name: 'How it works', value: 'Only members with the selected role should react. Each member can count once.' },
+            { name: 'How it works', value: 'Members who had the selected role when this was posted have 24 hours to react. Non-responders receive a Notice infraction.' },
         ],
         footer: `Activity Check #${record.id}`,
         timestamp: record.createdAt,
@@ -28,14 +28,19 @@ function buildEmbed(cfg, record, memberCount) {
 
 function buildRow(record) {
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`activity_react_${record.id}`).setLabel(`Reacted: ${record.voterIds.length}`).setStyle(ButtonStyle.Primary).setEmoji('✅')
+        new ButtonBuilder()
+            .setCustomId(`activity_react_${record.id}`)
+            .setLabel(record.status === 'completed' ? 'Check Closed' : `Reacted: ${record.voterIds.length}`)
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('✅')
+            .setDisabled(record.status === 'completed')
     );
 }
 
 module.exports = {
     buildEmbed,
     buildRow,
-    roleMemberCount,
+    roleMembers,
     data: new SlashCommandBuilder()
         .setName('activity')
         .setDescription('Create a live role activity check.')
@@ -47,10 +52,28 @@ module.exports = {
 
         const role = interaction.options.getRole('role', true);
         await interaction.deferReply({ ephemeral: true });
-        const record = activity.create(interaction.guildId, { roleId: role.id });
-        const memberCount = await roleMemberCount(interaction.guild, role.id);
-        const message = await interaction.channel.send({ embeds: [buildEmbed(cfg, record, memberCount)], components: [buildRow(record)] });
-        activity.attachMessage(interaction.guildId, record.id, message.id, message.channelId);
+        let members;
+        try {
+            members = await roleMembers(interaction.guild, role.id);
+        } catch (error) {
+            console.error('[activity] Failed to fetch role members:', error.message);
+            return interaction.editReply('Could not load the role members for this activity check. No check was created; please try again.');
+        }
+
+        const record = activity.create(interaction.guildId, {
+            roleId: role.id,
+            targetIds: members.map((member) => member.id),
+        });
+        const memberCount = members.length;
+        let message;
+        try {
+            message = await interaction.channel.send({ embeds: [buildEmbed(cfg, record, memberCount)], components: [buildRow(record)] });
+        } catch (error) {
+            activity.cancel(interaction.guildId, record.id);
+            console.error(`[activity] Could not post activity check #${record.id}:`, error.message);
+            return interaction.editReply('The activity check could not be posted. No infraction will be issued for this check.');
+        }
+        activity.attachMessage(interaction.guildId, record.id, message.id, message.channelId, message.createdTimestamp);
         return interaction.editReply(`Activity check #${record.id} posted for ${role}.`);
     },
 };
