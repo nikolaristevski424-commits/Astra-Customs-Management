@@ -43,6 +43,7 @@ const paymentRequestCmd = require('../commands/paymentrequest');
 const textCmd = require('../commands/text');
 const activityUtil = require('../utils/activity');
 const activityCmd = require('../commands/activity');
+const applicationStatus = require('../utils/applicationStatus');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -441,6 +442,9 @@ async function handleButton(interaction) {
     // ---- Dashboard: staff/designer applications ----
     if (customId === 'application_staff_open' || customId === 'application_designer_open') {
         const type = customId === 'application_staff_open' ? 'staff' : 'designer';
+        if (applicationStatus.getStatus(cfg, type) === 'closed') {
+            return interaction.reply({ content: `The **${applicationStatus.APPLICATIONS[type].name}** application is currently closed.`, flags: MessageFlags.Ephemeral });
+        }
         const modal = new ModalBuilder().setCustomId(`application_${type}_modal`).setTitle(`${type === 'staff' ? 'Staff' : 'Designer'} Application`);
         const questions = type === 'staff'
             ? [
@@ -792,6 +796,9 @@ async function handleModal(interaction) {
 
     if (customId === 'application_staff_modal' || customId === 'application_designer_modal') {
         const type = customId === 'application_staff_modal' ? 'staff' : 'designer';
+        if (applicationStatus.getStatus(cfg, type) === 'closed') {
+            return interaction.reply({ content: `The **${applicationStatus.APPLICATIONS[type].name}** application is currently closed. Your application was not submitted.`, flags: MessageFlags.Ephemeral });
+        }
         const answers = Object.fromEntries(['why_join', 'activity', 'experience', 'difficult_customer', 'roblox_username', 'portfolio', 'software', 'specialties']
             .map((field) => [field, interaction.fields.fields.has(field) ? interaction.fields.getTextInputValue(field) : null]));
 

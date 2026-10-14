@@ -8,6 +8,7 @@ const BANNERS = Object.freeze({
     order: `${ASSET_BASE}order-banner.png`,
     guidelines: `${ASSET_BASE}guidelines-banner.png`,
     status: `${ASSET_BASE}status-banner.png`,
+    applications: `${ASSET_BASE}applications-banner.png`,
     prices: `${ASSET_BASE}prices-banner.png`,
     portfolio: `${ASSET_BASE}portfolio-banner.png`,
     'designer-info': `${ASSET_BASE}marketplace-banner.png`,

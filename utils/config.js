@@ -29,6 +29,8 @@ function defaultConfig() {
         applicationReviewerRoleIds: [], // roles allowed to accept/deny applications
         staffApplicationAcceptRoleId: null,
         designerApplicationAcceptRoleId: null,
+        applicationStatus: { staff: 'open', designer: 'open' },
+        applicationPanel: { channelId: null, messageId: null },
 
         // Commission — % of the after-tax price a designer keeps, by role.
         // e.g. { "123456": 75, "234567": 70 }. Highest matching rate wins

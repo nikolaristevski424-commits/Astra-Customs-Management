@@ -15,6 +15,7 @@ const portfolio = require('../utils/portfolio');
 const { parseColor, addPanelBanner } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const { isExecutive } = require('../utils/env');
+const { APPLICATIONS, STATUSES, getStatus } = require('../utils/applicationStatus');
 
 function addPanelChannel(subcommand) {
     return subcommand.addChannelOption((o) => o.setName('channel').setDescription('Channel to send the panel to').addChannelTypes(ChannelType.GuildText));
@@ -73,15 +74,21 @@ function orderPanel(cfg) {
 }
 
 function applicationsPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'applications');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Employee Applications\n\n*${cfg.brandName} is hiring!* Review the requirements below, then choose the application that fits you best.`));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Creative Team**\n> <:OpenedEmoji1:1545902291469467668> Past experience\n> <:OpenedEmoji1:1545902291469467668> 13+\n> <:OpenedEmoji1:1545902291469467668> Active, dedicated, and professional\n\n**Customer Support**\n> <:OpenedEmoji1:1545902291469467668> 13+\n> <:OpenedEmoji1:1545902291469467668> Active and dedicated\n> <:OpenedEmoji1:1545902291469467668> At least 3 tickets per week'));
+    const designerStatus = getStatus(cfg, 'designer');
+    const staffStatus = getStatus(cfg, 'staff');
+    const designerInfo = STATUSES[designerStatus];
+    const staffInfo = STATUSES[staffStatus];
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        `**${APPLICATIONS.designer.name} — ${designerInfo.emoji} ${designerInfo.label}**\n> ${STATUSES.open.emoji} Past experience\n> ${STATUSES.open.emoji} 13+\n> ${STATUSES.open.emoji} Active, dedicated, and professional\n\n**${APPLICATIONS.staff.name} — ${staffInfo.emoji} ${staffInfo.label}**\n> ${STATUSES.open.emoji} 13+\n> ${STATUSES.open.emoji} Active and dedicated\n> ${STATUSES.open.emoji} At least 3 tickets per week`
+    ));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Answer every question honestly and with useful detail. Designers should prepare portfolio links and list their software or specialties. Submitting an application does not guarantee acceptance.'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('application_staff_open').setLabel('Apply for Staff').setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼'),
-        new ButtonBuilder().setCustomId('application_designer_open').setLabel('Apply as Designer').setStyle(ButtonStyle.Success).setEmoji('🎨'),
+        new ButtonBuilder().setCustomId('application_staff_open').setLabel(APPLICATIONS.staff.buttonLabel).setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼').setDisabled(staffStatus === 'closed'),
+        new ButtonBuilder().setCustomId('application_designer_open').setLabel(APPLICATIONS.designer.buttonLabel).setStyle(ButtonStyle.Success).setEmoji('🎨').setDisabled(designerStatus === 'closed'),
     ));
     return { components: [container] };
 }
@@ -165,6 +172,9 @@ module.exports = {
 
         if (type === 'honeypot' && sent) {
             config.setNested(guildId, 'honeypot', { channelId: sent.channelId, messageId: sent.id });
+        }
+        if (type === 'applications' && sent) {
+            config.setNested(guildId, 'applicationPanel', { channelId: sent.channelId, messageId: sent.id });
         }
 
         return sent;

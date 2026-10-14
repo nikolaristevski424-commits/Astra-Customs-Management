@@ -25,7 +25,8 @@ commented — work through it section by section:
 - **Executive team** — `EXECUTIVE_ROLE_IDS` / `EXECUTIVE_USER_IDS`, for approving payouts and `/package setprice` (see below — deliberately env-only)
 - **Branding** — brand name, colors, banner/footer images, prefix
   (`assets/banners` contains the dashboard, guidelines, marketplace,
-  order, status, portfolio, prices, infraction, and promotion artwork)
+  order, status, portfolio, prices, applications, infraction, and
+  promotion artwork)
 - **Roles** — staff, manager, HR, credit manager, payout manager, quality control, ticket staff (comma-separated — a role can be in more than one list)
 - **Commission** — `COMMISSION_RATES` maps a role to the % of the after-tax price a designer with that role keeps, e.g.:
   ```
@@ -246,8 +247,13 @@ The check then closes and its response button is disabled.
 
 ## Applications
 
-The dashboard has separate **Staff Application** and **Designer Application**
-buttons. Each opens a tailored five-question form and posts the result to
+The applications panel shows availability for **Customer Support** (staff)
+and **Creative Team** (designer). Staff can run
+`/application status application:<application> status:<open|delayed|closed>`
+to control either application. Closed applications have a disabled panel
+button, and both opening a form and submitting it check the current status.
+Changing the status refreshes the last applications panel posted by the bot.
+The panel buttons open tailored five-question forms and post results to
 `APPLICATIONS_CHANNEL_ID`. Reviewers are pinged using
 `APPLICATION_REVIEWER_ROLE_ID` (comma-separated for multiple roles); only
 those roles (or an administrator) can Accept/Deny. Accepted applicants
@@ -257,6 +263,11 @@ Every submission receives a confirmation DM, every decision receives a DM, and
 decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
 dashboard also has a **Request LOA** button (same as `/loa request`, just as a
 modal instead of typing dates as command options).
+
+The purchase monitor polls Roblox group transactions at a controlled rate.
+Transient Roblox HTTP 5xx responses are logged as upstream failures and retried
+with exponential backoff; the backoff state is persisted so restarts do not
+reset the retry delay.
 
 ## Guidelines and advertising
 

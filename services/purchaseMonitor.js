@@ -20,14 +20,20 @@ const TRANSACTION_LIMIT = 100;
 const MAX_SEEN_TRANSACTION_IDS = 500;
 const STATE_STORE = 'purchaseMonitor';
 const retryAfter = new Map();
-const consecutiveFailures = new Map();
 let isStarted = false;
 let lastRobloxRequestAt = 0;
 let hasLoadedRobloxRequestAt = false;
 
 function getGroupState(groupId) {
     const all = store.get(STATE_STORE, 'global', {});
-    return all[String(groupId)] || { initialized: false, lastSeenAt: 0, seenIds: [], nextRequestAt: 0 };
+    return {
+        initialized: false,
+        lastSeenAt: 0,
+        seenIds: [],
+        nextRequestAt: 0,
+        consecutiveFailures: 0,
+        ...all[String(groupId)],
+    };
 }
 
 function saveGroupState(groupId, state) {
@@ -223,19 +229,21 @@ async function pollGroups(client, cookie) {
             await processGroup(client, groupId, destinations, transactions);
             const updatedState = getGroupState(groupId);
             updatedState.nextRequestAt = 0;
+            updatedState.consecutiveFailures = 0;
             saveGroupState(groupId, updatedState);
             retryAfter.delete(groupId);
-            consecutiveFailures.delete(groupId);
         } catch (error) {
-            const failures = (consecutiveFailures.get(groupId) || 0) + 1;
-            consecutiveFailures.set(groupId, failures);
+            const failedState = getGroupState(groupId);
+            const failures = failedState.consecutiveFailures + 1;
             const delay = backoffDuration(error, failures);
             retryAfter.set(groupId, Date.now() + delay);
-            const failedState = getGroupState(groupId);
             failedState.nextRequestAt = Date.now() + delay;
+            failedState.consecutiveFailures = failures;
             saveGroupState(groupId, failedState);
             if (error.response?.status === 429) {
                 console.warn(`[purchaseMonitor] Roblox rate-limited group ${groupId}; retrying in ${Math.ceil(delay / 1000)} seconds.`);
+            } else if (error.response?.status >= 500) {
+                console.warn(`[purchaseMonitor] Roblox transactions endpoint returned HTTP ${error.response.status} for group ${groupId}; retrying in ${Math.ceil(delay / 1000)} seconds.`);
             } else {
                 console.error(`[purchaseMonitor] Error fetching transactions for group ${groupId}; retrying in ${Math.ceil(delay / 1000)} seconds:`, error.message);
             }
