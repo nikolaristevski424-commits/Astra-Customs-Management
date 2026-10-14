@@ -22,6 +22,7 @@ function defaultConfig() {
         hrRoleIds: [],                // can /infract, /promote
         creditManagerRoleIds: [],     // can /credit add|remove
         payoutManagerRoleIds: [],     // can /order reset
+        payoutRequesterRoleIds: ['1497420088456777859'], // can submit /payout request
         qcRoleIds: [],                // can accept/deny /qc submissions
         ticketStaffRoleIds: [],       // can claim/close tickets — falls back to staffRoleIds if empty
         welcomeRoleId: null,

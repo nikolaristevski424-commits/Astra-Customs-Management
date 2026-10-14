@@ -11,7 +11,16 @@ function create(guildId, data) {
     let record;
     store.update(STORE, guildId, state(guildId), (current) => {
         const id = current.counter++;
-        record = { id, voterIds: [], processedUserIds: [], status: 'active', createdAt: Date.now(), ...data };
+        const createdAt = Date.now();
+        record = {
+            id,
+            voterIds: [],
+            processedUserIds: [],
+            status: 'active',
+            createdAt,
+            deadlineAt: createdAt + CHECK_DURATION_MS,
+            ...data,
+        };
         current.checks[id] = record;
         return current;
     });

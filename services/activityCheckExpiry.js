@@ -6,9 +6,7 @@ const config = require('../utils/config');
 const activity = require('../utils/activity');
 const hr = require('../utils/hr');
 const activityCmd = require('../commands/activity');
-const { buildPanel } = require('../utils/embeds');
-const { sendWithAttachments } = require('../utils/respond');
-const { MessageFlags } = require('discord.js');
+const { sendInfractionMessages } = require('../utils/infractionMessages');
 
 const CHECK_INTERVAL_MS = 30_000;
 let isProcessing = false;
@@ -22,12 +20,12 @@ async function processCheck(client, guildId, guild, cfg, record) {
             .map((member) => member.id);
     }
 
-    let channel = null;
-    if (cfg.infractionsChannelId) {
-        channel = await client.channels.fetch(cfg.infractionsChannelId);
-        if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
-            throw new Error(`Configured infractions channel ${cfg.infractionsChannelId} is not a usable server text channel.`);
-        }
+    if (!cfg.infractionsChannelId) {
+        throw new Error(`INFRACTIONS_CHANNEL_ID is not configured for guild ${guildId}; activity Notices were not issued.`);
+    }
+    const channel = await client.channels.fetch(cfg.infractionsChannelId);
+    if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
+        throw new Error(`Configured infractions channel ${cfg.infractionsChannelId} is not a usable server text channel.`);
     }
 
     const voters = new Set(record.voterIds);
@@ -46,24 +44,21 @@ async function processCheck(client, guildId, guild, cfg, record) {
                 sourceActivityCheckId: record.id,
             });
 
-            if (channel) {
-                const container = buildPanel(cfg, {
-                    mention: `<@${userId}>`,
-                    heading: 'Activity Notice',
-                    body: 'This member did not respond to the activity check within 24 hours.',
-                    extraBlocks: [
-                        `**Punishment** \`-\` Notice`,
-                        `**Reason** \`-\` Did not react to Activity Check #${record.id}`,
-                        `**Role** \`-\` <@&${record.roleId}>`,
-                        `**Infraction ID** \`-\` ${infraction.infractionId}`,
-                    ],
-                });
-                await sendWithAttachments(channel, {
-                    flags: MessageFlags.IsComponentsV2,
-                    components: [container],
-                    allowedMentions: { users: [userId] },
-                });
-            }
+            const { panelMessage, pingMessage } = await sendInfractionMessages(channel, cfg, {
+                userId,
+                heading: 'Activity Notice',
+                body: 'This member did not respond to the activity check within 24 hours.',
+                punishment: 'Notice',
+                reason: `Did not react to Activity Check #${record.id}`,
+                infractionId: infraction.infractionId,
+                issuer: 'Activity check automation',
+                roleId: record.roleId,
+            });
+            hr.updateInfraction(guildId, infraction.infractionId, {
+                announcementChannelId: channel.id,
+                announcementMessageId: panelMessage.id,
+                notificationMessageId: pingMessage.id,
+            });
 
             activity.markUserProcessed(guildId, record.id, userId);
             processed.add(userId);
@@ -71,10 +66,6 @@ async function processCheck(client, guildId, guild, cfg, record) {
         } catch (error) {
             console.error(`[activityCheckExpiry] Failed issuing Notice for user ${userId}, check #${record.id} in guild ${guildId}:`, error.message);
         }
-    }
-
-    if (!channel && issuedCount > 0) {
-        console.warn(`[activityCheckExpiry] Recorded ${issuedCount} Notice infraction(s) for check #${record.id} in guild ${guildId}, but INFRACTIONS_CHANNEL_ID is not configured.`);
     }
 
     const incomplete = targetIds.some((userId) => !voters.has(userId) && !processed.has(userId));

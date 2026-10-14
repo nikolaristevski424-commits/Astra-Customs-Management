@@ -12,6 +12,10 @@ function findOpenForUser(guildId, userId) {
     return Object.values(all).find((ticket) => ticket.userId === userId && !ticket.closedAt);
 }
 
+function list(guildId) {
+    return Object.values(store.get(STORE, guildId, {}));
+}
+
 function create(guildId, channelId, data) {
     return store.update(STORE, guildId, {}, (all) => {
         all[channelId] = { channelId, createdAt: Date.now(), ...data };
@@ -33,4 +37,4 @@ function remove(guildId, channelId) {
     });
 }
 
-module.exports = { get, findOpenForUser, create, update, remove };
+module.exports = { get, list, findOpenForUser, create, update, remove };

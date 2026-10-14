@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const pricelistUtil = require('../utils/pricelist');
 const perms = require('../utils/permissions');
 const { parseColor } = require('../utils/embeds');
+const { banner } = require('../utils/brandAssets');
 const { sendAsPanel } = require('../utils/respond');
 
 function formatItems(items) {
@@ -52,6 +53,7 @@ function buildPricelistEmbed(cfg) {
             { name: `${pl.fullPack.name}`, value: `R$${pl.fullPack.price}\nIncludes: ${pl.fullPack.includes.join(', ')}` },
         );
     if (cfg.bannerUrl) embed.setImage(cfg.bannerUrl);
+    else embed.setImage(banner('prices'));
     return embed;
 }
 

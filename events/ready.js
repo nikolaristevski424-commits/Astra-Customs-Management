@@ -3,6 +3,7 @@ const purchaseMonitor = require('../services/purchaseMonitor');
 const loaExpiry = require('../services/loaExpiry');
 const giveawayScheduler = require('../services/giveawayScheduler');
 const activityCheckExpiry = require('../services/activityCheckExpiry');
+const ticketCloseRequests = require('../services/ticketCloseRequests');
 
 module.exports = {
     name: Events.ClientReady,
@@ -15,5 +16,6 @@ module.exports = {
         loaExpiry.start(client);
         giveawayScheduler.start(client);
         activityCheckExpiry.start(client);
+        ticketCloseRequests.start(client);
     },
 };

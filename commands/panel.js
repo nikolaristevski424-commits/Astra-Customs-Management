@@ -12,7 +12,7 @@ const {
 const config = require('../utils/config');
 const affiliations = require('./affiliate');
 const portfolio = require('../utils/portfolio');
-const { parseColor } = require('../utils/embeds');
+const { parseColor, addPanelBanner } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const { isExecutive } = require('../utils/env');
 
@@ -26,13 +26,15 @@ const PANEL_CHANNELS = Object.freeze({
     order: '1507174314485612708',
 });
 
-function baseContainer(cfg) {
-    return new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+function baseContainer(cfg, bannerKey = null) {
+    const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+    if (bannerKey) addPanelBanner(container, cfg, bannerKey);
+    return container;
 }
 
 function orderStatusPanel(cfg) {
     const services = Object.keys(cfg.serviceStatus || {}).length ? cfg.serviceStatus : { Liveries: 'open', Clothing: 'open', Graphics: 'open', Photography: 'open', Discord: 'open' };
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'status');
     const lines = [`## ${cfg.brandName} | Order Status`, '', 'Current availability for each service:', ''];
     for (const [name, status] of Object.entries(services)) {
         const normalized = { available: 'open', limited: 'delayed', unavailable: 'closed' }[status] || status;
@@ -50,7 +52,7 @@ function orderStatusPanel(cfg) {
 }
 
 function ticketsPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'guidelines');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Assistance\n\nNeed help with an order, payment, delivery, management issue, or member concern? Open a private ticket and explain what you need.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Before opening a ticket**\n- Explain the issue clearly.\n- Include relevant order or payment information.\n- Never share passwords, Roblox cookies, or private credentials.\n- Keep communication respectful while staff review your request.'));
@@ -59,7 +61,7 @@ function ticketsPanel(cfg) {
 }
 
 function orderPanel(cfg) {
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'order');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Order Here\n\nStart a private order request for custom work. Our team will review your details and guide you through the next steps.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Services**\n🚗 Livery Designs\n👕 Uniform Designs\n🎨 Graphics and ELS\n💬 Discord Designs\n\n**Have ready**\nYour references, deadline, budget, and important specifications.'));
@@ -86,7 +88,7 @@ function applicationsPanel(cfg) {
 
 function portfolioPanel(cfg, guildId) {
     const pieces = portfolio.list(guildId).slice(-10).reverse();
-    const container = baseContainer(cfg);
+    const container = baseContainer(cfg, 'portfolio');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Portfolio\n\nA selection of recent work from our creative team.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(

@@ -16,11 +16,13 @@ const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const { isExecutive } = require('../utils/env');
 const packages = require('../utils/packages');
-const { parseColor } = require('../utils/embeds');
+const { addPanelBanner, parseColor } = require('../utils/embeds');
 const { createCatalogThread } = require('../utils/catalogThreads');
+const { collectAttachmentFiles } = require('../utils/respond');
 
 function buildPackageContainer(cfg, pkg) {
     const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+    addPanelBanner(container, cfg, 'marketplace');
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
             [
@@ -209,7 +211,8 @@ module.exports = {
                 return interaction.reply({ content: 'This package isn\'t public yet.', ephemeral: true });
             }
             const container = buildPackageContainer(cfg, pkg);
-            return interaction.reply({ flags: MessageFlags.IsComponentsV2, components: [container], ephemeral: true });
+            const files = collectAttachmentFiles([container]);
+            return interaction.reply({ flags: MessageFlags.IsComponentsV2, components: [container], ...(files.length ? { files } : {}), ephemeral: true });
         }
     },
 };

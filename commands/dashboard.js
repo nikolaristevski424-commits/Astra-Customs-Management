@@ -4,6 +4,7 @@ const ordersUtil = require('../utils/orders');
 const jobsUtil = require('../utils/jobs');
 const store = require('../utils/store');
 const { baseEmbed } = require('../utils/embeds');
+const { collectAttachmentFiles } = require('../utils/respond');
 
 function countOpenTickets(guildId) {
     const all = store.get('tickets', guildId, {});
@@ -46,6 +47,7 @@ function buildDashboardEmbed(cfg, guildId) {
 
     return baseEmbed(cfg, {
         color: 0x2d8cff,
+        bannerKey: 'dashboard',
         title: `${cfg.brandName} | Live Dashboard`,
         description: 'A quick snapshot of what is active in the shop right now.',
         fields: [
@@ -76,6 +78,8 @@ module.exports = {
     async execute(interaction) {
         const guildId = interaction.guildId;
         const cfg = config.getConfig(guildId);
-        return interaction.reply({ embeds: [buildDashboardEmbed(cfg, guildId)] });
+        const embeds = [buildDashboardEmbed(cfg, guildId)];
+        const files = collectAttachmentFiles(embeds);
+        return interaction.reply({ embeds, ...(files.length ? { files } : {}) });
     },
 };

@@ -24,6 +24,8 @@ commented — work through it section by section:
 - **Discord** — `BOT_TOKEN`, `CLIENT_ID`, `GUILD_ID` (required)
 - **Executive team** — `EXECUTIVE_ROLE_IDS` / `EXECUTIVE_USER_IDS`, for approving payouts and `/package setprice` (see below — deliberately env-only)
 - **Branding** — brand name, colors, banner/footer images, prefix
+  (`assets/banners` contains the dashboard, guidelines, marketplace,
+  order, status, portfolio, prices, infraction, and promotion artwork)
 - **Roles** — staff, manager, HR, credit manager, payout manager, quality control, ticket staff (comma-separated — a role can be in more than one list)
 - **Commission** — `COMMISSION_RATES` maps a role to the % of the after-tax price a designer with that role keeps, e.g.:
   ```
@@ -209,16 +211,37 @@ panel; clicking **Help** opens a modal and creates a private ticket
 channel. Claiming and closing a ticket is restricted to
 `TICKET_STAFF_ROLE_IDS` — set this to a dedicated ticket-support role
 if you want it separate from general `STAFF_ROLE_IDS` (leave it blank
-to just use `STAFF_ROLE_IDS`). The ticket's own opener can also close
-it themselves and can invite other server members with `/add` in the
-ticket; ticket staff can also use the command. Closing posts a transcript
-to `TRANSCRIPT_CHANNEL_ID` if set, then deletes the channel.
+to just use `STAFF_ROLE_IDS`). The ticket opener and invited members can
+also manage its close request. Use `/close request` to post a public
+request with **Close Ticket Now** and **Keep Ticket Open** buttons. If no
+one responds within 24 hours, the ticket closes automatically. A closing
+ticket gets a complete text transcript (including attachments) in
+`TRANSCRIPT_CHANNEL_ID` when configured and a transcript DM to its opener
+before the channel is deleted. `/add user:<member>` grants a member
+private access to that ticket.
+
+## Payout requests
+
+`/payout request` is available to administrators and members with the
+`PAYOUT_REQUESTER_ROLE_IDS` role. The default requester role is
+`1497420088456777859`; change the comma-separated environment value to
+customize it. Reviewing, denying, and auto-sending requests remain
+restricted to the executive team.
 
 ## Activity checks
 
 `/activity check` snapshots the selected role's members when posted.
 Members have 24 hours to click the response button; after the deadline,
 any snapshot members who did not respond receive a **Notice** infraction.
+The activity panel displays a relative Discord timestamp for when those
+Notices are due. Each Notice is announced with a separate user mention in
+the configured infractions channel, followed by its infraction panel.
+
+HR can issue an infraction with `/infract issue`. Choose whether the
+issuer should be shown or the infraction should be anonymous; the issuer
+is still retained in the internal infraction record for audit purposes.
+Manual and activity-check infractions ping the affected member in a
+separate message outside the Components V2 infraction panel.
 The check then closes and its response button is disabled.
 
 ## Applications

@@ -19,6 +19,7 @@ function buildEmbed(cfg, record, memberCount) {
             { name: 'Members with role', value: `${memberCount}`, inline: true },
             { name: 'Reacted', value: `${record.voterIds.length}`, inline: true },
             { name: 'Participation', value: memberCount ? `${Math.round((record.voterIds.length / memberCount) * 100)}%` : '0%', inline: true },
+            { name: 'Infraction notices', value: `<t:${Math.floor((record.deadlineAt || record.createdAt + activity.CHECK_DURATION_MS) / 1000)}:R>`, inline: true },
             { name: 'How it works', value: 'Members who had the selected role when this was posted have 24 hours to react. Non-responders receive a Notice infraction.' },
         ],
         footer: `Activity Check #${record.id}`,

@@ -20,6 +20,7 @@ const jobsUtil = require('../utils/jobs');
 const bundlesUtil = require('../utils/bundles');
 const loaUtil = require('../utils/loa');
 const tickets = require('../utils/tickets');
+const { closeTicket } = require('../utils/ticketClosing');
 const paymentRequests = require('../utils/paymentRequests');
 const packagesUtil = require('../utils/packages');
 const payoutRequestsUtil = require('../utils/payoutRequests');
@@ -511,7 +512,7 @@ async function handleButton(interaction) {
         if (!perms.isTicketStaff(interaction.member, cfg)) return interaction.reply({ content: 'You do not have permission to claim tickets.', ephemeral: true });
         const channelId = customId.replace('ticket_claim_', '');
         const ticket = tickets.get(guildId, channelId);
-        if (!ticket) return interaction.reply({ content: 'This ticket is no longer tracked.', ephemeral: true });
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId) return interaction.reply({ content: 'This ticket is no longer open or tracked.', ephemeral: true });
         const updated = tickets.update(guildId, channelId, { claimedBy: interaction.user.id, claimedAt: Date.now() });
         const embed = ticket.type === 'order'
             ? {
@@ -544,33 +545,95 @@ async function handleButton(interaction) {
         return;
     }
 
+    if (customId.startsWith('ticket_keep_open_')) {
+        const channelId = customId.replace('ticket_keep_open_', '');
+        const ticket = tickets.get(guildId, channelId);
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
+            return interaction.reply({ content: 'This ticket is no longer open.', ephemeral: true });
+        }
+        if (!canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
+            return interaction.reply({ content: 'Only the ticket opener or ticket staff can respond to this close request.', ephemeral: true });
+        }
+        if (ticket.closeRequest?.status !== 'pending') {
+            return interaction.reply({ content: 'This close request is no longer active.', ephemeral: true });
+        }
+        if (Date.now() >= ticket.closeRequest.deadlineAt) {
+            tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'auto-closing', resolvedAt: Date.now() } });
+            await interaction.update({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] });
+            await closeTicket(interaction.client, guildId, cfg, channelId, 'automatic 24-hour timeout');
+            return;
+        }
+        tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'kept-open', resolvedBy: interaction.user.id, resolvedAt: Date.now() } });
+        await interaction.update({
+            content: `Ticket kept open by <@${interaction.user.id}>.`,
+            components: [],
+            allowedMentions: { users: [] },
+        });
+        return;
+    }
+
+    if (customId.startsWith('ticket_close_now_')) {
+        const channelId = customId.replace('ticket_close_now_', '');
+        const ticket = tickets.get(guildId, channelId);
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
+            return interaction.reply({ content: 'This ticket is no longer open.', ephemeral: true });
+        }
+        if (!canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
+            return interaction.reply({ content: 'Only the ticket opener or ticket staff can close this ticket.', ephemeral: true });
+        }
+        if (ticket.closeRequest?.status !== 'pending') {
+            return interaction.reply({ content: 'This close request is no longer active.', ephemeral: true });
+        }
+        if (Date.now() >= ticket.closeRequest.deadlineAt) {
+            tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'auto-closing', resolvedAt: Date.now() } });
+            await interaction.update({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] });
+            await closeTicket(interaction.client, guildId, cfg, channelId, 'automatic 24-hour timeout');
+            return;
+        }
+        tickets.update(guildId, channelId, {
+            closeRequest: { ...ticket.closeRequest, status: 'closed-now', resolvedBy: interaction.user.id, resolvedAt: Date.now() },
+        });
+        await interaction.update({
+            content: `Ticket closure confirmed by <@${interaction.user.id}>. Closing now and preparing the transcript.`,
+            components: [],
+            allowedMentions: { users: [] },
+        });
+        await closeTicket(interaction.client, guildId, cfg, channelId, interaction.user.id);
+        return;
+    }
+
     if (customId.startsWith('ticket_close_confirm_')) {
         const channelId = customId.replace('ticket_close_confirm_', '');
         const ticket = tickets.get(guildId, channelId);
-        if (!perms.isTicketStaff(interaction.member, cfg) && interaction.user.id !== ticket?.userId) {
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
         }
-        await interaction.update({ content: 'Closing this ticket in 5 seconds...', components: [] });
-        setTimeout(() => closeTicket(interaction, guildId, cfg, channelId), 5000);
+        await interaction.update({ content: 'Closing this ticket and preparing the transcript...', components: [] });
+        await closeTicket(interaction.client, guildId, cfg, channelId, interaction.user.id);
         return;
     }
 
     if (customId.startsWith('ticket_close_cancel_')) {
-        await interaction.update({ content: 'Close cancelled.', components: [] });
+        const channelId = customId.replace('ticket_close_cancel_', '');
+        const ticket = tickets.get(guildId, channelId);
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
+            return interaction.reply({ content: 'You do not have permission to cancel this close action.', ephemeral: true });
+        }
+        await interaction.update({ content: `Close cancelled by <@${interaction.user.id}>.`, components: [], allowedMentions: { users: [] } });
         return;
     }
 
     if (customId.startsWith('ticket_close_')) {
         const channelId = customId.replace('ticket_close_', '');
         const ticket = tickets.get(guildId, channelId);
-        if (!perms.isTicketStaff(interaction.member, cfg) && interaction.user.id !== ticket?.userId) {
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
         }
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_close_confirm_${channelId}`).setLabel('Confirm Close').setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`ticket_close_cancel_${channelId}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
         );
-        return interaction.reply({ content: 'Are you sure you want to close this ticket?', components: [row], ephemeral: true });
+        return interaction.reply({ content: 'Are you sure you want to close this ticket?', components: [row], ephemeral: false });
     }
 
     // ---- Quality control: accept/deny ----
@@ -591,27 +654,18 @@ async function handleButton(interaction) {
     }
 }
 
-async function closeTicket(interaction, guildId, cfg, channelId) {
-    const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
-    if (!channel) return;
+function canManageTicket(member, ticket, cfg, userId) {
+    return userId === ticket.userId
+        || perms.isTicketStaff(member, cfg);
+}
 
-    if (cfg.transcriptChannelId) {
-        try {
-            const messages = await channel.messages.fetch({ limit: 100 });
-            const sorted = [...messages.values()].reverse();
-            const text = sorted.map((m) => `[${m.createdAt.toISOString()}] ${m.author.tag}: ${m.content}`).join('\n');
-            const transcriptChannel = await interaction.client.channels.fetch(cfg.transcriptChannelId).catch(() => null);
-            if (transcriptChannel) {
-                const file = new AttachmentBuilder(Buffer.from(text || 'No messages.', 'utf8'), { name: `transcript-${channel.name}.txt` });
-                await transcriptChannel.send({ content: `Transcript for **#${channel.name}**`, files: [file] });
-            }
-        } catch (err) {
-            console.error('[tickets] Failed to build transcript:', err.message);
-        }
-    }
-
-    tickets.remove(guildId, channelId);
-    await channel.delete().catch(() => {});
+function ticketStaffRoles(guild, cfg) {
+    const configured = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds || [];
+    return configured.filter((roleId) => {
+        if (guild.roles.cache.has(roleId)) return true;
+        console.warn(`[tickets] Ignoring configured ticket-staff role ${roleId}; it is not present in guild ${guild.id}.`);
+        return false;
+    });
 }
 
 async function handleModal(interaction) {
@@ -635,7 +689,7 @@ async function handleModal(interaction) {
         if (existing) return interaction.reply({ content: `You already have an open ticket: <#${existing.channelId}>`, ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
-        const ticketStaffRoleIds = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds;
+        const ticketStaffRoleIds = ticketStaffRoles(interaction.guild, cfg);
         const overwrites = [
             { id: interaction.guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionsBitField.Flags.ViewChannel] },
             { id: interaction.user.id, type: OverwriteType.Member, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
@@ -695,7 +749,7 @@ async function handleModal(interaction) {
             { id: interaction.guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionsBitField.Flags.ViewChannel] },
             { id: interaction.user.id, type: OverwriteType.Member, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
         ];
-        const ticketStaffRoleIds = cfg.ticketStaffRoleIds?.length ? cfg.ticketStaffRoleIds : cfg.staffRoleIds;
+        const ticketStaffRoleIds = ticketStaffRoles(interaction.guild, cfg);
         for (const roleId of ticketStaffRoleIds) {
             overwrites.push({ id: roleId, type: OverwriteType.Role, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
         }
@@ -707,7 +761,7 @@ async function handleModal(interaction) {
             permissionOverwrites: overwrites,
         });
 
-        tickets.create(guildId, channel.id, { userId: interaction.user.id, reason, staffRoleIds: ticketStaffRoleIds });
+        tickets.create(guildId, channel.id, { userId: interaction.user.id, reason, type: 'support', staffRoleIds: ticketStaffRoleIds });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Primary),

@@ -24,24 +24,43 @@ function issueInfraction(guildId, data) {
             if (created) return all;
         }
         const id = generateId(all.map((i) => i.infractionId));
-        created = { infractionId: id, createdAt: Date.now(), voided: false, ...data };
+        created = {
+            infractionId: id,
+            createdAt: Date.now(),
+            voided: false,
+            anonymous: false,
+            ...data,
+        };
         all.push(created);
         return all;
     });
     return created;
 }
 
-function voidInfraction(guildId, infractionId) {
-    let removed = null;
+function voidInfraction(guildId, infractionId, voidedBy) {
+    let updated = null;
     store.update(INFRACTIONS, guildId, [], (all) => {
-        const idx = all.findIndex((i) => i.infractionId === infractionId);
-        if (idx !== -1) {
-            removed = all[idx];
-            all.splice(idx, 1);
+        const record = all.find((infraction) => infraction.infractionId === infractionId);
+        if (record && !record.voided) {
+            Object.assign(record, { voided: true, voidedAt: Date.now(), voidedBy });
+            updated = record;
         }
         return all;
     });
-    return removed;
+    return updated;
+}
+
+function updateInfraction(guildId, infractionId, patch) {
+    let updated = null;
+    store.update(INFRACTIONS, guildId, [], (all) => {
+        const record = all.find((infraction) => infraction.infractionId === infractionId);
+        if (record) {
+            Object.assign(record, patch);
+            updated = record;
+        }
+        return all;
+    });
+    return updated;
 }
 
 function issuePromotion(guildId, data) {
@@ -73,6 +92,7 @@ module.exports = {
     listPromotions,
     issueInfraction,
     voidInfraction,
+    updateInfraction,
     issuePromotion,
     voidPromotion,
 };

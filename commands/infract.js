@@ -1,13 +1,8 @@
-const {
-    SlashCommandBuilder,
-    userMention,
-    MessageFlags,
-} = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const hr = require('../utils/hr');
 const perms = require('../utils/permissions');
-const { buildPanel } = require('../utils/embeds');
-const { sendWithAttachments } = require('../utils/respond');
+const { sendInfractionMessages } = require('../utils/infractionMessages');
 
 const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Under Investigation', 'Termination', 'Staff Blacklist'];
 
@@ -22,6 +17,10 @@ module.exports = {
                 .addUserOption((o) => o.setName('user').setDescription('Staff member').setRequired(true))
                 .addStringOption((o) => o.setName('punishment').setDescription('Punishment').setRequired(true).addChoices(...PUNISHMENTS.map((p) => ({ name: p, value: p }))))
                 .addStringOption((o) => o.setName('reason').setDescription('Reason').setRequired(true))
+                .addStringOption((o) => o.setName('issuer_visibility').setDescription('Whether to show who issued this infraction').setRequired(true).addChoices(
+                    { name: 'Show issuer', value: 'identified' },
+                    { name: 'Anonymous', value: 'anonymous' },
+                ))
         )
         .addSubcommand((sub) =>
             sub.setName('void').setDescription('Void an infraction').addStringOption((o) => o.setName('id').setDescription('Infraction ID, e.g. #ABCXYZ').setRequired(true))
@@ -38,43 +37,112 @@ module.exports = {
         const sub = interaction.options.getSubcommand();
 
         if (sub === 'issue') {
+            await interaction.deferReply({ ephemeral: true });
+            const channel = cfg.infractionsChannelId
+                ? await interaction.client.channels.fetch(cfg.infractionsChannelId).catch(() => null)
+                : null;
+            if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
+                return interaction.editReply('Could not issue the infraction: the configured infractions channel is unavailable. No infraction was recorded.');
+            }
+
             const user = interaction.options.getUser('user', true);
             const punishment = interaction.options.getString('punishment', true);
             const reason = interaction.options.getString('reason', true);
+            const anonymous = interaction.options.getString('issuer_visibility', true) === 'anonymous';
 
             const infraction = hr.issueInfraction(guildId, {
                 userId: user.id,
                 issuedBy: interaction.user.id,
+                anonymous,
                 punishment,
                 reason,
             });
 
-            if (cfg.infractionsChannelId) {
-                const channel = await interaction.client.channels.fetch(cfg.infractionsChannelId).catch(() => null);
-                if (channel) {
-                    const container = buildPanel(cfg, {
-                        mention: `<@${user.id}>`,
-                        heading: 'Staff Punishment',
-                        body: `This user has received a punishment from the HR team.\n**Staff Username** \`-\` ${userMention(user.id)}`,
-                        extraBlocks: [
-                            `**Punishment** \`-\` ${punishment}`,
-                            `**Reason** \`-\` ${reason}`,
-                            `**Issued by** \`-\` <@${interaction.user.id}>`,
-                            `**Infraction ID** \`-\` ${infraction.infractionId}`,
-                        ],
-                    });
-                    await sendWithAttachments(channel, { flags: MessageFlags.IsComponentsV2, components: [container], allowedMentions: { users: [user.id] } });
-                }
+            let notificationSent = false;
+            let notificationError = null;
+            try {
+                const { panelMessage, pingMessage } = await sendInfractionMessages(channel, cfg, {
+                    userId: user.id,
+                    heading: 'Staff Punishment',
+                    body: 'This user has received a punishment from the HR team.',
+                    punishment,
+                    reason,
+                    infractionId: infraction.infractionId,
+                    issuer: anonymous ? null : `<@${interaction.user.id}>`,
+                });
+                hr.updateInfraction(guildId, infraction.infractionId, {
+                    announcementChannelId: channel.id,
+                    announcementMessageId: panelMessage.id,
+                    notificationMessageId: pingMessage.id,
+                });
+                notificationSent = true;
+            } catch (error) {
+                notificationError = error;
+                console.error(`[infract] Could not notify ${user.id} about infraction ${infraction.infractionId}:`, error.message);
             }
 
-            return interaction.reply({ content: `Successfully infracted **${user.tag}**.\nID: \`${infraction.infractionId}\``, ephemeral: true, allowedMentions: { users: [] } });
+            const notificationWarning = notificationSent ? '' : `\n**Warning:** the infraction was recorded, but its notification could not be sent${notificationError ? ` (${notificationError.message})` : ''}.`;
+            return interaction.editReply({ content: `Successfully infracted **${user.tag}**.\nID: \`${infraction.infractionId}\`${notificationWarning}`, allowedMentions: { users: [] } });
         }
 
         if (sub === 'void') {
+            await interaction.deferReply({ ephemeral: true });
             const id = interaction.options.getString('id', true).toUpperCase();
-            const removed = hr.voidInfraction(guildId, id);
-            if (!removed) return interaction.reply({ content: `No infraction found with ID \`${id}\`.`, ephemeral: true });
-            return interaction.reply({ content: `Infraction \`${id}\` has been **voided**.`, ephemeral: true });
+            const removed = hr.voidInfraction(guildId, id, interaction.user.id);
+            if (!removed) {
+                const existing = hr.listInfractions(guildId).find((infraction) => infraction.infractionId === id);
+                return interaction.editReply(existing ? `Infraction \`${id}\` has already been voided.` : `No infraction found with ID \`${id}\`.`);
+            }
+
+            let announcementUpdated = false;
+            let announcementError = null;
+            if (removed.announcementChannelId && removed.announcementMessageId) {
+                const channel = await interaction.client.channels.fetch(removed.announcementChannelId).catch(() => null);
+                if (channel?.isTextBased?.() && !channel.isDMBased?.()) {
+                    if (removed.notificationMessageId) {
+                        const pingMessage = await channel.messages.fetch(removed.notificationMessageId).catch(() => null);
+                        if (pingMessage) {
+                            try {
+                                await pingMessage.edit({
+                                    content: `Infraction \`${id}\` was voided. <@${removed.userId}>`,
+                                    allowedMentions: { parse: [] },
+                                });
+                            } catch (error) {
+                                announcementError = error;
+                                console.error(`[infract] Could not update the notification for voided infraction ${id}:`, error.message);
+                            }
+                        }
+                    }
+
+                    const panelMessage = await channel.messages.fetch(removed.announcementMessageId).catch(() => null);
+                    if (panelMessage) {
+                        try {
+                            await panelMessage.reply({
+                                embeds: [{
+                                    title: 'Infraction Voided',
+                                    description: `Infraction \`${id}\` for <@${removed.userId}> has been voided.`,
+                                    color: 0xf1c40f,
+                                    fields: [
+                                        { name: 'Voided by', value: `<@${removed.voidedBy || interaction.user.id}>`, inline: true },
+                                        { name: 'Reason', value: removed.reason || 'Not provided', inline: false },
+                                    ],
+                                    timestamp: new Date().toISOString(),
+                                }],
+                                allowedMentions: { parse: [] },
+                            });
+                            announcementUpdated = true;
+                        } catch (error) {
+                            announcementError = error;
+                            console.error(`[infract] Could not add the yellow void notice for infraction ${id}:`, error.message);
+                        }
+                    }
+                }
+            }
+
+            const announcementStatus = announcementUpdated
+                ? ''
+                : ` Its original announcement could not be updated${announcementError ? ` (${announcementError.message})` : ''}, so no yellow notice was added.`;
+            return interaction.editReply(`Infraction \`${id}\` has been **voided** and retained in the audit history.${announcementStatus}`);
         }
     },
 };

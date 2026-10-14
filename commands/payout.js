@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
+const perms = require('../utils/permissions');
 const { isExecutive } = require('../utils/env');
 const payoutRequests = require('../utils/payoutRequests');
 const { baseEmbed } = require('../utils/embeds');
@@ -72,6 +73,10 @@ module.exports = {
         }
 
         if (sub === 'request') {
+            if (!perms.isPayoutRequester(interaction.member, cfg)) {
+                return interaction.reply({ content: 'You need the configured payout requester role to submit a payout request.', ephemeral: true });
+            }
+
             const amount = interaction.options.getInteger('amount', true);
             const robuxUsername = interaction.options.getString('robux_username', true);
             const reason = interaction.options.getString('reason', true);

@@ -1,4 +1,5 @@
 const { ChannelType } = require('discord.js');
+const { collectAttachmentFiles } = require('./respond');
 
 async function createCatalogThread(channel, name, message) {
     if (!channel?.threads?.create) return null;
@@ -10,9 +11,11 @@ async function createCatalogThread(channel, name, message) {
     };
 
     if (channel.type === ChannelType.GuildForum) {
-        options.message = message;
+        const files = collectAttachmentFiles(message);
+        options.message = files.length ? { ...message, files } : message;
     } else {
-        options.startMessage = message;
+        const files = collectAttachmentFiles(message);
+        options.startMessage = files.length ? { ...message, files } : message;
     }
 
     return channel.threads.create(options);

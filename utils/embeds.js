@@ -20,6 +20,20 @@ function parseColor(hex, fallback = 0x2d2d31) {
     return Number.isNaN(n) ? fallback : n;
 }
 
+function addPanelBanner(container, config, bannerKey = 'dashboard') {
+    const bannerPath = path.join(BANNERS_DIR, `${bannerKey}-banner.png`);
+    const dashboardPath = path.join(BANNERS_DIR, 'dashboard-banner.png');
+    const bannerUrl = config.bannerUrl || (
+        fs.existsSync(bannerPath) ? banner(bannerKey) : fs.existsSync(dashboardPath) ? banner('dashboard') : null
+    );
+
+    if (bannerUrl) {
+        container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems([{ media: { url: bannerUrl } }])
+        );
+    }
+}
+
 /**
  * Build a Components V2 "container" panel: optional banner image, a
  * markdown text block, optional extra text blocks (with separators),
@@ -27,16 +41,11 @@ function parseColor(hex, fallback = 0x2d2d31) {
  * still needs to add any buttons/select menus and send it with
  * `flags: MessageFlags.IsComponentsV2`.
  */
-function buildPanel(config, { heading, body, extraBlocks = [], mention } = {}) {
+function buildPanel(config, { heading, body, extraBlocks = [], mention, bannerKey = 'dashboard' } = {}) {
     const container = new ContainerBuilder().setAccentColor(parseColor(config.accentColor));
-    const bannerUrl = config.bannerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'dashboard-banner.png')) ? banner('dashboard') : null);
     const footerUrl = config.footerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'footer-banner.png')) ? FOOTER : null);
 
-    if (bannerUrl) {
-        container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: bannerUrl } }])
-        );
-    }
+    addPanelBanner(container, config, bannerKey);
 
     if (mention || heading || body) {
         container.addTextDisplayComponents(
@@ -65,6 +74,8 @@ function baseEmbed(config, opts = {}) {
     if (opts.description) embed.setDescription(opts.description);
     if (opts.fields) embed.addFields(opts.fields);
     if (opts.image) embed.setImage(opts.image);
+    else if (config.bannerUrl) embed.setImage(config.bannerUrl);
+    else if (opts.bannerKey && fs.existsSync(path.join(BANNERS_DIR, `${opts.bannerKey}-banner.png`))) embed.setImage(banner(opts.bannerKey));
     if (config.brandName) embed.setAuthor({ name: config.brandName });
     embed.setFooter({ text: opts.footer || config.brandName || 'Astra Customs' });
     if (opts.thumbnail) embed.setThumbnail(opts.thumbnail);
@@ -72,4 +83,4 @@ function baseEmbed(config, opts = {}) {
     return embed;
 }
 
-module.exports = { parseColor, buildPanel, baseEmbed };
+module.exports = { parseColor, addPanelBanner, buildPanel, baseEmbed };

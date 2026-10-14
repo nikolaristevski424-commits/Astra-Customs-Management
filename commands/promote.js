@@ -52,6 +52,7 @@ module.exports = {
                 const channel = await interaction.client.channels.fetch(cfg.promotionsChannelId).catch(() => null);
                 if (channel) {
                     const container = buildPanel(cfg, {
+                        bannerKey: 'promotion',
                         mention: `<@${user.id}>`,
                         heading: 'Staff Promotion',
                         body: `This user has been given a promotion by the HR team!\n**Staff Username** \`-\` ${userMention(user.id)}`,

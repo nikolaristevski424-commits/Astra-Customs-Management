@@ -29,6 +29,10 @@ function isPayoutManager(member, config) {
     return isAdmin(member) || hasAnyRole(member, config.payoutManagerRoleIds);
 }
 
+function isPayoutRequester(member, config) {
+    return isAdmin(member) || hasAnyRole(member, config.payoutRequesterRoleIds);
+}
+
 function isQualityControl(member, config) {
     return isAdmin(member) || hasAnyRole(member, config.qcRoleIds);
 }
@@ -63,6 +67,7 @@ module.exports = {
     isHR,
     isCreditManager,
     isPayoutManager,
+    isPayoutRequester,
     isQualityControl,
     isTicketStaff,
     commissionRate,

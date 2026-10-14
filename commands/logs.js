@@ -39,11 +39,12 @@ module.exports = {
             if (type === 'infractions') {
                 embed.addFields(
                     { name: 'User', value: userMention(log.userId), inline: true },
-                    { name: 'Issued by', value: `<@${log.issuedBy}>`, inline: true },
+                    { name: 'Issued by', value: log.anonymous ? 'Anonymous' : `<@${log.issuedBy}>`, inline: true },
                     { name: 'Punishment', value: log.punishment },
                     { name: 'Reason', value: log.reason },
                     { name: 'ID', value: log.infractionId },
                 );
+                if (log.voided) embed.addFields({ name: 'Status', value: 'Voided', inline: true });
             } else {
                 embed.addFields(
                     { name: 'User', value: userMention(log.userId), inline: true },
