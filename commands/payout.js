@@ -6,9 +6,15 @@ const payoutRequests = require('../utils/payoutRequests');
 const { baseEmbed } = require('../utils/embeds');
 
 function buildEmbed(cfg, record) {
+    const statusColor = record.status === 'Paid'
+        ? 0x2ecc71
+        : record.status === 'Denied'
+            ? 0xe74c3c
+            : undefined;
     return baseEmbed(cfg, {
         title: 'Astra Customs | Robux Payout Request',
         bannerKey: 'payout',
+        color: statusColor,
         fields: [
             { name: 'Requested by', value: userMention(record.requestedBy), inline: true },
             { name: 'Amount', value: `R$${record.amount}`, inline: true },
@@ -16,10 +22,11 @@ function buildEmbed(cfg, record) {
             { name: 'Reason', value: record.reason },
             { name: 'Status', value: record.status, inline: true },
             ...(record.paidBy ? [{ name: 'Paid by', value: userMention(record.paidBy), inline: true }] : []),
-            ],
-            footer: `Payout request #${record.id}`,
-            timestamp: record.createdAt,
-            });
+            ...(record.decisionReason ? [{ name: 'Decision reason', value: record.decisionReason }] : []),
+        ],
+        footer: `Payout request #${record.id}`,
+        timestamp: record.createdAt,
+    });
 }
 
 function buildButtons(record) {

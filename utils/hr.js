@@ -74,17 +74,28 @@ function issuePromotion(guildId, data) {
     return created;
 }
 
-function voidPromotion(guildId, promotionId) {
-    let removed = null;
+function updatePromotion(guildId, promotionId, patch) {
+    let updated = null;
     store.update(PROMOTIONS, guildId, [], (all) => {
-        const idx = all.findIndex((p) => p.promotionId === promotionId);
-        if (idx !== -1) {
-            removed = all[idx];
-            all.splice(idx, 1);
+        const record = all.find((promotion) => promotion.promotionId === promotionId);
+        if (record) {
+            Object.assign(record, patch);
+            updated = record;
         }
         return all;
     });
-    return removed;
+    return updated;
+}
+
+function voidPromotion(guildId, promotionId, voidedBy, voidReason) {
+    const record = listPromotions(guildId).find((promotion) => promotion.promotionId === promotionId);
+    if (!record || record.voided) return null;
+    return updatePromotion(guildId, promotionId, {
+        voided: true,
+        voidedAt: Date.now(),
+        voidedBy,
+        voidReason,
+    });
 }
 
 module.exports = {
@@ -94,5 +105,6 @@ module.exports = {
     voidInfraction,
     updateInfraction,
     issuePromotion,
+    updatePromotion,
     voidPromotion,
 };

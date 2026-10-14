@@ -53,7 +53,7 @@ function orderStatusPanel(cfg) {
 }
 
 function ticketsPanel(cfg) {
-    const container = baseContainer(cfg, 'guidelines');
+    const container = baseContainer(cfg, 'tickets');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Assistance\n\nNeed help with an order, payment, delivery, management issue, or member concern? Open a private ticket and explain what you need.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Before opening a ticket**\n- Explain the issue clearly.\n- Include relevant order or payment information.\n- Never share passwords, Roblox cookies, or private credentials.\n- Keep communication respectful while staff review your request.'));

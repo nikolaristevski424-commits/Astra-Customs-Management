@@ -6,7 +6,7 @@ const CATEGORIES = [
     { name: '📋 Job Queue', value: '`/order add`, `/order list` — post work and let designers claim it' },
     { name: '🧾 Sales Ledger', value: '`/order log|status|view|history|reset`, `/earnings`' },
     { name: '💰 Pricing', value: '`/pricelist view|set`, `/quote`, `/tax`' },
-    { name: '💸 Payments', value: '`/payment request|release|pool`, `/payment link get|check`, `/paymentrequest`' },
+    { name: '💸 Payments', value: '`/payment request|release|pool`, `/payment link get|check`' },
     { name: '🤑 Payouts & Credit', value: '`/payout request|list`, `/credit add|remove|view|history`, `/leaderboard credits|designers`' },
     { name: '🪙 Economy', value: '`/economy balance|daily|work|pay|coinflip|leaderboard` — virtual Astra Coins, separate from Robux credit' },
     { name: '🏷️ Discounts', value: '`/discounts list|redeem`, executives: `/discounts create|disable`' },

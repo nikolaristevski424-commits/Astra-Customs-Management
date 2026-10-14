@@ -41,8 +41,8 @@ function addPanelBanner(container, config, bannerKey = 'dashboard') {
  * still needs to add any buttons/select menus and send it with
  * `flags: MessageFlags.IsComponentsV2`.
  */
-function buildPanel(config, { heading, body, extraBlocks = [], mention, bannerKey = 'dashboard' } = {}) {
-    const container = new ContainerBuilder().setAccentColor(parseColor(config.accentColor));
+function buildPanel(config, { heading, body, extraBlocks = [], mention, bannerKey = 'dashboard', accentColor = config.accentColor } = {}) {
+    const container = new ContainerBuilder().setAccentColor(parseColor(accentColor));
     const footerUrl = config.footerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'footer-banner.png')) ? FOOTER : null);
 
     addPanelBanner(container, config, bannerKey);

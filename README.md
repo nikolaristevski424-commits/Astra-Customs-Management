@@ -25,7 +25,7 @@ commented — work through it section by section:
 - **Executive team** — `EXECUTIVE_ROLE_IDS` / `EXECUTIVE_USER_IDS`, for approving payouts and `/package setprice` (see below — deliberately env-only)
 - **Branding** — brand name, colors, banner/footer images, prefix
   (`assets/banners` contains the dashboard, guidelines, marketplace,
-  order, status, portfolio, prices, applications, infraction, and
+  order, status, tickets, portfolio, prices, applications, infraction, and
   promotion artwork)
 - **Roles** — staff, manager, HR, credit manager, payout manager, quality control, ticket staff (comma-separated — a role can be in more than one list)
 - **Commission** — `COMMISSION_RATES` maps a role to the % of the after-tax price a designer with that role keeps, e.g.:
@@ -96,9 +96,7 @@ channel under `ORDER_CATEGORY_ID`. Customers can provide the product, deadline,
 budget, details, and references directly in that channel. `/order status` checks
 an order's current status for any user. `/order update` sets Paid/Void/etc. for
 staff and refreshes the original order-log message. `/order view`, `/order history`, `/order reset`, and
-`/earnings` round out the ledger. `/paymentrequest` is a richer
-version of the same idea matching a payment-link-style workflow
-(payment link, Roblox usernames, price breakdown, Paid/Decline).
+`/earnings` round out the ledger.
 
 ## Payments
 
@@ -227,7 +225,9 @@ private access to that ticket.
 `PAYOUT_REQUESTER_ROLE_IDS` role. The default requester role is
 `1497420088456777859`; change the comma-separated environment value to
 customize it. Reviewing, denying, and auto-sending requests remain
-restricted to the executive team.
+restricted to the executive team. A reviewer must include a reason when marking
+a request Paid or Denied. The request embed turns green when paid and red when
+denied, and the requester receives a decision DM with the same status and reason.
 
 ## Activity checks
 
@@ -243,7 +243,10 @@ issuer should be shown or the infraction should be anonymous; the issuer
 is still retained in the internal infraction record for audit purposes.
 Manual and activity-check infractions ping the affected member in a
 separate message outside the Components V2 infraction panel.
-The check then closes and its response button is disabled.
+The infraction panel shows its active status and is updated with a yellow void
+notice when the infraction is voided. `/promote issue` publishes a green
+promotion announcement; `/promote void` retains the record in the audit history
+and updates its announcement in red, including the optional void reason.
 
 ## Applications
 
@@ -259,8 +262,10 @@ The panel buttons open tailored five-question forms and post results to
 those roles (or an administrator) can Accept/Deny. Accepted applicants
 receive the matching role from `STAFF_APPLICATION_ACCEPT_ROLE_ID` or
 `DESIGNER_APPLICATION_ACCEPT_ROLE_ID`.
-Every submission receives a confirmation DM, every decision receives a DM, and
-decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
+Reviewers must provide a reason when accepting or denying. The application
+submission, result-channel notice, and applicant DM show the decision in green
+or red and include that reason. Every submission receives a confirmation DM,
+and decisions are copied to `APPLICATION_RESULTS_CHANNEL_ID` when configured. The
 dashboard also has a **Request LOA** button (same as `/loa request`, just as a
 modal instead of typing dates as command options).
 

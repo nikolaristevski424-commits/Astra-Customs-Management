@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const hr = require('../utils/hr');
 const perms = require('../utils/permissions');
 const { sendInfractionMessages } = require('../utils/infractionMessages');
+const { updateStatusPanel } = require('../utils/statusPanel');
 
 const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Under Investigation', 'Termination', 'Staff Blacklist'];
 
@@ -117,6 +118,11 @@ module.exports = {
                     const panelMessage = await channel.messages.fetch(removed.announcementMessageId).catch(() => null);
                     if (panelMessage) {
                         try {
+                            await updateStatusPanel(panelMessage, {
+                                color: 0xf1c40f,
+                                heading: 'Infraction Voided',
+                                details: `Infraction \`${id}\` for <@${removed.userId}> has been voided.`,
+                            });
                             await panelMessage.reply({
                                 embeds: [{
                                     title: 'Infraction Voided',

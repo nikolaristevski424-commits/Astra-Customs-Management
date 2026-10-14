@@ -1,6 +1,7 @@
 const {
     Events,
     MessageFlags,
+    EmbedBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
@@ -21,7 +22,6 @@ const bundlesUtil = require('../utils/bundles');
 const loaUtil = require('../utils/loa');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
-const paymentRequests = require('../utils/paymentRequests');
 const packagesUtil = require('../utils/packages');
 const payoutRequestsUtil = require('../utils/payoutRequests');
 const releasesUtil = require('../utils/releases');
@@ -39,7 +39,6 @@ const releaseCmd = require('../commands/release');
 const giveawayCmd = require('../commands/giveaway');
 const loaCmd = require('../commands/loa');
 const quoteCmd = require('../commands/quote');
-const paymentRequestCmd = require('../commands/paymentrequest');
 const textCmd = require('../commands/text');
 const activityUtil = require('../utils/activity');
 const activityCmd = require('../commands/activity');
@@ -257,8 +256,8 @@ async function handleButton(interaction) {
         return interaction.showModal(modal);
     }
 
-    // ---- Payout request: mark paid / deny / try auto-send ----
-    if (customId.startsWith('payout_markpaid_') || customId.startsWith('payout_deny_') || customId.startsWith('payout_autosend_')) {
+    // ---- Payout request: decide / try auto-send ----
+    if (customId.startsWith('payout_markpaid_') || customId.startsWith('payout_deny_')) {
         if (!isExecutive(interaction.member)) {
             return interaction.reply({ content: 'This is restricted to the executive team.', ephemeral: true });
         }
@@ -266,50 +265,66 @@ async function handleButton(interaction) {
         const id = customId.split('_').pop();
         const record = payoutRequestsUtil.find(guildId, id);
         if (!record) return interaction.reply({ content: 'That payout request no longer exists.', ephemeral: true });
+        if (record.status !== 'Pending') return interaction.reply({ content: `This payout request is already **${record.status}**.`, ephemeral: true });
 
-        if (customId.startsWith('payout_markpaid_')) {
-            const updated = payoutRequestsUtil.updateStatus(guildId, id, 'Paid', { paidBy: interaction.user.id, paidAt: Date.now() });
-            const row = new ActionRowBuilder().addComponents(payoutCmd.buildButtons(updated));
-            await interaction.update({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] });
-            return;
+        const decision = customId.startsWith('payout_markpaid_') ? 'paid' : 'deny';
+        const modal = new ModalBuilder()
+            .setCustomId(`payout_decision_modal_${decision}_${id}_${interaction.channelId}_${interaction.message.id}`)
+            .setTitle(decision === 'paid' ? 'Confirm Payout Payment' : 'Deny Payout Request');
+        const reason = new TextInputBuilder()
+            .setCustomId('reason')
+            .setLabel(decision === 'paid' ? 'Payment confirmation / reason' : 'Reason for denial')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(new ActionRowBuilder().addComponents(reason));
+        return interaction.showModal(modal);
+    }
+
+    if (customId.startsWith('payout_autosend_')) {
+        if (!isExecutive(interaction.member)) {
+            return interaction.reply({ content: 'This is restricted to the executive team.', ephemeral: true });
+        }
+        const id = customId.split('_').pop();
+        const record = payoutRequestsUtil.find(guildId, id);
+        if (!record) return interaction.reply({ content: 'That payout request no longer exists.', ephemeral: true });
+        if (record.status !== 'Pending') return interaction.reply({ content: `This payout request is already **${record.status}**.`, ephemeral: true });
+        if (!cfg.robloxGroupId || !process.env.ROBLOX_COOKIE) {
+            return interaction.reply({ content: 'Auto-send needs `ROBLOX_GROUP_ID` and `ROBLOX_COOKIE` set in `.env`. Send this one manually instead.', ephemeral: true });
+        }
+        const robloxUserId = record.robloxId;
+        if (!robloxUserId) {
+            return interaction.reply({ content: 'No Roblox user ID was given with this request — can\'t auto-send. Send it manually and click Mark Paid.', ephemeral: true });
         }
 
-        if (customId.startsWith('payout_deny_')) {
-            const updated = payoutRequestsUtil.updateStatus(guildId, id, 'Denied', { deniedBy: interaction.user.id });
-            const row = new ActionRowBuilder().addComponents(payoutCmd.buildButtons(updated));
-            await interaction.update({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] });
-            return;
+        await interaction.deferReply({ ephemeral: true });
+        const roblox = require('../utils/roblox');
+        const result = await roblox.payoutGroupRobux({ groupId: cfg.robloxGroupId, robloxUserId, amount: record.amount });
+
+        if (!result.success) {
+            const reasons = {
+                no_credentials: 'No Roblox cookie configured.',
+                csrf_failed: 'Could not obtain a CSRF token from Roblox — the cookie may be expired.',
+                challenge_required: result.message,
+                request_failed: `Roblox rejected the request: ${result.message || 'unknown error'}`,
+            };
+            return interaction.editReply(`Auto-send failed: ${reasons[result.reason] || 'unknown error'}. This request is still pending — send it manually and click Mark Paid.`);
         }
 
-        if (customId.startsWith('payout_autosend_')) {
-            if (!cfg.robloxGroupId || !process.env.ROBLOX_COOKIE) {
-                return interaction.reply({ content: 'Auto-send needs `ROBLOX_GROUP_ID` and `ROBLOX_COOKIE` set in `.env`. Send this one manually instead.', ephemeral: true });
-            }
-            const robloxUserId = record.robloxId;
-            if (!robloxUserId) {
-                return interaction.reply({ content: 'No Roblox user ID was given with this request — can\'t auto-send. Send it manually and click Mark Paid.', ephemeral: true });
-            }
-
-            await interaction.deferReply({ ephemeral: true });
-            const roblox = require('../utils/roblox');
-            const result = await roblox.payoutGroupRobux({ groupId: cfg.robloxGroupId, robloxUserId, amount: record.amount });
-
-            if (!result.success) {
-                const reasons = {
-                    no_credentials: 'No Roblox cookie configured.',
-                    csrf_failed: 'Could not obtain a CSRF token from Roblox — the cookie may be expired.',
-                    challenge_required: result.message,
-                    request_failed: `Roblox rejected the request: ${result.message || 'unknown error'}`,
-                };
-                return interaction.editReply(`Auto-send failed: ${reasons[result.reason] || 'unknown error'}. This request is still pending — send it manually and click Mark Paid.`);
-            }
-
-            const updated = payoutRequestsUtil.updateStatus(guildId, id, 'Paid', { paidBy: interaction.user.id, paidAt: Date.now(), autoSent: true });
-            const row = new ActionRowBuilder().addComponents(payoutCmd.buildButtons(updated));
-            await interaction.message.edit({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] }).catch(() => {});
-            await interaction.editReply(`Auto-sent R$${record.amount} to Roblox user \`${robloxUserId}\` and marked this request Paid.`);
-            return;
+        const updated = payoutRequestsUtil.updateStatus(guildId, id, 'Paid', {
+            paidBy: interaction.user.id,
+            paidAt: Date.now(),
+            autoSent: true,
+            decisionReason: 'Automatically sent through Roblox group payouts.',
+        });
+        const row = new ActionRowBuilder().addComponents(payoutCmd.buildButtons(updated));
+        try {
+            await interaction.message.edit({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] });
+        } catch (error) {
+            console.error(`[payout] Auto-send succeeded for request #${id}, but its message could not be updated:`, error);
         }
+        await interaction.editReply(`Auto-sent R$${record.amount} to Roblox user \`${robloxUserId}\` and marked this request Paid.`);
+        return;
     }
 
     // ---- Release: React toward the reaction goal ----
@@ -369,24 +384,6 @@ async function handleButton(interaction) {
         const updated = giveawaysUtil.addEntrant(guildId, id, interaction.user.id);
         await interaction.reply({ content: `You're entered into the giveaway for **${giveaway.prize}**! Good luck 🍀`, ephemeral: true });
         await interaction.message.edit({ embeds: [giveawayCmd.buildEmbed(cfg, updated)], components: [giveawayCmd.buildRow(updated)] }).catch(() => {});
-        return;
-    }
-
-    // ---- Payment request paid/decline ----
-    if (customId.startsWith('payreq_paid_') || customId.startsWith('payreq_decline_')) {
-        if (!perms.isStaff(interaction.member, cfg)) return interaction.reply({ content: 'You do not have permission to do that.', ephemeral: true });
-
-        const id = customId.split('_').pop();
-        const record = paymentRequests.find(guildId, id);
-        if (!record) return interaction.reply({ content: 'That payment request no longer exists.', ephemeral: true });
-
-        const status = customId.startsWith('payreq_paid_') ? 'Paid' : 'Declined';
-        const updated = paymentRequests.updateStatus(guildId, id, status);
-
-        const container = paymentRequestCmd.buildContainer(cfg, updated);
-        const buttons = paymentRequestCmd.buildButtons(updated);
-        const components = buttons.length ? [container, new ActionRowBuilder().addComponents(buttons)] : [container];
-        await interaction.update({ flags: MessageFlags.IsComponentsV2, components });
         return;
     }
 
@@ -467,48 +464,22 @@ async function handleButton(interaction) {
 
     // ---- Application accept/deny ----
     if (customId.startsWith('app_accept_') || customId.startsWith('app_deny_')) {
-        const parts = customId.split('_');
-        const type = parts[2];
-        const applicantId = parts[3];
         const canReview = perms.isAdmin(interaction.member) || cfg.applicationReviewerRoleIds.some((roleId) => interaction.member.roles.cache.has(roleId));
         if (!canReview) return interaction.reply({ content: 'Only the configured application reviewers can decide applications.', ephemeral: true });
 
         const accept = customId.startsWith('app_accept_');
-        const applicant = await interaction.client.users.fetch(applicantId).catch(() => null);
-
-        const acceptedRoleId = type === 'staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
-        if (accept && acceptedRoleId) {
-            const member = await interaction.guild.members.fetch(applicantId).catch(() => null);
-            if (member) await member.roles.add(acceptedRoleId).catch(() => null);
-        }
-
-        if (applicant) {
-            await applicant
-                .send(accept ? `Congratulations! Your **${type} application** to **${cfg.brandName}** was accepted by <@${interaction.user.id}>.` : `Thanks for applying to **${cfg.brandName}**. Your **${type} application** was not accepted this time. You are welcome to apply again later.`)
-                .catch(() => {});
-        }
-
-        if (cfg.applicationResultsChannelId) {
-            const resultsChannel = await interaction.client.channels.fetch(cfg.applicationResultsChannelId).catch(() => null);
-            if (resultsChannel) {
-                await resultsChannel.send({
-                    embeds: [{
-                        title: `${type === 'staff' ? 'Staff' : 'Designer'} Application ${accept ? 'Accepted' : 'Denied'}`,
-                        color: accept ? 0x2ecc71 : 0xe74c3c,
-                        fields: [
-                            { name: 'Applicant', value: `<@${applicantId}>`, inline: true },
-                            { name: 'Reviewed by', value: `<@${interaction.user.id}>`, inline: true },
-                        ],
-                        timestamp: new Date().toISOString(),
-                    }],
-                }).catch(() => {});
-            }
-        }
-
-        const disabled = disableAllButtons(interaction.message.components);
-        await interaction.update({ components: disabled });
-        await interaction.followUp({ content: `${type === 'staff' ? 'Staff' : 'Designer'} application ${accept ? 'accepted' : 'denied'} by <@${interaction.user.id}>.`, allowedMentions: { parse: [] } });
-        return;
+        const [, , type, applicantId] = customId.split('_');
+        const modal = new ModalBuilder()
+            .setCustomId(`app_decision_modal_${accept ? 'accept' : 'deny'}_${type}_${applicantId}_${interaction.channelId}_${interaction.message.id}`)
+            .setTitle(`${accept ? 'Accept' : 'Deny'} Application`);
+        const reason = new TextInputBuilder()
+            .setCustomId('reason')
+            .setLabel(accept ? 'Reason for acceptance' : 'Reason for denial')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(new ActionRowBuilder().addComponents(reason));
+        return interaction.showModal(modal);
     }
 
     // ---- Ticket claim/close ----
@@ -792,6 +763,166 @@ async function handleModal(interaction) {
 
         await interaction.editReply(`Ticket opened: <#${channel.id}>`);
         return;
+    }
+
+    if (customId.startsWith('payout_decision_modal_')) {
+        const [, , , decision, id, channelId, messageId] = customId.split('_');
+        if (!isExecutive(interaction.member)) {
+            return interaction.reply({ content: 'This is restricted to the executive team.', flags: MessageFlags.Ephemeral });
+        }
+
+        const record = payoutRequestsUtil.find(guildId, id);
+        if (!record) return interaction.reply({ content: 'That payout request no longer exists.', flags: MessageFlags.Ephemeral });
+        if (record.status !== 'Pending') {
+            return interaction.reply({ content: `This payout request is already **${record.status}**.`, flags: MessageFlags.Ephemeral });
+        }
+
+        const decisionReason = interaction.fields.getTextInputValue('reason').trim();
+        if (!decisionReason) {
+            return interaction.reply({ content: 'A decision reason is required.', flags: MessageFlags.Ephemeral });
+        }
+
+        const paid = decision === 'paid';
+        const updated = payoutRequestsUtil.updateStatus(guildId, id, paid ? 'Paid' : 'Denied', {
+            ...(paid ? { paidBy: interaction.user.id, paidAt: Date.now() } : { deniedBy: interaction.user.id, deniedAt: Date.now() }),
+            decisionReason,
+        });
+        if (!updated) return interaction.reply({ content: 'That payout request could not be updated.', flags: MessageFlags.Ephemeral });
+
+        const buttons = payoutCmd.buildButtons(updated);
+        let panelUpdated = false;
+        try {
+            const channel = await interaction.client.channels.fetch(channelId);
+            const requestMessage = await channel.messages.fetch(messageId);
+            await requestMessage.edit({
+                embeds: [payoutCmd.buildEmbed(cfg, updated)],
+                components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [],
+            });
+            panelUpdated = true;
+        } catch (error) {
+            console.error(`[payout] Updated request #${id}, but could not update its message:`, error);
+        }
+
+        const statusColor = paid ? 0x2ecc71 : 0xe74c3c;
+        try {
+            const requester = await interaction.client.users.fetch(record.requestedBy);
+            await requester.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(statusColor)
+                    .setTitle(`Payout Request ${paid ? 'Paid' : 'Denied'}`)
+                    .setDescription(`Your payout request **#${id}** for **R$${record.amount}** has been ${paid ? 'paid' : 'denied'}.`)
+                    .addFields({ name: 'Decision reason', value: decisionReason }, { name: 'Reviewed by', value: `<@${interaction.user.id}>`, inline: true })
+                    .setTimestamp()],
+            });
+        } catch (error) {
+            console.warn(`[payout] Could not notify requester ${record.requestedBy} about request #${id}:`, error.message);
+        }
+
+        const message = `Payout request **#${id}** marked **${updated.status}**.${panelUpdated ? '' : ' The request status was saved, but its channel message could not be updated.'}`;
+        return interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
+    }
+
+    if (customId.startsWith('app_decision_modal_')) {
+        const [, , , decision, type, applicantId, channelId, messageId] = customId.split('_');
+        const canReview = perms.isAdmin(interaction.member) || cfg.applicationReviewerRoleIds.some((roleId) => interaction.member.roles.cache.has(roleId));
+        if (!canReview) {
+            return interaction.reply({ content: 'Only the configured application reviewers can decide applications.', flags: MessageFlags.Ephemeral });
+        }
+
+        const reason = interaction.fields.getTextInputValue('reason').trim();
+        if (!reason) {
+            return interaction.reply({ content: 'A decision reason is required.', flags: MessageFlags.Ephemeral });
+        }
+
+        let applicationMessage;
+        try {
+            const channel = await interaction.client.channels.fetch(channelId);
+            applicationMessage = await channel.messages.fetch(messageId);
+        } catch (error) {
+            console.error(`[applications] Could not load the application message for ${applicantId}:`, error);
+            return interaction.reply({ content: 'The application message could not be found, so no decision was recorded.', flags: MessageFlags.Ephemeral });
+        }
+
+        const originalEmbed = applicationMessage.embeds[0];
+        if (originalEmbed?.footer?.text?.startsWith('Decision:')) {
+            return interaction.reply({ content: 'This application has already been reviewed.', flags: MessageFlags.Ephemeral });
+        }
+
+        const accepted = decision === 'accept';
+        const status = accepted ? 'Accepted' : 'Denied';
+        const color = accepted ? 0x2ecc71 : 0xe74c3c;
+        const appName = type === 'staff' ? 'Customer Support' : 'Creative Team';
+        const reviewerMention = `<@${interaction.user.id}>`;
+        const updatedEmbed = (originalEmbed ? EmbedBuilder.from(originalEmbed) : new EmbedBuilder())
+            .setTitle(`${appName} Application — ${status}`)
+            .setColor(color)
+            .addFields(
+                { name: 'Decision', value: status, inline: true },
+                { name: 'Reviewed by', value: reviewerMention, inline: true },
+                { name: 'Decision reason', value: reason },
+            )
+            .setFooter({ text: `Decision: ${status} • ${interaction.user.tag}` })
+            .setTimestamp();
+
+        try {
+            await applicationMessage.edit({
+                embeds: [updatedEmbed],
+                components: disableAllButtons(applicationMessage.components),
+            });
+        } catch (error) {
+            console.error(`[applications] Could not update the original application for ${applicantId}:`, error);
+            return interaction.reply({ content: 'The decision could not be applied to the application message. No result notification was sent.', flags: MessageFlags.Ephemeral });
+        }
+
+        let roleWarning = '';
+        const acceptedRoleId = type === 'staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
+        if (accepted && acceptedRoleId) {
+            try {
+                const member = await interaction.guild.members.fetch(applicantId);
+                await member.roles.add(acceptedRoleId);
+            } catch (error) {
+                roleWarning = ' The decision was recorded, but the applicant role could not be assigned.';
+                console.error(`[applications] Could not assign role ${acceptedRoleId} to applicant ${applicantId}:`, error);
+            }
+        }
+
+        const resultEmbed = new EmbedBuilder()
+            .setColor(color)
+            .setTitle(`${appName} Application ${status}`)
+            .setDescription(`The application from <@${applicantId}> was ${status.toLowerCase()}.`)
+            .addFields(
+                { name: 'Reviewed by', value: reviewerMention, inline: true },
+                { name: 'Decision reason', value: reason },
+            )
+            .setTimestamp();
+
+        if (cfg.applicationResultsChannelId) {
+            try {
+                const resultsChannel = await interaction.client.channels.fetch(cfg.applicationResultsChannelId);
+                await resultsChannel.send({ embeds: [resultEmbed] });
+            } catch (error) {
+                console.error(`[applications] Could not post the decision result for applicant ${applicantId}:`, error);
+            }
+        }
+
+        try {
+            const applicant = await interaction.client.users.fetch(applicantId);
+            await applicant.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(color)
+                    .setTitle(`Application ${status}`)
+                    .setDescription(`Your **${appName}** application to **${cfg.brandName}** was ${status.toLowerCase()}.`)
+                    .addFields(
+                        { name: 'Decision reason', value: reason },
+                        { name: 'Reviewed by', value: reviewerMention, inline: true },
+                    )
+                    .setTimestamp()],
+            });
+        } catch (error) {
+            console.warn(`[applications] Could not DM applicant ${applicantId} about the decision:`, error.message);
+        }
+
+        return interaction.reply({ content: `${appName} application ${status.toLowerCase()}.${roleWarning}`, flags: MessageFlags.Ephemeral });
     }
 
     if (customId === 'application_staff_modal' || customId === 'application_designer_modal') {
