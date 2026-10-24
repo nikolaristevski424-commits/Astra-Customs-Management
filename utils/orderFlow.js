@@ -1,5 +1,5 @@
 const {ActionRowBuilder,StringSelectMenuBuilder,ModalBuilder,TextInputBuilder,TextInputStyle,ChannelType,PermissionsBitField,MessageFlags,ButtonBuilder,ButtonStyle} = require('discord.js');
-const config=require('./config'), tickets=require('./tickets');
+const config=require('./config'), tickets=require('./tickets'), orders=require('./orders'), progress=require('./orderProgress');
 const catalog=require('./catalog'), service=require('./serviceAvailability');
 const TERMS='https://astra-customs-terms.vercel.app/';
 const SHOP='https://www.roblox.com/games/102262993580557/Astra-Customs-Shop';
@@ -67,22 +67,23 @@ async function modal(interaction){
  const budget=interaction.fields.getTextInputValue('budget')||'Not provided';
  const brief=interaction.fields.getTextInputValue('brief').slice(0,1024);
  const refs=(interaction.fields.getTextInputValue('references')||'None').slice(0,1024);
- tickets.create(interaction.guildId,channel.id,{userId:interaction.user.id,type:'order',reason:p.label,product:p.label,service:p.type,quantity,price:total,deadline:date,budget,details:brief,references:refs,staffRoleIds:roles});
+ const record=orders.createOrder(interaction.guildId,{customerId:interaction.user.id,designerId:null,source:'orderRequest',product:p.label,service:p.type,
+   quantity:qty,price:total,quoteRequired:total===null,designerEarning:0,ticketChannelId:channel.id,deadline:date,
+   status:'Not Paid',statusHistory:[]});
+ tickets.create(interaction.guildId,channel.id,{userId:interaction.user.id,type:'order',reason:p.label,product:p.label,service:p.type,orderId:record.id,
+  quantity,price:total,deadline:date,budget,details:brief,references:refs,staffRoleIds:roles});
  const row=new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId('ticket_claim_'+channel.id).setLabel('Claim Order').setStyle(ButtonStyle.Success),
   new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Close').setStyle(ButtonStyle.Danger)
  );
  try{
-  await channel.send({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),
-   embeds:[{title:'Astra Customs | '+p.service+' Order',color:0x4169e1,
-   description:'A designer will review your request and confirm the final amount before requesting payment.',
-   fields:[{name:'Design',value:p.label,inline:true},{name:'Quantity',value:String(qty),inline:true},
-    {name:'Estimated price',value:price,inline:false},{name:'Deadline',value:date,inline:true},
-    {name:'Budget',value:budget.slice(0,1024),inline:true},{name:'Brief',value:brief,inline:false},
-    {name:'References',value:refs,inline:false}],footer:{text:'Astra Customs • Order Request'}}],
-   components:[row],allowedMentions:{users:[interaction.user.id],roles:guild.roles.cache.has(p.role)?[p.role]:[]}});
+  const sent=await channel.send({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),
+    embeds:[progress.embed(cfg,record,tickets.get(interaction.guildId,channel.id))],
+    components:progress.controls(record),allowedMentions:{users:[interaction.user.id],roles:guild.roles.cache.has(p.role)?[p.role]:[]}});
+  orders.updateOrder(interaction.guildId,record.id,{requestMessageId:sent.id});
+  tickets.update(interaction.guildId,channel.id,{orderMessageId:sent.id});
   await channel.send({content:'**Before you continue:** Please read our Terms of Service: '+TERMS+'\nRoblox shop: '+SHOP+'\nA designer will confirm your final price before payment.'});
  }catch(error){console.error('[orderFlow] Failed sending order messages:',error)}
- return interaction.editReply('Order opened: <#'+channel.id+'>\n**Estimated cost:** '+price+'. A designer will confirm the final quote.');
+ return interaction.editReply('Order **#'+record.id+'** opened: <#'+channel.id+'>\n**Estimated cost:** '+price+'. A designer will confirm the final quote.');
 }
 module.exports={start,category,item,modal,categories,TERMS,SHOP};

@@ -22,12 +22,12 @@ function find(guildId, id) {
     return store.get(STORE, guildId, defaultState()).list.find((b) => b.id === Number(id));
 }
 
-function updateStatus(guildId, id, status) {
+function updateStatus(guildId, id, status, extra = {}) {
     let updated = null;
     store.update(STORE, guildId, defaultState(), (state) => {
         const record = state.list.find((b) => b.id === Number(id));
         if (record) {
-            record.status = status;
+            Object.assign(record,{status,...extra});
             updated = record;
         }
         return state;

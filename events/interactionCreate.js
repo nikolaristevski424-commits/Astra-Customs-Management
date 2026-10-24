@@ -32,6 +32,7 @@ const { disableAllButtons } = require('../utils/components');
 
 const orderCmd = require('../commands/order');
 const orderFlow = require('../utils/orderFlow');
+const orderProgress=require('../utils/orderProgress');
 const bundleCmd = require('../commands/bundle');
 const packageCmd = require('../commands/package');
 const qcCmd = require('../commands/qc');
@@ -114,16 +115,30 @@ async function handleButton(interaction) {
         return;
     }
 
+    if(customId.startsWith('order_stage_')){
+      const match=customId.match(/^order_stage_(\d+)_(paid|working|completed|delivered|cancelled)$/);
+      if(!match)return interaction.reply({content:'Invalid order action.',flags:MessageFlags.Ephemeral});
+      const order=orders.findOrder(guildId,match[1]),target=orderProgress.TARGETS[match[2]];
+      if(!order)return interaction.reply({content:'This order no longer exists.',flags:MessageFlags.Ephemeral});
+      if(!orderProgress.authorized(interaction.member,cfg,target))return interaction.reply({content:'You do not have permission to make this status change.',flags:MessageFlags.Ephemeral});
+      if(!orderProgress.canTransition(order.status,target))return interaction.reply({content:'This action is no longer available. Order status is '+order.status,flags:MessageFlags.Ephemeral});
+      await interaction.deferReply({flags:MessageFlags.Ephemeral});
+      try{
+        await orderProgress.setStatus(interaction.client,guildId,cfg,order,target,{actorId:interaction.user.id,note:'Updated through staff order controls'});
+        return interaction.editReply('Order **#'+order.id+'** moved to **'+target+'**. Customer and order panel updated.');
+      }catch(error){return interaction.editReply('Failed to update order: '+error.message);}
+    }
     // ---- Order paid/void/unvoid ----
     if (customId.startsWith('order_paid_') || customId.startsWith('order_void_') || customId.startsWith('order_unvoid_')) {
-        if (!perms.isStaff(interaction.member, cfg)) return interaction.reply({ content: 'You do not have permission to do that.', ephemeral: true });
+        if (!perms.isManager(interaction.member, cfg)) return interaction.reply({ content: 'Only managers can change payment/void states.',flags:MessageFlags.Ephemeral });
 
         const id = customId.split('_').pop();
         const order = orders.findOrder(guildId, id);
         if (!order) return interaction.reply({ content: 'That order no longer exists.', ephemeral: true });
 
         const newStatus = customId.startsWith('order_paid_') ? 'Paid' : customId.startsWith('order_void_') ? 'Void' : 'Not Paid';
-        const updated = orders.updateOrder(guildId, id, { status: newStatus });
+        const updated = orders.updateOrder(guildId, id, { status: newStatus,statusUpdatedAt:Date.now() });
+        await orderProgress.refresh(interaction.client,guildId,cfg,updated);
 
         await interaction.update({ embeds: [orderCmd.orderEmbed(cfg, updated)], components: [new ActionRowBuilder().addComponents(orderCmd.orderButtons(updated))] });
         if (newStatus === 'Void') await interaction.followUp({ content: `Order **#${id}** has been marked **VOIDED** by <@${interaction.user.id}>.`, allowedMentions: { users: [interaction.user.id] } });
@@ -167,7 +182,7 @@ async function handleButton(interaction) {
             const reviewChannel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
             if (reviewChannel) {
                 const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`jobreq_accept_${orderNumber}_${instanceNum}`).setLabel('Accept').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`jobreq_accept_${orderNumber}_${instanceNum}`).setLabel('Assign Designer').setEmoji('✅').setStyle(ButtonStyle.Success),
                     new ButtonBuilder().setCustomId(`jobreq_deny_${orderNumber}_${instanceNum}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
                 );
                 await reviewChannel.send({
@@ -202,11 +217,12 @@ async function handleButton(interaction) {
         jobsUtil.updateInstance(guildId, orderNumber, instanceNum, approve ? { status: 'claimed', designerId: requesterId } : { status: 'open', requesterId: null });
 
         const disabled = disableAllButtons(interaction.message.components);
-        await interaction.update({ components: disabled });
-        await interaction.followUp({
-            content: `${approve ? 'Accepted' : 'Denied'} <@${requesterId}>'s request for Order ${orderNumber} (instance ${instanceNum}) — decided by <@${interaction.user.id}>.`,
-            allowedMentions: { parse: [] },
-        });
+        const e=new EmbedBuilder().setColor(approve?0x2caa80:0xe05252)
+          .setTitle('Astra Customs | Designer Request '+(approve?'Approved':'Denied'))
+          .setDescription('**Order #'+orderNumber+' · Instance '+instanceNum+'**\n'+(approve?'✅ The designer has been assigned.':'❌ The request was declined; the job is open for other designers.'))
+          .addFields({name:'Requested by',value:'<@'+requesterId+'>',inline:true},{name:'Reviewed by',value:'<@'+interaction.user.id+'>',inline:true})
+          .setTimestamp();
+        await interaction.update({content:null,embeds:[e],components:disabled,allowedMentions:{parse:[]}});
         return;
     }
 
@@ -219,7 +235,8 @@ async function handleButton(interaction) {
         if (!record) return interaction.reply({ content: 'That bundle request no longer exists.', ephemeral: true });
 
         const approve = customId.startsWith('bundle_approve_');
-        const updated = bundlesUtil.updateStatus(guildId, id, approve ? 'Approved' : 'Denied');
+        if(record.status!=='Pending')return interaction.reply({content:'This bundle was already reviewed.',flags:MessageFlags.Ephemeral});
+        const updated = bundlesUtil.updateStatus(guildId, id, approve ? 'Approved' : 'Denied',{decidedBy:interaction.user.id,decidedAt:Date.now()});
 
         const embed = bundleCmd.buildEmbed(cfg, updated);
         const buttons = bundleCmd.buildButtons(updated);
@@ -237,7 +254,8 @@ async function handleButton(interaction) {
         if (!pkg) return interaction.reply({ content: 'That package no longer exists.', ephemeral: true });
 
         const approve = customId.startsWith('package_approve_');
-        const updated = packagesUtil.updateStatus(guildId, id, approve ? 'approved' : 'denied', { decidedBy: interaction.user.id });
+        if(pkg.status!=='pending')return interaction.reply({content:'This package was already reviewed.',flags:MessageFlags.Ephemeral});
+        const updated = packagesUtil.updateStatus(guildId, id, approve ? 'approved' : 'denied', { decidedBy: interaction.user.id,decidedAt:Date.now() });
 
         const container = packageCmd.buildPackageContainer(cfg, updated);
         const buttons = packageCmd.buildReviewButtons(updated);
@@ -486,11 +504,16 @@ async function handleButton(interaction) {
 
     // ---- Ticket claim/close ----
     if (customId.startsWith('ticket_claim_')) {
-        if (!perms.isTicketStaff(interaction.member, cfg)) return interaction.reply({ content: 'You do not have permission to claim tickets.', ephemeral: true });
         const channelId = customId.replace('ticket_claim_', '');
         const ticket = tickets.get(guildId, channelId);
+        const authorizedToClaim=perms.isTicketStaff(interaction.member,cfg)||perms.isManager(interaction.member,cfg)||perms.isStaff(interaction.member,cfg)||
+            (ticket?.staffRoleIds||[]).some(roleId=>interaction.member.roles.cache.has(roleId));
+        if(!authorizedToClaim)return interaction.reply({content:'Only the assigned service designers or ticket staff can claim this order.',flags:MessageFlags.Ephemeral});
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId) return interaction.reply({ content: 'This ticket is no longer open or tracked.', ephemeral: true });
+        if(ticket.claimedBy)return interaction.reply({content:'This ticket is already claimed by <@'+ticket.claimedBy+'>.',flags:MessageFlags.Ephemeral});
+        await interaction.deferReply({flags:MessageFlags.Ephemeral});
         const updated = tickets.update(guildId, channelId, { claimedBy: interaction.user.id, claimedAt: Date.now() });
+        if(updated.type==='order' && updated.orderId){ const record=orders.updateOrder(guildId,updated.orderId,{designerId:interaction.user.id}); await orderProgress.refresh(interaction.client,guildId,cfg,record); }
         const embed = ticket.type === 'order'
             ? {
                   title: 'New Order',
@@ -515,11 +538,9 @@ async function handleButton(interaction) {
                   ],
                   footer: { text: `Ticket ID: ${channelId}` },
               };
-        await interaction.update({
-            embeds: [embed],
-            components: interaction.message.components,
-        });
-        return;
+        if(updated.type==='order' && updated.orderId)return interaction.editReply('Order claimed. Your assignment is now visible on the order progress panel.');
+        await interaction.message.edit({embeds:[embed],components:interaction.message.components});
+        return interaction.editReply('Ticket successfully claimed.');
     }
 
     if (customId.startsWith('ticket_keep_open_')) {
@@ -949,8 +970,8 @@ async function handleModal(interaction) {
         }
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`app_accept_${type}_${interaction.user.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`app_deny_${type}_${interaction.user.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`app_accept_${type}_${interaction.user.id}`).setLabel('Approve Applicant').setEmoji('✅').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`app_deny_${type}_${interaction.user.id}`).setLabel('Deny Applicant').setEmoji('❌').setStyle(ButtonStyle.Danger),
         );
         const fields = [
             { name: 'Applicant', value: `<@${interaction.user.id}>`, inline: true },

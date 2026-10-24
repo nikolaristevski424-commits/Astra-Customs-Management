@@ -21,7 +21,7 @@ const { createCatalogThread } = require('../utils/catalogThreads');
 const { collectAttachmentFiles } = require('../utils/respond');
 
 function buildPackageContainer(cfg, pkg) {
-    const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+    const container = new ContainerBuilder().setAccentColor(pkg.status==='approved'?0x2caa80:pkg.status==='denied'?0xe05252:parseColor(cfg.accentColor));
     addPanelBanner(container, cfg, 'marketplace');
     container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
@@ -29,7 +29,8 @@ function buildPackageContainer(cfg, pkg) {
                 `## ${pkg.name}`,
                 `**Price:** R$${pkg.price}`,
                 `**Created by:** <@${pkg.createdBy}>`,
-                `**Status:** ${pkg.status}`,
+                `**Status:** ${pkg.status==='approved'?'✅ Approved':pkg.status==='denied'?'❌ Denied':pkg.status==='pending'?'🟠 Pending review':pkg.status}`,
+                ...(pkg.decidedBy?[`**Reviewed by:** <@${pkg.decidedBy}>`]:[]),
                 '',
                 pkg.description || 'No description.',
                 pkg.files?.length ? `\n**Delivery files:** ${pkg.files.map((file) => `[${file.name}](${file.url})`).join(', ')}` : '\n**Delivery files:** None attached.',
@@ -46,9 +47,9 @@ function buildPackageContainer(cfg, pkg) {
 function buildReviewButtons(pkg) {
     if (pkg.status !== 'pending') return [];
     return [
-        new ButtonBuilder().setCustomId(`package_approve_${pkg.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`package_deny_${pkg.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`package_editprice_${pkg.id}`).setLabel('Edit Price').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`package_approve_${pkg.id}`).setLabel('Approve Package').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`package_deny_${pkg.id}`).setLabel('Deny Package').setEmoji('❌').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`package_editprice_${pkg.id}`).setLabel('Adjust Price').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
     ];
 }
 

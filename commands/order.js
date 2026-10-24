@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const config = require('../utils/config');
 const orders = require('../utils/orders');
+const progress=require('../utils/orderProgress');
 const jobs = require('../utils/jobs');
 const perms = require('../utils/permissions');
 const { baseEmbed, parseColor } = require('../utils/embeds');
@@ -280,7 +281,7 @@ module.exports = {
         }
 
         if (sub === 'update') {
-            if (!perms.isStaff(interaction.member, cfg)) {
+            if (!perms.isStaff(interaction.member, cfg) && !perms.isManager(interaction.member,cfg)) {
                 return interaction.reply({ content: 'You do not have permission to edit order status.', ephemeral: true });
             }
             const id = interaction.options.getInteger('order_id', true);
@@ -288,15 +289,24 @@ module.exports = {
             const order = orders.findOrder(guildId, id);
             if (!order) return interaction.reply({ content: `No order found with ID \`#${id}\`.`, ephemeral: true });
 
-            const updated = orders.updateOrder(guildId, id, { status });
-            await refreshOrderMessage(interaction.client, cfg, updated);
-            return interaction.reply({ content: `Order \`#${id}\` status set to **${status}**.`, embeds: [orderEmbed(cfg, updated)], ephemeral: true });
+            if(!progress.authorized(interaction.member,cfg,status))return interaction.reply({content:'Management approval is required for payment, delivery or cancellation statuses.',flags:64});
+            await interaction.deferReply({flags:64});
+            let updated;
+            try {
+              if(progress.canTransition(order.status,status)) updated=await progress.setStatus(interaction.client,guildId,cfg,order,status,{actorId:interaction.user.id,note:'Updated by staff command'});
+              else if(['Void','Not Paid'].includes(status) && perms.isManager(interaction.member,cfg)){
+                updated=orders.updateOrder(guildId,id,{status,statusUpdatedAt:Date.now()});
+                await progress.refresh(interaction.client,guildId,cfg,updated);
+              } else return interaction.editReply('Invalid transition from **'+order.status+'** to **'+status+'**. Move through the order stages in sequence.');
+            }catch(error){return interaction.editReply('Could not update order status: '+error.message);}
+            return interaction.editReply({ content: `Order \`#${id}\` status set to **${status}**.`, embeds: [orderEmbed(cfg, updated)] });
         }
 
         if (sub === 'status') {
             const id = interaction.options.getInteger('order_id', true);
             const order = orders.findOrder(guildId, id);
             if (!order) return interaction.reply({ content: `No order found with ID \`#${id}\`.`, ephemeral: true });
+            if(order.customerId!==interaction.user.id && !perms.isStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg))return interaction.reply({content:'You can only view your own orders.',flags:64});
             return interaction.reply({ content: `Current status for order \`#${id}\`: **${order.status}**`, embeds: [orderEmbed(cfg, order)], ephemeral: true });
         }
 

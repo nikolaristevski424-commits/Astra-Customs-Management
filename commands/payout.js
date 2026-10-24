@@ -12,7 +12,7 @@ function buildEmbed(cfg, record) {
             ? 0xe74c3c
             : undefined;
     return baseEmbed(cfg, {
-        title: 'Astra Customs | Robux Payout Request',
+        title: 'Astra Customs | Payout #'+record.id+' — '+(record.status==='Pending'?'Awaiting Review':record.status),
         bannerKey: 'payout',
         color: statusColor,
         fields: [
@@ -20,8 +20,9 @@ function buildEmbed(cfg, record) {
             { name: 'Amount', value: `R$${record.amount}`, inline: true },
             { name: 'Roblox username', value: record.robloxUsername, inline: true },
             { name: 'Reason', value: record.reason },
-            { name: 'Status', value: record.status, inline: true },
-            ...(record.paidBy ? [{ name: 'Paid by', value: userMention(record.paidBy), inline: true }] : []),
+            { name: 'Decision', value: record.status==='Pending'?'🟠 Pending review':record.status==='Paid'?'🟢 Paid — recorded by management':'🔴 Denied', inline: true },
+            ...(record.paidBy ? [{ name: 'Reviewed by', value: userMention(record.paidBy), inline: true }] : []),
+            ...(record.deniedBy ? [{ name: 'Denied by', value: userMention(record.deniedBy), inline: true }] : []),
             ...(record.decisionReason ? [{ name: 'Decision reason', value: record.decisionReason }] : []),
         ],
         footer: `Payout request #${record.id}`,
@@ -32,9 +33,9 @@ function buildEmbed(cfg, record) {
 function buildButtons(record) {
     if (record.status !== 'Pending') return [];
     return [
-        new ButtonBuilder().setCustomId(`payout_markpaid_${record.id}`).setLabel('Mark Paid').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`payout_deny_${record.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`payout_autosend_${record.id}`).setLabel('Try Auto-Send').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`payout_markpaid_${record.id}`).setLabel('Confirm Manual Payment').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`payout_deny_${record.id}`).setLabel('Deny Request').setEmoji('❌').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`payout_autosend_${record.id}`).setLabel('Send Robux Automatically').setEmoji('💸').setStyle(ButtonStyle.Secondary),
     ];
 }
 

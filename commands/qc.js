@@ -30,8 +30,8 @@ function buildEmbed(cfg, record) {
 function buildButtons(record) {
     if (record.status !== 'pending') return [];
     return [
-        new ButtonBuilder().setCustomId(`qc_accept_${record.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`qc_deny_${record.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`qc_accept_${record.id}`).setLabel('Approve Work').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`qc_deny_${record.id}`).setLabel('Request Changes').setEmoji('📝').setStyle(ButtonStyle.Danger),
     ];
 }
 

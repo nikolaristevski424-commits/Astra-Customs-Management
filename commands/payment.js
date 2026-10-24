@@ -5,6 +5,7 @@ const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
 const discounts = require('../utils/discounts');
 const packages = require('../utils/packages');
+const orders=require('../utils/orders');
 const { baseEmbed } = require('../utils/embeds');
 
 function formatSince(ts) {
@@ -38,6 +39,7 @@ module.exports = {
                 .addIntegerOption((o) => o.setName('price').setDescription('Price in Robux').setRequired(true).setMinValue(0))
                 .addIntegerOption((o) => o.setName('package_id').setDescription('Approved package to deliver after payment').setAutocomplete(true))
                 .addUserOption((o) => o.setName('customer').setDescription('Discord customer who should receive the files'))
+                .addIntegerOption((o)=>o.setName('order_id').setDescription('Optional tracked order ID to link this Roblox payment').setMinValue(1))
                 .addStringOption((o) => o.setName('discount_code').setDescription('Optional discount code').setMaxLength(32))
                 .addStringOption((o) => o.setName('note').setDescription('What this payment is for (shown in /payment pool)'))
         )
@@ -157,6 +159,11 @@ module.exports = {
             const price = interaction.options.getInteger('price', true);
             const packageId = interaction.options.getInteger('package_id');
             const customer = interaction.options.getUser('customer');
+            const orderId = interaction.options.getInteger('order_id');
+            const orderRecord=orderId?orders.findOrder(guildId,orderId):null;
+            if(orderId && !orderRecord)return interaction.reply({content:'That tracked order ID does not exist.',flags:64});
+            if(orderRecord && ['Void','Cancelled','Delivered'].includes(orderRecord.status))return interaction.reply({content:'That order is not awaiting payment.',flags:64});
+            if(orderRecord && customer && customer.id!==orderRecord.customerId)return interaction.reply({content:'Customer does not match the tracked order.',flags:64});
             let packageRecord = null;
             if (packageId) {
                 packageRecord = packages.find(guildId, packageId);
@@ -184,7 +191,8 @@ module.exports = {
 
             const gamePassId = pool.pickAvailable(guildId, note, undefined, {
                 packageId: packageRecord?.id || null,
-                customerDiscordId: customer?.id || null,
+                customerDiscordId: customer?.id || orderRecord?.customerId || null,
+                orderId: orderRecord?.id || null,
             });
             if (!gamePassId) {
                 return interaction.reply({ content: 'Every payment game pass is currently reserved. Free one up with `/payment release`, or check `/payment pool`.', ephemeral: true });

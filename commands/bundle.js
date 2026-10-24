@@ -7,14 +7,16 @@ const { baseEmbed } = require('../utils/embeds');
 
 function buildEmbed(cfg, record) {
     return baseEmbed(cfg, {
-        title: 'Astra Customs | Bundle Request',
+        title: 'Astra Customs | Bundle #'+record.id+' — '+record.status,
         bannerKey: 'bundle',
+        color: record.status==='Approved'?0x2caa80:record.status==='Denied'?0xe05252:0x526aaf,
         fields: [
             { name: 'Bundle type', value: record.bundleType },
             { name: 'Designer', value: userMention(record.designerId) },
             { name: 'Total after tax', value: `${record.totalAfterTax}` },
             { name: 'Notes', value: record.notes || 'None' },
-            { name: 'Status', value: record.status },
+            { name: 'Status', value: record.status==='Pending'?'🟠 Pending review':record.status==='Approved'?'✅ Approved':'❌ Denied' },
+            ...(record.decidedBy?[{name:'Reviewed by',value:userMention(record.decidedBy),inline:true}]:[]),
         ],
         footer: `Bundle request #${record.id}`,
     });
@@ -23,8 +25,8 @@ function buildEmbed(cfg, record) {
 function buildButtons(record) {
     if (record.status !== 'Pending') return [];
     return [
-        new ButtonBuilder().setCustomId(`bundle_approve_${record.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`bundle_deny_${record.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`bundle_approve_${record.id}`).setLabel('Approve Bundle').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`bundle_deny_${record.id}`).setLabel('Deny Bundle').setEmoji('❌').setStyle(ButtonStyle.Danger),
     ];
 }
 
