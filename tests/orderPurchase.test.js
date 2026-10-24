@@ -55,3 +55,29 @@ test('order state persists when a valid transition is applied',async()=>{
  assert.equal(updated.status,'Paid');
  assert.equal(orders.findOrder(gid,o.id).statusHistory.length,1);
 });
+
+test('Roblox monitor checks every two minutes and respects persisted restart time',()=>{
+ assert.equal(monitor.POLL_INTERVAL_MS,120000);
+ assert.equal(monitor.PAGE_GAP_MS,3000);
+ assert.equal(monitor.nextEligiblePollAt({lastPolledAt:100000,nextRequestAt:0},100000),220000);
+ assert.equal(monitor.nextEligiblePollAt({lastPolledAt:100000,nextRequestAt:400000},150000),400000);
+ assert.equal(monitor.nextEligiblePollAt({lastPolledAt:0,nextRequestAt:0},0),0);
+});
+test('backoff never schedules automatic retries more often than two minutes',()=>{
+ for (const status of [500,502,503,429]) {
+   assert.ok(monitor.retryDelay({response:{status,headers:{}}},1)>=monitor.POLL_INTERVAL_MS);
+ }
+});
+
+test('manual purchase retry preserves Roblox HTTP 429 cooldown',()=>{
+ const groupId='retry-test-'+Date.now();
+ const store=require('../utils/store');
+ const until=Date.now()+10*60_000;
+ store.update('purchaseMonitor','global',{},state=>{
+   state[groupId]={lastPolledAt:Date.now()-5*60_000,nextRequestAt:until,lastError:'HTTP 429: rate limited'};
+   return state;
+ });
+ const result=monitor.retryNow(groupId);
+ assert.equal(result.scheduled,false);
+ assert.equal(monitor.getGroupState(groupId).nextRequestAt,until);
+});

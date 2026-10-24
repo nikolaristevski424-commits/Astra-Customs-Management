@@ -14,18 +14,21 @@ module.exports={
     const groupId=String(cfg.robloxGroupId),sub=interaction.options.getSubcommand();
     if(sub==='retry'){
       if(!perms.isManager(interaction.member,cfg))return interaction.reply({content:'Managers only.',flags:MessageFlags.Ephemeral});
-      monitor.retryNow(groupId);
-      return interaction.reply({content:'Roblox monitoring retry scheduled on the next polling cycle. A server-side HTTP 500 may still recur.',flags:MessageFlags.Ephemeral});
+      const result=monitor.retryNow(groupId);
+      if (!result.scheduled) return interaction.reply({content:'Roblox has rate-limited requests. The monitor will respect its retry window; please do not force repeated checks.',flags:MessageFlags.Ephemeral});
+      return interaction.reply({content:'Purchase monitoring will retry on its next two-minute-interval slot. Roblox errors may still recur.',flags:MessageFlags.Ephemeral});
     }
     const st=monitor.getGroupState(groupId);
     const records=receipts.list(interaction.guildId);
     const needsReview=records.filter(r=>r.reviewRequired);
     const last=st.lastSuccessAt?'<t:'+Math.floor(st.lastSuccessAt/1000)+':R>':'Never';
-    const retry=st.nextRequestAt>Date.now()?'<t:'+Math.floor(st.nextRequestAt/1000)+':R>':'Ready';
+    const next=monitor.nextEligiblePollAt(st);
+    const retry=next>Date.now()?'<t:'+Math.floor(next/1000)+':R>':'Ready';
     return interaction.reply({flags:MessageFlags.Ephemeral,content:[
       '**Astra Customs | Purchase Monitor**',
       'Roblox Group: \`'+groupId+'\`',
       'Last successful check: '+last,
+      'Automatic sale checks: 2-minute minimum per group (slower during outages or when tracking multiple groups)',
       'Next eligible poll: '+retry,
       'Consecutive failures: '+st.consecutiveFailures,
       'Last error: '+(st.lastError||'None'),

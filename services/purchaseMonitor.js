@@ -11,7 +11,10 @@ const orders = require('../utils/orders');
 const receipts = require('../utils/purchaseReceipts');
 const store = require('../utils/store');
 
-const POLL_INTERVAL_MS = 60_000;
+// Check unique Roblox groups at most every two minutes.
+const POLL_INTERVAL_MS = 2 * 60_000;
+// Space additional pagination requests to avoid API bursts.
+const PAGE_GAP_MS = 3_000;
 const LIMIT = 100;
 const PAGE_CAP = 8;
 const MAX_SEEN = 1500;
@@ -19,11 +22,11 @@ const LOOKBACK_MS = 15 * 60_000;
 const STATE_STORE = 'purchaseMonitor';
 let started = false;
 let polling = false;
-let lastRequestAt = 0;
+
 
 function getGroupState(groupId) {
   const state = store.get(STATE_STORE, 'global', {})[String(groupId)] || {};
-  return { initialized:false, baselineCutoff:0, lastSeenAt:0, seenIds:[], nextRequestAt:0,
+  return { initialized:false, baselineCutoff:0, lastSeenAt:0, seenIds:[], nextRequestAt:0, lastPolledAt:0,
     consecutiveFailures:0, lastError:null, lastSuccessAt:0, ...state };
 }
 function saveGroupState(groupId, patch) {
@@ -32,6 +35,27 @@ function saveGroupState(groupId, patch) {
     return all;
   })[String(groupId)];
 }
+function globalLastPollAt() {
+  const state = store.get(STATE_STORE, 'global', {});
+  return Number(state.lastRobloxRequestAt) || 0;
+}
+function markPollStarted(groupId, now) {
+  // Persist before the request, preventing rapid requests after a restart.
+  store.update(STATE_STORE, 'global', {}, all => {
+    all.lastRobloxRequestAt = now;
+    const group = all[String(groupId)] || {};
+    all[String(groupId)] = { ...group, lastPolledAt: now };
+    return all;
+  });
+}
+function nextEligiblePollAt(state, globalLast = globalLastPollAt()) {
+  return Math.max(
+    Number(state.nextRequestAt) || 0,
+    (Number(state.lastPolledAt) || 0) + (state.lastPolledAt ? POLL_INTERVAL_MS : 0),
+    (Number(globalLast) || 0) + (globalLast ? POLL_INTERVAL_MS : 0),
+  );
+}
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function transactionKey(tx) {
   return String(tx.id ?? [
     Date.parse(tx.created), tx.agent?.id || '', tx.details?.id || tx.details?.gamepassId || '', tx.currency?.amount ?? '',
@@ -49,7 +73,7 @@ function retryDelay(error, attempts) {
   }
   if (!canRetry(error)) return 30 * 60_000;
   const exponential = Math.min(30 * 60_000, POLL_INTERVAL_MS * 2 ** Math.min(attempts,5));
-  return Math.round(exponential * (0.85 + Math.random() * 0.3));
+  return Math.max(POLL_INTERVAL_MS, Math.round(exponential * (0.85 + Math.random() * 0.3)));
 }
 async function requestPage(groupId, cookie, { cursor, limit=LIMIT }={}) {
   const params = { transactionType:'Sale', limit, sortOrder:'Desc' };
@@ -76,6 +100,7 @@ async function scanSince(groupId, cookie, state) {
   const transactions=[];
   let cursor=null, more=false, pageLimit=LIMIT, reduced=false;
   for(let page=0;page<PAGE_CAP;page++) {
+    if(page>0)await sleep(PAGE_GAP_MS);
     let result;
     try { result=await requestPage(groupId,cookie,{cursor,limit:pageLimit}); }
     catch(error) {
@@ -83,6 +108,7 @@ async function scanSince(groupId, cookie, state) {
         // If Roblox cannot build a 100-sale response, retry 25 and paginate normally.
         pageLimit=25; reduced=true;
         console.warn('[purchaseMonitor] HTTP 500 with 100 sales; paging 25 at a time.');
+        await sleep(PAGE_GAP_MS);
         result=await requestPage(groupId,cookie,{cursor,limit:pageLimit});
       }else throw error;
     }
@@ -215,13 +241,16 @@ async function pollGroups(client,cookie) {
       if(!groups.has(groupId))groups.set(groupId,[]);
       groups.get(groupId).push({guildId,cfg});
     }
-    for(const [groupId,destinations] of groups) {
+    // Oldest-first scheduling prevents starvation when monitoring multiple
+    // groups. Only one group can be polled per two-minute global slot.
+    const eligible = [...groups.entries()].sort(([a],[b]) =>
+      (getGroupState(a).lastPolledAt || 0) - (getGroupState(b).lastPolledAt || 0));
+    for(const [groupId,destinations] of eligible) {
       const state=getGroupState(groupId);
-      if(Date.now()<state.nextRequestAt)continue;
+      const now=Date.now();
+      if(now < nextEligiblePollAt(state)) continue;
+      markPollStarted(groupId,now);
       try {
-        const wait=lastRequestAt+POLL_INTERVAL_MS-Date.now();
-        if(wait>0)await new Promise(resolve=>setTimeout(resolve,wait));
-        lastRequestAt=Date.now();
         const {transactions,hasMore}=await scanSince(groupId,cookie,state);
         await processGroup(client,groupId,destinations,transactions,{hasMore});
         saveGroupState(groupId,{consecutiveFailures:0,nextRequestAt:0,lastError:null,lastSuccessAt:Date.now()});
@@ -230,6 +259,7 @@ async function pollGroups(client,cookie) {
         saveGroupState(groupId,{consecutiveFailures:failures,nextRequestAt:Date.now()+delay,lastError:'HTTP '+(error.response?.status||'network')+': '+error.message.slice(0,180)});
         console.warn('[purchaseMonitor] Group '+groupId+' '+(error.response?.status||'network')+'; retry in '+Math.ceil(delay/1000)+'s. '+error.message);
       }
+      break;
     }
   } finally {polling=false;}
 }
@@ -238,11 +268,17 @@ function start(client){
   const cookie=process.env.ROBLOX_COOKIE;
   if(!cookie){console.log('[purchaseMonitor] Monitoring disabled: ROBLOX_COOKIE missing');return;}
   started=true;
-  console.log('[purchaseMonitor] Monitoring group sales with persisted receipts and retry backoff.');
+  console.log('[purchaseMonitor] Checking unique Roblox groups for new sales at most every 2 minutes (slower on errors); paginated requests are spaced.');
   const loop=async()=>{try{await pollGroups(client,cookie)}catch(e){console.error('[purchaseMonitor] Poll failed:',e)}finally{setTimeout(loop,POLL_INTERVAL_MS).unref?.();}};
   loop();
 }
 function retryNow(groupId){
+  const state = getGroupState(groupId);
+  // Never let a manual retry override Roblox's rate-limit response.
+  if (state.nextRequestAt > Date.now() && String(state.lastError||'').startsWith('HTTP 429')) {
+    return {scheduled:false,nextRequestAt:state.nextRequestAt};
+  }
   saveGroupState(groupId,{nextRequestAt:0,consecutiveFailures:0});
+  return {scheduled:true,nextRequestAt:nextEligiblePollAt(getGroupState(groupId))};
 }
-module.exports={start,fetchRecentTransactions,scanSince,processGroup,pollGroups,transactionKey,retryDelay,getGroupState,recordPurchase,retryNow};
+module.exports={start,fetchRecentTransactions,scanSince,processGroup,pollGroups,transactionKey,retryDelay,getGroupState,recordPurchase,retryNow,nextEligiblePollAt,POLL_INTERVAL_MS,PAGE_GAP_MS};
