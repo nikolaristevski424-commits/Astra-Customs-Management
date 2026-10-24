@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
+const availability=require('../utils/serviceAvailability');
+const panel=require('./panel');
 
 const ICONS = {
     open: '<:StatusEMOJIGreen:1545902027299627018><:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>',
@@ -31,10 +33,13 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to change service status.', ephemeral: true });
         }
 
-        const name = interaction.options.getString('name', true);
+        const name = availability.normalize(interaction.options.getString('name', true));
+        if(!name)return interaction.reply({content:'Unknown service. Available: Discord, Liveries, Graphics, Uniforms, Bots, Logos, Embeds, Websites, ELS.',flags:64});
+        await interaction.deferReply({flags:64});
         const status = interaction.options.getString('status', true);
         config.setNested(guildId, 'serviceStatus', { [name]: status });
+        await panel.refreshPanels(interaction.client,guildId);
 
-        return interaction.reply({ content: `Set **${name}** to ${ICONS[status]} **${status}**.`, ephemeral: true });
+        return interaction.editReply({ content: `Set **${name}** to ${ICONS[status]} **${status}**. Live panels refreshed.` });
     },
 };

@@ -6,10 +6,13 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    StringSelectMenuBuilder,
     ChannelType,
     MessageFlags,
 } = require('discord.js');
 const config = require('../utils/config');
+const catalog=require('../utils/catalog');
+const availability=require('../utils/serviceAvailability');
 const affiliations = require('./affiliate');
 const portfolio = require('../utils/portfolio');
 const { parseColor, addPanelBanner } = require('../utils/embeds');
@@ -34,22 +37,20 @@ function baseContainer(cfg, bannerKey = null) {
 }
 
 function orderStatusPanel(cfg) {
-    const services = Object.keys(cfg.serviceStatus || {}).length ? cfg.serviceStatus : { Liveries: 'open', Clothing: 'open', Graphics: 'open', Photography: 'open', Discord: 'open' };
-    const container = baseContainer(cfg, 'status');
-    const lines = [`## ${cfg.brandName} | Order Status`, '', 'Current availability for each service:', ''];
-    for (const [name, status] of Object.entries(services)) {
-        const normalized = { available: 'open', limited: 'delayed', unavailable: 'closed' }[status] || status;
-        const icons = { open: '<:StatusEMOJIGreen:1545902027299627018><:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>', delayed: '<:StatusEmojiYellow:1545902089186705459>', closed: '<:StatusEmojiRed:1545902134258827294><:ClosedEmoji1:1545902477621072022><:ClosedEmoji2:1545902533703245914><:ClosedEmoji3:1545902589403594903>', premium: '<:boost_1:1492387526613143683>' };
-        lines.push(`**${name}:** ${icons[normalized] || '❓'}`);
+    const container=baseContainer(cfg,'status');
+    const lines=['## '+cfg.brandName+' | Order Status','','Current availability for all design services',''];
+    for (const [id,group] of Object.entries(catalog.TYPES)) {
+        const value=availability.status(cfg,id);
+        lines.push('**'+group.label+'** '+(availability.icons[value]||'❔')+' '+(availability.labels[value]||value));
     }
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Status can change as the queue moves. Open an order or ticket to confirm current availability with staff.'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Live availability: updated when staff change /status or /service. Custom prices are confirmed before payment.'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('order_open').setLabel('Start an Order').setStyle(ButtonStyle.Success).setEmoji('🛒'),
-        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Ask Support').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
+       new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success),
+       new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Support').setStyle(ButtonStyle.Secondary)
     ));
-    return { components: [container] };
+    return {components:[container]};
 }
 
 function ticketsPanel(cfg) {
@@ -61,16 +62,20 @@ function ticketsPanel(cfg) {
     return { components: [container] };
 }
 
-function orderPanel(cfg) {
-    const container = baseContainer(cfg, 'order');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Order Here\n\nStart a private order request for custom work. Our team will review your details and guide you through the next steps.`));
+function orderPanel(cfg){
+    const container=baseContainer(cfg,'order');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## '+cfg.brandName+' | Place an Order\n\nSelect your desired service below. Prices and availability update when our staff change the order status.'));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Services**\n🚗 Livery Designs\n👕 Uniform Designs\n🎨 Graphics and ELS\n💬 Discord Designs\n\n**Have ready**\nYour references, deadline, budget, and important specifications.'));
+    const lines=Object.entries(catalog.TYPES).map(([id,group])=>'**'+group.label+'** — '+(availability.labels[availability.status(cfg,id)]||'Open'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')+'\n\n**Before you purchase:** https://astra-customs-terms.vercel.app/'));
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+        .setCustomId('astra_order_type').setPlaceholder('Select an order type...').addOptions(
+            Object.entries(catalog.TYPES).map(([id,group])=>({label:group.label,value:id,description:availability.labels[availability.status(cfg,id)]||'View designs'}))
+        )));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('order_open').setLabel('Start Order Request').setStyle(ButtonStyle.Success).setEmoji('🛒'),
-        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Need Help First').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
+        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Contact Support').setStyle(ButtonStyle.Secondary)
     ));
-    return { components: [container] };
+    return {components:[container]};
 }
 
 function applicationsPanel(cfg) {
@@ -140,6 +145,19 @@ const BUILDERS = {
 module.exports = {
     BUILDERS,
     PANEL_CHANNELS,
+    async refreshPanels(client,guildId){
+        const cfg=config.getConfig(guildId);
+        for(const [type,key] of [['order','orderPanel'],['order-status','orderStatusPanel']]){
+            const record=cfg[key];
+            if(!record?.channelId||!record?.messageId) continue;
+            try{
+                const channel=await client.channels.fetch(record.channelId);
+                if(!channel?.messages?.fetch)continue;
+                const message=await channel.messages.fetch(record.messageId);
+                await message.edit({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)});
+            }catch(error){console.warn('[panel] Refresh failed for '+type+': '+error.message);}
+        }
+    },
 
     data: new SlashCommandBuilder()
         .setName('panel')
@@ -170,6 +188,8 @@ module.exports = {
         const payload = builder(cfg, guildId);
         const sent = await sendAsPanel(interaction, { flags: MessageFlags.IsComponentsV2, ...payload }, targetChannel);
 
+        if(type==='order' && sent) config.setNested(guildId,'orderPanel',{channelId:sent.channelId,messageId:sent.id});
+        if(type==='order-status' && sent) config.setNested(guildId,'orderStatusPanel',{channelId:sent.channelId,messageId:sent.id});
         if (type === 'honeypot' && sent) {
             config.setNested(guildId, 'honeypot', { channelId: sent.channelId, messageId: sent.id });
         }

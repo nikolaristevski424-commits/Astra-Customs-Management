@@ -31,6 +31,7 @@ const { isExecutive } = require('../utils/env');
 const { disableAllButtons } = require('../utils/components');
 
 const orderCmd = require('../commands/order');
+const orderFlow = require('../utils/orderFlow');
 const bundleCmd = require('../commands/bundle');
 const packageCmd = require('../commands/package');
 const qcCmd = require('../commands/qc');
@@ -54,6 +55,7 @@ module.exports = {
             if (interaction.isStringSelectMenu()) return await handleSelect(interaction);
             if (interaction.isModalSubmit()) return await handleModal(interaction);
         } catch (err) {
+            if(err?.code===10062 || err?.code===40060){console.warn('[interactionCreate] Interaction expired or already acknowledged:',interaction.customId||interaction.commandName);return;}
             console.error('[interactionCreate] Unhandled error:', err);
             const payload = { content: 'Something went wrong handling that. Check the bot console.', flags: MessageFlags.Ephemeral };
             if (interaction.deferred || interaction.replied) {
@@ -78,6 +80,8 @@ async function handleAutocomplete(interaction) {
 }
 
 async function handleSelect(interaction) {
+    if(interaction.customId==='astra_order_type')return orderFlow.category(interaction);
+    if(interaction.customId.startsWith('astra_order_item_'))return orderFlow.item(interaction);
     const { customId } = interaction;
 
     if (customId.startsWith('quote_sel_')) {
@@ -342,6 +346,12 @@ async function handleButton(interaction) {
             const finalRelease = releasesUtil.find(guildId, id);
             await interaction.update({ embeds: [releaseCmd.buildEmbed(cfg, finalRelease)], components: [] });
 
+            if(finalRelease.text){
+                const chunks=finalRelease.text.match(/[\s\S]{1,1700}/g)||[];
+                await interaction.channel.send({content:'🎉 **Free release unlocked!** '+finalRelease.title,allowedMentions:{parse:[]}});
+                for(const chunk of chunks) await interaction.channel.send({content:'\`\`\`\n'+chunk.replace(/\`\`\`/g,'\` \` \`')+'\n\`\`\`',allowedMentions:{parse:[]}});
+                return;
+            }
             // Re-download and re-post the file fresh so the download isn't tied to a
             // potentially-expiring original attachment URL.
             try {
@@ -409,6 +419,9 @@ async function handleButton(interaction) {
         return;
     }
 
+    if(customId==='payment_friend_help'){
+        return interaction.reply({flags:MessageFlags.Ephemeral,content:'**Adding a Roblox friend**\n1. Sign in to Roblox.\n2. Search for the owner’s verified Roblox username (ask staff for the correct account).\n3. Open that user profile and select **Add Friend**.\n4. Wait for them to accept.\n\nA friendship does not override age or purchase restrictions. If Roblox blocks the transaction, follow Roblox guidance or ask a parent/guardian and staff for an approved option. Never send your password or security codes.'});
+    }
     // ---- Guidelines panel sub-buttons ----
     if (customId.startsWith('guidelines_view_')) {
         const type = customId.replace('guidelines_view_', '');
@@ -416,18 +429,7 @@ async function handleButton(interaction) {
     }
 
     // ---- Dashboard: Help (open ticket) ----
-    if (customId === 'order_open') {
-        const modal = new ModalBuilder().setCustomId('order_open_modal').setTitle('New Order');
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('product').setLabel('What would you like designed?').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(120)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('style').setLabel('Design style / vibe').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(120)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deadline').setLabel('Deadline / preferred finish date').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(120)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('budget').setLabel('Budget in Robux').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('references').setLabel('Any references / examples?').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('details').setLabel('Tell us more about the order').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1800)),
-        );
-        return interaction.showModal(modal);
-    }
+    if(customId==='order_open') return orderFlow.start(interaction);
 
     if (customId === 'help_ticket_open') {
         const modal = new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Open a Ticket');
@@ -644,6 +646,7 @@ function ticketStaffRoles(guild, cfg) {
 }
 
 async function handleModal(interaction) {
+    if(interaction.customId.startsWith('astra_order_form_')) return orderFlow.modal(interaction);
     const { customId } = interaction;
     const guildId = interaction.guildId;
     const cfg = config.getConfig(guildId);
@@ -761,6 +764,7 @@ async function handleModal(interaction) {
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
         });
 
+        await channel.send({content:'**Astra Customs | Terms of Service**\nPlease read before continuing: https://astra-customs-terms.vercel.app/\nA team member will respond soon.',allowedMentions:{parse:[]}});
         await interaction.editReply(`Ticket opened: <#${channel.id}>`);
         return;
     }

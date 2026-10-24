@@ -7,6 +7,7 @@ const activity = require('../utils/activity');
 const hr = require('../utils/hr');
 const activityCmd = require('../commands/activity');
 const { sendInfractionMessages } = require('../utils/infractionMessages');
+const staffDiscipline = require('./staffDiscipline');
 
 const CHECK_INTERVAL_MS = 30_000;
 let isProcessing = false;
@@ -43,6 +44,11 @@ async function processCheck(client, guildId, guild, cfg, record) {
                 reason: `Did not respond to activity check #${record.id} within 24 hours.`,
                 sourceActivityCheckId: record.id,
             });
+
+            for(const item of infraction.escalations||[]){
+                await staffDiscipline.apply(client,guildId,item);
+                await sendInfractionMessages(channel,cfg,{userId,heading:'Automatic HR Escalation',body:'The configured staff discipline threshold was reached.',punishment:item.punishment,reason:item.reason,infractionId:item.infractionId,issuer:'Activity check escalation'});
+            }
 
             const { panelMessage, pingMessage } = await sendInfractionMessages(channel, cfg, {
                 userId,

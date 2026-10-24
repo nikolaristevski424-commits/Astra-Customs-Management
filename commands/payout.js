@@ -93,7 +93,7 @@ module.exports = {
 
             const targetChannelId = cfg.payoutRequestsChannelId || interaction.channelId;
             const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
-            if (!channel) {
+            if (!channel?.send || !channel.isTextBased?.() || channel.isDMBased?.()) {
                 return interaction.reply({ content: `Payout request \`#${record.id}\` saved, but the payout requests channel isn't reachable. Set \`PAYOUT_REQUESTS_CHANNEL_ID\` in \`.env\`.`, ephemeral: true });
             }
 

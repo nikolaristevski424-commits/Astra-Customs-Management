@@ -220,13 +220,16 @@ function buildLinkMessage(cfg, gamePassId, price, discount = null) {
         discount ? `Discount **${discount.code}** applied: R$${discount.original} → R$${price} (saved R$${discount.savings}).` : null,
         roblox.gamePassLink(gamePassId),
     ].filter(Boolean);
-    if (cfg.gamePlaceId) {
-        lines.push('', 'If you are under 13 and the purchase link is locked, request access from staff. Do not join the game to bypass the purchase restriction.');
-    }
+    lines.push('', '**Need another way to purchase?** [Astra Customs Shop](https://www.roblox.com/games/102262993580557/Astra-Customs-Shop).');
+    lines.push('For under-13 users: if Roblox restricts a purchase, contact staff and a parent or guardian to request a permitted purchasing option. Do not bypass age restrictions.');
     return lines.join('\n');
 }
 
 function buildLinkButtons(cfg, gamePassId) {
-    const buttons = [new ButtonBuilder().setLabel('Payment Link').setStyle(ButtonStyle.Link).setURL(roblox.gamePassLink(gamePassId))];
+    const buttons = [
+        new ButtonBuilder().setLabel('Payment Link').setStyle(ButtonStyle.Link).setURL(roblox.gamePassLink(gamePassId)),
+        new ButtonBuilder().setLabel('Astra Customs Shop').setStyle(ButtonStyle.Link).setURL('https://www.roblox.com/games/102262993580557/Astra-Customs-Shop'),
+        new ButtonBuilder().setCustomId('payment_friend_help').setLabel('How to Add a Roblox Friend').setStyle(ButtonStyle.Secondary)
+    ];
     return new ActionRowBuilder().addComponents(buttons);
 }

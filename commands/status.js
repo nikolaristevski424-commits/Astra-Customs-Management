@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const { isExecutive } = require('../utils/env');
 const { ICONS } = require('./service');
+const availability=require('../utils/serviceAvailability');
+const panel=require('./panel');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,10 +23,13 @@ module.exports = {
             return interaction.reply({ content: 'Only configured executives can change service status.', ephemeral: true });
         }
 
-        const service = interaction.options.getString('service', true).trim();
+        const service = availability.normalize(interaction.options.getString('service', true));
+        if(!service)return interaction.reply({content:'Unknown service. Use Discord, Liveries, Graphics, Uniforms, Bots, Logos, Embeds, Websites, or ELS.',flags:64});
+        await interaction.deferReply({flags:64});
         const status = interaction.options.getString('status', true);
         config.setNested(interaction.guildId, 'serviceStatus', { [service]: status });
+        await panel.refreshPanels(interaction.client,interaction.guildId);
 
-        return interaction.reply({ content: `Set **${service}** to ${ICONS[status]} **${status === 'premium' ? 'Premium / Boosters Only' : status}**.`, ephemeral: true });
+        return interaction.editReply({ content: `Set **${service}** to ${ICONS[status]} **${status === 'premium' ? 'Premium / Boosters Only' : status}**. Live panels refreshed.` });
     },
 };

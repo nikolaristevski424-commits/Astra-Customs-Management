@@ -15,13 +15,13 @@ function buildEmbed(cfg, release) {
         fields: [
             { name: 'Reaction Goal', value: `🎉 ${release.reactedUserIds.length}/${release.goal}`, inline: true },
             { name: 'Released By', value: userMention(release.releasedBy), inline: true },
-            { name: 'File', value: reached ? release.fileName : `🔒 Unlocks at ${release.goal} reactions`, inline: false },
+            { name: 'File', value: reached ? (release.fileName||'Text/code unlocked') : `🔒 Unlocks at ${release.goal} reactions`, inline: false },
         ],
         footer: `Free Release #${release.id}`,
     });
     if (reached) embed.setAuthor({ name: '🎉 Goal reached!' });
     if (release.previewImageUrl) embed.setImage(release.previewImageUrl);
-    if (reached) embed.addFields({ name: 'Download', value: release.fileName });
+    if (reached) embed.addFields({ name: 'Delivery', value: release.fileName||'Text/code posted below' });
     return embed;
 }
 
@@ -48,7 +48,8 @@ module.exports = {
         .addStringOption((o) => o.setName('title').setDescription('e.g. "Free Release"').setRequired(true))
         .addStringOption((o) => o.setName('description').setDescription('What it is').setRequired(true))
         .addIntegerOption((o) => o.setName('goal').setDescription('Reactions needed to unlock it').setRequired(true).setMinValue(1))
-        .addAttachmentOption((o) => o.setName('file').setDescription('The file to give away').setRequired(true))
+        .addAttachmentOption((o) => o.setName('file').setDescription('Optional file to give away'))
+        .addStringOption((o) => o.setName('text').setDescription('Text/code to release (instead of a file)').setMaxLength(4000))
         .addAttachmentOption((o) => o.setName('preview_image').setDescription('Optional preview image shown before the goal is reached')),
 
     async execute(interaction) {
@@ -64,9 +65,11 @@ module.exports = {
         const title = interaction.options.getString('title', true);
         const description = interaction.options.getString('description', true);
         const goal = interaction.options.getInteger('goal', true);
-        const file = interaction.options.getAttachment('file', true);
+        const file = interaction.options.getAttachment('file');
+        const text = interaction.options.getString('text')?.trim() || null;
+        if(!file && !text) return interaction.editReply('Attach a file OR provide text/code to release.');
         const previewImage = interaction.options.getAttachment('preview_image');
-        const imageSource = previewImage || (file.contentType?.startsWith('image/') ? file : null);
+        const imageSource = previewImage || (file?.contentType?.startsWith('image/') ? file : null);
         let previewBuffer = null;
         let previewName = null;
 
@@ -84,8 +87,9 @@ module.exports = {
             title,
             description,
             goal,
-            fileUrl: file.url,
-            fileName: file.name,
+            fileUrl: file?.url||null,
+            fileName: file?.name||null,
+            text,
             previewImageUrl: previewName ? `attachment://${previewName}` : null,
             releasedBy: interaction.user.id,
         });

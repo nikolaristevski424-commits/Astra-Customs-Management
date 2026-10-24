@@ -14,27 +14,40 @@ function listPromotions(guildId, userId) {
     return userId ? all.filter((p) => p.userId === userId) : all;
 }
 
-function issueInfraction(guildId, data) {
-    let created;
-    store.update(INFRACTIONS, guildId, [], (all) => {
-        if (data.sourceActivityCheckId) {
-            created = all.find((infraction) =>
-                infraction.sourceActivityCheckId === data.sourceActivityCheckId && infraction.userId === data.userId
-            );
-            if (created) return all;
-        }
-        const id = generateId(all.map((i) => i.infractionId));
-        created = {
-            infractionId: id,
-            createdAt: Date.now(),
-            voided: false,
-            anonymous: false,
-            ...data,
-        };
-        all.push(created);
-        return all;
-    });
-    return created;
+const ESCALATION_RULES=Object.freeze({
+ Notice:{count:2,next:'Warning'},Warning:{count:2,next:'Strike'},Strike:{count:3,next:'Suspension'},
+ Suspension:{count:2,next:'Termination'},Termination:{count:2,next:'Staff Blacklist'}
+});
+const FIVE_DAYS=5*24*60*60*1000;
+function issueInfraction(guildId,data){
+ let created;
+ store.update(INFRACTIONS,guildId,[],all=>{
+   if(data.sourceActivityCheckId){
+     created=all.find(i=>i.sourceActivityCheckId===data.sourceActivityCheckId && i.userId===data.userId);
+     if(created)return all;
+   }
+   const add=(patch)=>{
+      const infractionId=generateId(all.map(i=>i.infractionId));
+      const record={infractionId,createdAt:Date.now(),voided:false,anonymous:false,...patch};
+      if(record.punishment==='Suspension')record.suspensionExpiresAt=record.createdAt+FIVE_DAYS;
+      all.push(record);
+      return record;
+   };
+   created=add(data);
+   const cascades=[];let last=created;
+   while(ESCALATION_RULES[last.punishment]){
+      const rule=ESCALATION_RULES[last.punishment];
+      const num=all.filter(i=>!i.voided && i.userId===data.userId && i.punishment===last.punishment).length;
+      if(num%rule.count!==0)break;
+      last=add({userId:data.userId,issuedBy:data.issuedBy,anonymous:!!data.anonymous,
+          punishment:rule.next,automatic:true,sourceInfractionId:last.infractionId,
+          reason:'Automatic escalation after '+rule.count+' active '+last.punishment.toLowerCase()+' infractions.'});
+      cascades.push({...last});
+   }
+   created.escalations=cascades;
+   return all;
+ });
+ return created;
 }
 
 function voidInfraction(guildId, infractionId, voidedBy) {

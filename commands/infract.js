@@ -4,6 +4,7 @@ const hr = require('../utils/hr');
 const perms = require('../utils/permissions');
 const { sendInfractionMessages } = require('../utils/infractionMessages');
 const { updateStatusPanel } = require('../utils/statusPanel');
+const staffDiscipline = require('../services/staffDiscipline');
 
 const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Under Investigation', 'Termination', 'Staff Blacklist'];
 
@@ -59,6 +60,9 @@ module.exports = {
                 reason,
             });
 
+            const escalations=infraction.escalations||[];
+            // Apply suspensions and terminations even when the announcement channel is temporarily unavailable.
+            for(const item of [infraction,...escalations]) await staffDiscipline.apply(interaction.client,guildId,item);
             let notificationSent = false;
             let notificationError = null;
             try {
@@ -76,14 +80,22 @@ module.exports = {
                     announcementMessageId: panelMessage.id,
                     notificationMessageId: pingMessage.id,
                 });
+                for (const item of escalations) {
+                    await sendInfractionMessages(channel,cfg,{
+                        userId:user.id,heading:'Automatic HR Escalation',body:'The configured staff discipline threshold was reached.',
+                        punishment:item.punishment,reason:item.reason,infractionId:item.infractionId,
+                        issuer:'Automatic escalation system'
+                    });
+                }
                 notificationSent = true;
             } catch (error) {
                 notificationError = error;
                 console.error(`[infract] Could not notify ${user.id} about infraction ${infraction.infractionId}:`, error.message);
             }
 
+            const automaticSummary=escalations.length ? '\n**Automatic escalations:** '+escalations.map(item=>item.punishment+' (#'+item.infractionId+')').join(', ') : '';
             const notificationWarning = notificationSent ? '' : `\n**Warning:** the infraction was recorded, but its notification could not be sent${notificationError ? ` (${notificationError.message})` : ''}.`;
-            return interaction.editReply({ content: `Successfully infracted **${user.tag}**.\nID: \`${infraction.infractionId}\`${notificationWarning}`, allowedMentions: { users: [] } });
+            return interaction.editReply({ content: `Successfully infracted **${user.tag}**.\nID: \`${infraction.infractionId}\`${automaticSummary}${notificationWarning}`, allowedMentions: { users: [] } });
         }
 
         if (sub === 'void') {
