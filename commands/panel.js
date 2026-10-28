@@ -9,6 +9,7 @@ const {
     StringSelectMenuBuilder,
     ChannelType,
     MessageFlags,
+    EmbedBuilder,
 } = require('discord.js');
 const config = require('../utils/config');
 const catalog=require('../utils/catalog');
@@ -46,7 +47,7 @@ function orderStatusPanel(cfg) {
     }
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Live availability: updated when staff change /status or /service. Custom prices are confirmed before payment.'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Updated automatically when management changes \`/status\`. Use the Order Now button to request a design.'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
        new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success),
        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Support').setStyle(ButtonStyle.Secondary)
@@ -67,7 +68,10 @@ function orderPanel(cfg){
     const container=baseContainer(cfg,'order');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## '+cfg.brandName+' | Place an Order\n\nSelect your desired service below. Prices and availability update when our staff change the order status.'));
     container.addSeparatorComponents(new SeparatorBuilder());
-    const lines=Object.entries(catalog.TYPES).map(([id,group])=>'**'+group.label+'** — '+(availability.labels[availability.status(cfg,id)]||'Open'));
+    const lines=Object.entries(catalog.TYPES).map(([id,group])=>{
+      const current=availability.status(cfg,id);
+      return '**'+group.label+'** '+(availability.icons[current]||'')+' '+(availability.labels[current]||'Open');
+    });
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')+'\n\n**Before you purchase:** https://astra-customs-terms.vercel.app/'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
         .setCustomId('astra_order_type').setPlaceholder('Select an order type...').addOptions(
@@ -133,6 +137,38 @@ function honeypotPanel(cfg) {
     return { components: [container] };
 }
 
+function hasPanelMarker(message,type,clientUserId){
+    if(!message || message.author?.id!==clientUserId)return false;
+    const body=JSON.stringify(message.components?.map(c=>c.toJSON?.()||c)||[]);
+    const legacy=JSON.stringify(message.embeds?.map(e=>e.toJSON?.()||e)||[]);
+    if(type==='order-status') {
+      return (/Order Status/i.test(body) && /Current availability|Order Now/i.test(body)) ||
+        (/Order Status/i.test(legacy) && /Liveries|Graphics|Uniforms|Discord/i.test(legacy));
+    }
+    if(type==='order') return body.includes('astra_order_type') && !/Order Status/i.test(body);
+    return false;
+}
+function legacyStatusPayload(cfg,message){
+    const old=message.embeds?.[0];
+    const lines=Object.entries(catalog.TYPES).map(([id,group])=>{
+        const current=availability.status(cfg,id);
+        return '**'+group.label+'** '+(availability.icons[current]||'')+' **'+(availability.labels[current]||current)+'**';
+    });
+    const embed=new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle(cfg.brandName+' | Order Status')
+        .setDescription('**Live availability**\n\n'+lines.join('\n')+
+          '\n\nAvailability updates when management uses \`/status\`.').setTimestamp();
+    const image=old?.image?.url;
+    if(image)embed.setImage(image);
+    return withFooter({embeds:[embed],components:[],allowedMentions:{parse:[]}},cfg);
+}
+async function discoverPanel(client,guildId,type,cfg){
+    const id=cfg[type==='order'?'orderPanel':'orderStatusPanel']?.channelId || PANEL_CHANNELS[type];
+    if(!id)return null;
+    const channel=await client.channels.fetch(id).catch(()=>null);
+    if(!channel?.messages?.fetch)return null;
+    const recent=await channel.messages.fetch({limit:100});
+    return recent.find(message=>hasPanelMarker(message,type,client.user.id))||null;
+}
 const BUILDERS = {
     'order-status': (cfg) => orderStatusPanel(cfg),
     tickets: (cfg) => ticketsPanel(cfg),
@@ -146,18 +182,43 @@ const BUILDERS = {
 module.exports = {
     BUILDERS,
     PANEL_CHANNELS,
-    async refreshPanels(client,guildId){
+    async refreshPanels(client,guildId,{discover=false}={}){
         const cfg=config.getConfig(guildId);
+        const results=[];
         for(const [type,key] of [['order','orderPanel'],['order-status','orderStatusPanel']]){
             const record=cfg[key];
-            if(!record?.channelId||!record?.messageId) continue;
+            let message=null;
+            let error=null;
+            if(record?.channelId && record?.messageId){
+                try{
+                    const channel=await client.channels.fetch(record.channelId);
+                    if(channel?.messages?.fetch)message=await channel.messages.fetch(record.messageId);
+                }catch(e){error=e.message;}
+            }
+            if(!message && discover){
+                try{message=await discoverPanel(client,guildId,type,cfg);}catch(e){error=e.message;}
+            }
+            if(!message){results.push({type,updated:false,...(error?{error}:{} )});continue;}
+            if(message.author?.id!==client.user.id){
+                results.push({type,updated:false,error:'Stored panel belongs to a different author.'});
+                continue;
+            }
             try{
-                const channel=await client.channels.fetch(record.channelId);
-                if(!channel?.messages?.fetch)continue;
-                const message=await channel.messages.fetch(record.messageId);
-                await message.edit(withFooter({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)},cfg));
-            }catch(error){console.warn('[panel] Refresh failed for '+type+': '+error.message);}
+                const isLegacy=type==='order-status' && message.embeds?.length &&
+                    !message.flags?.has?.(MessageFlags.IsComponentsV2);
+                const payload=isLegacy ? legacyStatusPayload(cfg,message):
+                    withFooter({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)},cfg);
+                await message.edit(payload);
+                // Recover tracking when the old ID was deleted or the panel was not registered.
+                if(record?.messageId!==message.id || record?.channelId!==message.channelId)
+                    config.setNested(guildId,key,{channelId:message.channelId,messageId:message.id});
+                results.push({type,updated:true,messageId:message.id});
+            }catch(e){
+                console.warn('[panel] Refresh failed for '+type+': '+e.message);
+                results.push({type,updated:false,error:e.message});
+            }
         }
+        return results;
     },
 
     data: new SlashCommandBuilder()
@@ -169,7 +230,11 @@ module.exports = {
         .addSubcommand((sub) => addPanelChannel(sub.setName('applications').setDescription('Send the applications panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('portfolio').setDescription('Send the portfolio panel.')))
         .addSubcommand((sub) => addPanelChannel(sub.setName('affiliations').setDescription('Send the affiliations panel.')))
-        .addSubcommand((sub) => addPanelChannel(sub.setName('honeypot').setDescription('Send the protected-channel panel.'))),
+        .addSubcommand((sub) => addPanelChannel(sub.setName('honeypot').setDescription('Send the protected-channel panel.')))
+        .addSubcommand(sub=>sub.setName('refresh').setDescription('Repair and refresh published order/status panels.'))
+        .addSubcommand(sub=>sub.setName('track-status').setDescription('Register an existing bot-authored status panel by message ID.')
+            .addStringOption(o=>o.setName('message_id').setDescription('Existing Discord message ID').setRequired(true))
+            .addChannelOption(o=>o.setName('channel').setDescription('Channel containing the status message').addChannelTypes(ChannelType.GuildText))),
 
     async execute(interaction) {
         const guildId = interaction.guildId;
@@ -180,6 +245,29 @@ module.exports = {
         }
 
         const type = interaction.options.getSubcommand();
+        if(type==='refresh'){
+            await interaction.deferReply({flags:MessageFlags.Ephemeral});
+            const results=await module.exports.refreshPanels(interaction.client,guildId,{discover:true});
+            const detail=results.map(r=>'**'+r.type+'**: '+(r.updated?'✅ Updated':'⚠️ Not updated'+(r.error?' ('+r.error+')':''))).join('\n');
+            return interaction.editReply(detail+'\nIf a panel is missing, republish it with \`/panel order-status\` or \`/panel order\`.');
+        }
+        if(type==='track-status'){
+            const messageId=interaction.options.getString('message_id',true).trim();
+            if(!/^\d{17,22}$/.test(messageId))
+                return interaction.reply({content:'Provide a valid Discord message ID.',flags:MessageFlags.Ephemeral});
+            await interaction.deferReply({flags:MessageFlags.Ephemeral});
+            const channel=interaction.options.getChannel('channel')||
+                await interaction.client.channels.fetch(cfg.orderStatusPanel?.channelId||PANEL_CHANNELS['order-status']).catch(()=>null);
+            const message=await channel?.messages?.fetch(messageId).catch(()=>null);
+            if(!message || !hasPanelMarker(message,'order-status',interaction.client.user.id)){
+                return interaction.editReply('That message is not an Astra Customs order-status panel authored by this bot.');
+            }
+            config.setNested(guildId,'orderStatusPanel',{channelId:channel.id,messageId:message.id});
+            const result=await module.exports.refreshPanels(interaction.client,guildId);
+            const refreshed=result.find(x=>x.type==='order-status');
+            return interaction.editReply(refreshed?.updated?'Existing panel registered and refreshed: '+message.url:
+                'Panel registered, but refresh failed: '+(refreshed?.error||'Unknown error'));
+        }
         const configuredChannel = PANEL_CHANNELS[type] ? await interaction.client.channels.fetch(PANEL_CHANNELS[type]).catch(() => null) : null;
         const targetChannel = interaction.options.getChannel('channel') || configuredChannel || interaction.channel;
 

@@ -67,13 +67,22 @@ module.exports = {
         }
 
         const row = new ActionRowBuilder().addComponents(buildButtons(record));
-        const thread = await createCatalogThread(channel, `Bundle ${record.id} - ${bundleType}`, {
-            embeds: [buildEmbed(cfg, record)],
-            components: [row],
-            allowedMentions: { parse: [] },
-        }).catch(() => null);
-        if (!thread) return interaction.reply({ content: 'Bundle request saved, but its review thread could not be created. Check the bot has permission to create threads in `PACKAGE_BUNDLE_CHANNEL_ID`.', ephemeral: true });
-
-        return interaction.reply({ content: `Bundle request \`#${record.id}\` submitted in <#${thread.id}> for approval.`, ephemeral: true });
+        let review;
+        try{
+            const fallbackId=cfg.packageReviewChannelId && cfg.packageReviewChannelId!==channel.id
+                ?cfg.packageReviewChannelId:null;
+            const fallbackChannel=(fallbackId
+                ?await interaction.client.channels.fetch(fallbackId).catch(()=>null):null)
+                ||(interaction.channel?.type===0?interaction.channel:null);
+            review=await createCatalogThread(channel,`Bundle ${record.id} - ${bundleType}`,{
+                embeds:[buildEmbed(cfg,record)],components:[row],allowedMentions:{parse:[]}
+            },{fallbackChannel,botId:interaction.client.user.id});
+        }catch(error){
+            console.error('[bundle] Review submission failed:',error);
+            return interaction.reply({content:'Bundle saved, but could not post for review: '+error.message.slice(0,800)+
+                '\nUse \`/review diagnose\` to check the channel.',flags:64});
+        }
+        return interaction.reply({content:'Bundle request \`#'+record.id+'\` submitted '+(review.fallback?'as a channel message':'in a review thread')+
+            ': '+(review.url||'<#'+review.id+'>'),flags:64});
     },
 };

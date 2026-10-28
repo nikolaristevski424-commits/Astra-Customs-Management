@@ -1,45 +1,11 @@
-const { SlashCommandBuilder } = require('discord.js');
-const config = require('../utils/config');
-const perms = require('../utils/permissions');
-const availability=require('../utils/serviceAvailability');
-const panel=require('./panel');
-
-const ICONS = {
-    open: '<:StatusEMOJIGreen:1545902027299627018><:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>',
-    delayed: '<:StatusEmojiYellow:1545902089186705459>',
-    closed: '<:StatusEmojiRed:1545902134258827294><:ClosedEmoji1:1545902477621072022><:ClosedEmoji2:1545902533703245914><:ClosedEmoji3:1545902589403594903>',
-    premium: '<:boost_1:1492387526613143683>',
-};
-
-module.exports = {
-    ICONS,
-
-    data: new SlashCommandBuilder()
-        .setName('service')
-        .setDescription('Set service availability shown on the order-status panel.')
-        .addStringOption((o) => o.setName('name').setDescription('Service name, e.g. Liveries').setRequired(true))
-        .addStringOption((o) =>
-            o
-                .setName('status')
-                .setDescription('Availability')
-                .setRequired(true)
-                .addChoices({ name: 'Open', value: 'open' }, { name: 'Delayed', value: 'delayed' }, { name: 'Closed', value: 'closed' }, { name: 'Premium / Boosters Only', value: 'premium' })
-        ),
-
-    async execute(interaction) {
-        const guildId = interaction.guildId;
-        const cfg = config.getConfig(guildId);
-        if (!perms.isStaff(interaction.member, cfg)) {
-            return interaction.reply({ content: 'You do not have permission to change service status.', ephemeral: true });
-        }
-
-        const name = availability.normalize(interaction.options.getString('name', true));
-        if(!name)return interaction.reply({content:'Unknown service. Available: Discord, Liveries, Graphics, Uniforms, Bots, Logos, Embeds, Websites, ELS.',flags:64});
-        await interaction.deferReply({flags:64});
-        const status = interaction.options.getString('status', true);
-        config.setNested(guildId, 'serviceStatus', { [name]: status });
-        await panel.refreshPanels(interaction.client,guildId);
-
-        return interaction.editReply({ content: `Set **${name}** to ${ICONS[status]} **${status}**. Live panels refreshed.` });
-    },
-};
+const {SlashCommandBuilder}=require('discord.js');
+const manager=require('../utils/serviceStatusManager');
+const {icons:ICONS}=require('../utils/serviceAvailability');
+const data=new SlashCommandBuilder().setName('service')
+ .setDescription('Compatibility alias for /status; both update the same live panels.')
+ .addStringOption(o=>o.setName('name').setDescription('Service name, e.g. Liveries').setRequired(true)
+   .addChoices(...manager.ALL.map(v=>({name:v[0].toUpperCase()+v.slice(1),value:v}))))
+ .addStringOption(o=>o.setName('status').setDescription('Availability').setRequired(true)
+   .addChoices({name:'Open',value:'open'},{name:'Delayed',value:'delayed'},
+     {name:'Closed',value:'closed'},{name:'Premium / Boosters Only',value:'premium'}));
+module.exports={ICONS,data,execute:interaction=>manager.execute(interaction,{optionName:'name'})};

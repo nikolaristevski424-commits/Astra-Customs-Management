@@ -205,6 +205,7 @@ module.exports = {
             if (!channel?.isTextBased?.()) {
                 return interaction.reply({ content: 'The package review channel is unavailable. Check PACKAGE_BUNDLE_CHANNEL_ID and try again.', flags: MessageFlags.Ephemeral });
             }
+            const previousStatus=pkg.status;
             const updated = packages.updateDelivery(guildId,id,{
                 deliveryText:moreText,deliveryLinks:moreLinks,files:extraFile?[{name:extraFile.name,url:extraFile.url}]:[]
             });
@@ -212,16 +213,25 @@ module.exports = {
 
             const container = buildPackageContainer(cfg, updated);
             const row = new ActionRowBuilder().addComponents(buildReviewButtons(updated));
-            const thread = await createCatalogThread(channel, `Package ${updated.id} - ${updated.name}`, {
-                flags: MessageFlags.IsComponentsV2,
-                components: [container, row],
-            }).catch(() => null);
-            if (!thread) {
-                packages.updateStatus(guildId,id,pkg.status);
-                return interaction.reply({ content: 'Review thread could not be created, so the package remains **'+pkg.status+'**. Check Create Threads and Send Messages permissions.', flags: MessageFlags.Ephemeral });
+            let review;
+            try{
+                const fallbackId=cfg.packageReviewChannelId && cfg.packageReviewChannelId!==channel.id
+                    ?cfg.packageReviewChannelId:null;
+                const fallbackChannel=(fallbackId
+                    ?await interaction.client.channels.fetch(fallbackId).catch(()=>null):null)
+                    ||(interaction.channel?.type===ChannelType.GuildText?interaction.channel:null);
+                review=await createCatalogThread(channel,`Package ${updated.id} - ${updated.name}`,{
+                    flags:MessageFlags.IsComponentsV2,components:[container,row]
+                },{fallbackChannel,botId:interaction.client.user.id});
+            }catch(error){
+                packages.updateStatus(guildId,id,previousStatus);
+                console.error('[package] Review submission failed:',error);
+                return interaction.reply({content:'Could not post package review: '+error.message.slice(0,800)+
+                  '\nUse \`/review diagnose\` to check the review channel.',flags:MessageFlags.Ephemeral});
             }
-
-            return interaction.reply({ content: `Package \`#${id}\` submitted in <#${thread.id}> for approval.`, ephemeral: true });
+            return interaction.reply({content:'Package \`#'+id+'\` submitted for approval '+(review.fallback?'as a channel message':'in a review thread')+
+                ': '+(review.url||'<#'+review.id+'>')+(review.fallback?'\n⚠️ Review-thread creation was unavailable; staff can still approve from the posted message.':''),
+                flags:MessageFlags.Ephemeral});
         }
 
         if (sub === 'setprice') {

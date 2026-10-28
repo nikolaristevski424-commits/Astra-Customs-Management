@@ -18,6 +18,10 @@ function create(guildId, data) {
     return created;
 }
 
+function list(guildId,status=null){
+  const records=store.get(STORE,guildId,defaultState()).list;
+  return status?records.filter(r=>r.status===status):records;
+}
 function find(guildId, id) {
     return store.get(STORE, guildId, defaultState()).list.find((b) => b.id === Number(id));
 }
@@ -35,4 +39,4 @@ function updateStatus(guildId, id, status, extra = {}) {
     return updated;
 }
 
-module.exports = { create, find, updateStatus };
+module.exports = { create, find, list, updateStatus };

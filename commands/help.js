@@ -4,6 +4,7 @@ const config = require('../utils/config');
 const { parseColor } = require('../utils/embeds');
 
 const CATEGORIES = [
+    { name: '📊 Service & Review Tools', value: '`/availability` — live status for customers; `/status` — update services (manager); `/panel refresh` and `/panel track-status` — repair status panels; `/review queue` and `/review diagnose` — review submissions and check channel permissions.' },
     { name: '📋 Job Queue', value: '`/order add`, `/order list` — post work and let designers claim it' },
     { name: '🧾 Sales Ledger', value: '`/order log|status|view|history|reset`, `/earnings`' },
     { name: '💰 Pricing', value: '`/pricelist view|set`, `/quote`, `/tax`' },
