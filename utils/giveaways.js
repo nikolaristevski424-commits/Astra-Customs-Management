@@ -33,6 +33,27 @@ function addEntrant(guildId, id, userId) {
     return updated;
 }
 
+function removeEntrant(guildId, id, userId) {
+    let updated = null;
+    store.update(STORE, guildId, defaultState(), (state) => {
+        const record = state.list.find((g) => g.id === Number(id));
+        if (record && record.status === 'active' && record.endsAt > Date.now()) {
+            record.entrantIds = record.entrantIds.filter(id => id !== userId);
+        }
+        updated = record;
+        return state;
+    });
+    return updated;
+}
+
+/** Equal-chance, no-weight entry odds at the current entrant count.
+ * Assumes all current entrants remain; odds may change until the draw.
+ */
+function oddsPercent(entrantCount, winnerCount) {
+    if (!entrantCount || !Number.isFinite(entrantCount) || !Number.isFinite(winnerCount)) return null;
+    return Math.min(100, Math.max(0, (Math.min(winnerCount, entrantCount) / entrantCount) * 100));
+}
+
 function setWinners(guildId, id, winnerIds) {
     let updated = null;
     store.update(STORE, guildId, defaultState(), (state) => {
@@ -81,4 +102,4 @@ function parseDuration(input) {
     return Number(amount) * UNIT_MS[unit.toLowerCase()];
 }
 
-module.exports = { create, find, addEntrant, setWinners, attachMessage, findExpired, pickWinners, parseDuration };
+module.exports = { create, find, addEntrant, removeEntrant, oddsPercent, setWinners, attachMessage, findExpired, pickWinners, parseDuration };

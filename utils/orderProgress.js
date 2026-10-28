@@ -6,12 +6,14 @@ const STAGES=['Not Paid','Paid','In Progress','Completed','Delivered'];
 const BUTTONS=[['paid','Paid',ButtonStyle.Success],['working','Start Work',ButtonStyle.Primary],['completed','Complete',ButtonStyle.Primary],['delivered','Delivered',ButtonStyle.Success],['cancelled','Cancel',ButtonStyle.Danger]];
 const TARGETS={paid:'Paid',working:'In Progress',completed:'Completed',delivered:'Delivered',cancelled:'Cancelled'};
 const COLORS={'Not Paid':0x718096,'Paid':0x2aa876,'In Progress':0x4174d9,Completed:0x9b59b6,Delivered:0x2aa876,Cancelled:0xd9534f,Void:0xd9534f};
+// Designers can move between work stages in any order, including correcting
+// a previous selection. Payment confirmation stays a management decision.
 function canTransition(from,to){
- if(from===to)return false;
- if(['Cancelled','Void','Delivered'].includes(from))return false;
- if(to==='Cancelled')return true;
- const a=STAGES.indexOf(from),b=STAGES.indexOf(to);
- return a>=0 && b===a+1;
+ if(from===to || from==='Void')return false;
+ if(!Object.values(TARGETS).includes(to))return false;
+ // Cancelled orders must be reopened by management using /order update.
+ if(from==='Cancelled')return false;
+ return true;
 }
 function controls(order){
  const btns=BUTTONS.map(([code,label,style])=>
@@ -25,8 +27,7 @@ function controls(order){
  return rows;
 }
 function embed(cfg,order,ticket){
- const idx=STAGES.indexOf(order.status);
- const progress=STAGES.map((s,i)=>i<=idx?'●':'○').join(' ─ ');
+ const progress=STAGES.map(s=>s===order.status?'🔵':'▫️').join('  ');
  const e=new EmbedBuilder().setColor(COLORS[order.status]||0x718096)
   .setTitle('Astra Customs | Order #'+order.id)
   .setDescription('**'+String(order.product||'Commission').slice(0,100)+'**\n'+progress+'\n**Current status: '+order.status+'**')
@@ -37,6 +38,7 @@ function embed(cfg,order,ticket){
    {name:'Estimated / quoted price',value:order.quoteRequired?'Awaiting custom quote':('R$'+(order.price??0)),inline:true},
    {name:'Deadline',value:String(ticket?.deadline||order.deadline||'Not specified').slice(0,1024),inline:true},
    {name:'Updated',value:order.statusUpdatedAt?'<t:'+Math.floor(order.statusUpdatedAt/1000)+':R>':'Just created',inline:true});
+ if(order.statusUpdatedBy)e.addFields({name:'Updated by',value:'<@'+order.statusUpdatedBy+'>',inline:true});
  if(order.statusNote)e.addFields({name:'Most recent update',value:String(order.statusNote).slice(0,800)});
  e.setFooter({text:'Astra Customs • Order progress updates automatically'}).setTimestamp(order.statusUpdatedAt||order.createdAt||Date.now());
  return e;
@@ -67,7 +69,7 @@ async function setStatus(client,guildId,cfg,order,next,{actorId=null,note='',aut
  if(!canTransition(order.status,next))throw new Error('Invalid order transition: '+order.status+' → '+next);
  const now=Date.now();
  const history=[...(order.statusHistory||[]),{from:order.status,to:next,at:now,by:actorId,automated:auto,note:String(note||'').slice(0,400)}].slice(-60);
- const updated=orders.updateOrder(guildId,order.id,{status:next,statusUpdatedAt:now,statusHistory:history,statusNote:String(note||'').slice(0,400)});
+ const updated=orders.updateOrder(guildId,order.id,{status:next,statusUpdatedAt:now,statusHistory:history,statusNote:String(note||'').slice(0,400),statusUpdatedBy:actorId||null});
  if(updated.ticketChannelId && (next==='Paid'||next==='Completed'||next==='Delivered'||next==='Cancelled')){
    const channel=await client.channels.fetch(updated.ticketChannelId).catch(()=>null);
    if(channel?.send)await channel.send({content:'**Order #'+updated.id+'** is now **'+next+'**.'+
@@ -77,8 +79,11 @@ async function setStatus(client,guildId,cfg,order,next,{actorId=null,note='',aut
  await refresh(client,guildId,cfg,updated);
  return updated;
 }
-function authorized(member,cfg,next){
- if(['Paid','Delivered','Cancelled'].includes(next))return perms.isManager(member,cfg);
- return perms.isStaff(member,cfg)||perms.isTicketStaff(member,cfg)||perms.isManager(member,cfg);
+function authorized(member,cfg,next,order=null){
+ if(perms.isManager(member,cfg))return true;
+ // Confirming payment or cancelling cannot be done by designers.
+ if(['Paid','Cancelled'].includes(next))return false;
+ if(order?.designerId && member?.id===order.designerId)return true;
+ return perms.isStaff(member,cfg)||perms.isTicketStaff(member,cfg);
 }
 module.exports={STAGES,TARGETS,canTransition,controls,embed,refresh,setStatus,authorized};

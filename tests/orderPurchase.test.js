@@ -8,11 +8,14 @@ const orders=require('../utils/orders');
 const progress=require('../utils/orderProgress');
 const catalog=require('../utils/catalog');
 function tx(id,created){return {id,created:new Date(created).toISOString(),agent:{id:12345,name:'SampleBuyer'},details:{id:6789,name:'Test item'},currency:{amount:100}};}
-test('order status progression is ordered and cannot be repeated',()=>{
+test('order work statuses are flexible while locked orders remain protected',()=>{
  assert.equal(progress.canTransition('Not Paid','Paid'),true);
- assert.equal(progress.canTransition('Not Paid','Delivered'),false);
+ assert.equal(progress.canTransition('Not Paid','Delivered'),true);
  assert.equal(progress.canTransition('Completed','Delivered'),true);
- assert.equal(progress.canTransition('Delivered','Paid'),false);
+ assert.equal(progress.canTransition('Delivered','Paid'),true);
+ assert.equal(progress.canTransition('In Progress','In Progress'),false);
+ assert.equal(progress.canTransition('Void','In Progress'),false);
+ assert.equal(progress.canTransition('Cancelled','Delivered'),false);
 });
 test('catalog prices remain deterministic',()=>{
  assert.equal(catalog.estimate(catalog.byId('pd-livery'),2),260);
@@ -80,4 +83,41 @@ test('manual purchase retry preserves Roblox HTTP 429 cooldown',()=>{
  const result=monitor.retryNow(groupId);
  assert.equal(result.scheduled,false);
  assert.equal(monitor.getGroupState(groupId).nextRequestAt,until);
+});
+
+test('giveaway odds account for entries and multiple winners',()=>{
+  const g=require('../utils/giveaways');
+  assert.equal(g.oddsPercent(0,1),null);
+  assert.equal(g.oddsPercent(1,1),100);
+  assert.equal(g.oddsPercent(67,1).toFixed(2),'1.49');
+  assert.equal(g.oddsPercent(10,3),30);
+  assert.equal(g.oddsPercent(2,10),100);
+});
+test('sponsored giveaway winners are directed to the sponsor, not Astra Customs',()=>{
+  const g=require('../commands/giveaway');
+  const a=g.winnerAnnouncement({sponsor:'Example RP',sponsorInvite:'https://discord.gg/example',prize:'Logo'},['123']);
+  assert.match(a,/Open a ticket in the sponsoring server/);
+  assert.match(a,/https:\/\/discord.gg\/example/);
+  assert.match(a,/Do not open a claim ticket in Astra Customs/);
+  const own=g.winnerAnnouncement({sponsor:null,prize:'Logo'},['123']);
+  assert.match(own,/Astra Customs support ticket/);
+});
+test('giveaway participants may leave before a drawing',()=>{
+  const gs=require('../utils/giveaways'),id='giveaway-test-'+Date.now();
+  const g=gs.create(id,{prize:'Banner',winnerCount:1,endsAt:Date.now()+60000,hostedBy:'test'});
+  gs.addEntrant(id,g.id,'user1');
+  gs.addEntrant(id,g.id,'user2');
+  assert.equal(gs.find(id,g.id).entrantIds.length,2);
+  gs.removeEntrant(id,g.id,'user1');
+  assert.deepEqual(gs.find(id,g.id).entrantIds,['user2']);
+});
+
+test('only assigned designer or staff can modify work stages, payment remains manager-only',()=>{
+ const progress=require('../utils/orderProgress');
+ const cfg={staffRoleIds:[],ticketStaffRoleIds:[],managerRoleIds:[]};
+ const make=(id)=>({id,permissions:{has:()=>false},roles:{cache:new Map()}});
+ assert.equal(progress.authorized(make('designer1'),cfg,'In Progress',{designerId:'designer1'}),true);
+ assert.equal(progress.authorized(make('designer2'),cfg,'In Progress',{designerId:'designer1'}),false);
+ assert.equal(progress.authorized(make('designer1'),cfg,'Paid',{designerId:'designer1'}),false);
+ assert.equal(progress.authorized(make('designer1'),cfg,'Cancelled',{designerId:'designer1'}),false);
 });

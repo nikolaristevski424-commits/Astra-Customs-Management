@@ -120,7 +120,7 @@ async function handleButton(interaction) {
       if(!match)return interaction.reply({content:'Invalid order action.',flags:MessageFlags.Ephemeral});
       const order=orders.findOrder(guildId,match[1]),target=orderProgress.TARGETS[match[2]];
       if(!order)return interaction.reply({content:'This order no longer exists.',flags:MessageFlags.Ephemeral});
-      if(!orderProgress.authorized(interaction.member,cfg,target))return interaction.reply({content:'You do not have permission to make this status change.',flags:MessageFlags.Ephemeral});
+      if(!orderProgress.authorized(interaction.member,cfg,target,order))return interaction.reply({content:'You do not have permission to make this status change.',flags:MessageFlags.Ephemeral});
       if(!orderProgress.canTransition(order.status,target))return interaction.reply({content:'This action is no longer available. Order status is '+order.status,flags:MessageFlags.Ephemeral});
       await interaction.deferReply({flags:MessageFlags.Ephemeral});
       try{
@@ -399,19 +399,36 @@ async function handleButton(interaction) {
         return interaction.reply({ content: `You picked **Option ${customId === 'wyr_a' ? 'A' : 'B'}**! 🎉`, ephemeral: true });
     }
 
-    // ---- Giveaway: enter ----
-    if (customId.startsWith('giveaway_enter_')) {
-        const id = customId.replace('giveaway_enter_', '');
+    // ---- Giveaway: enter or leave ----
+    if (customId.startsWith('giveaway_enter_') || customId.startsWith('giveaway_leave_')) {
+        const leaving = customId.startsWith('giveaway_leave_');
+        const id = customId.replace(/^giveaway_(enter|leave)_/, '');
         const giveaway = giveawaysUtil.find(guildId, id);
-        if (!giveaway) return interaction.reply({ content: 'This giveaway no longer exists.', ephemeral: true });
-        if (giveaway.status === 'ended') return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
-        if (giveaway.entrantIds.includes(interaction.user.id)) {
-            return interaction.reply({ content: 'You\'re already entered! Good luck 🍀', ephemeral: true });
+        if (!giveaway) return interaction.reply({ content: 'This giveaway no longer exists.', flags: MessageFlags.Ephemeral });
+        if (giveaway.status !== 'active' || Date.now() >= giveaway.endsAt) {
+            return interaction.reply({ content: 'This giveaway has already ended.', flags: MessageFlags.Ephemeral });
         }
-
-        const updated = giveawaysUtil.addEntrant(guildId, id, interaction.user.id);
-        await interaction.reply({ content: `You're entered into the giveaway for **${giveaway.prize}**! Good luck 🍀`, ephemeral: true });
-        await interaction.message.edit({ embeds: [giveawayCmd.buildEmbed(cfg, updated)], components: [giveawayCmd.buildRow(updated)] }).catch(() => {});
+        const entered = giveaway.entrantIds.includes(interaction.user.id);
+        if (leaving && !entered) {
+            return interaction.reply({ content: 'You are not entered in this giveaway.', flags: MessageFlags.Ephemeral });
+        }
+        if (!leaving && entered) {
+            return interaction.reply({ content: 'You are already entered. You can select **Leave Giveaway** to withdraw.', flags: MessageFlags.Ephemeral });
+        }
+        // Acknowledge before Discord's 3-second interaction deadline.
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const updated = leaving
+            ? giveawaysUtil.removeEntrant(guildId, id, interaction.user.id)
+            : giveawaysUtil.addEntrant(guildId, id, interaction.user.id);
+        if (!updated) return interaction.editReply('This giveaway is no longer available.');
+        const odds = giveawaysUtil.oddsPercent(updated.entrantIds.length, updated.winnerCount);
+        await interaction.editReply(leaving
+            ? 'You left the giveaway for **'+giveaway.prize+'**. Your entry has been removed.'
+            : 'You entered the giveaway for **'+giveaway.prize+'**! Current odds: **'+(odds===null?'N/A':odds.toFixed(2)+'%')+'** (may change as others join or leave).');
+        await interaction.message.edit({
+            embeds: [giveawayCmd.buildEmbed(cfg, updated)],
+            components: [giveawayCmd.buildRow(updated)],
+        }).catch(error=>console.warn('[giveaway] Could not refresh the public giveaway display:',error.message));
         return;
     }
 

@@ -26,7 +26,7 @@ function start(client) {
 
                         if (winners.length) {
                             await channel.send({
-                                content: `🎉 Congratulations ${winners.map((id) => `<@${id}>`).join(', ')} — you won **${giveaway.prize}**!`,
+                                content: giveawayCmd.winnerAnnouncement(updated,winners),
                                 allowedMentions: { users: winners },
                             });
                         } else {

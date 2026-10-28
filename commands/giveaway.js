@@ -13,10 +13,20 @@ const PING_CHOICES = [
 
 function buildEmbed(cfg, giveaway) {
     const ended = giveaway.status === 'ended';
+    const odds = giveaways.oddsPercent(giveaway.entrantIds.length,giveaway.winnerCount);
     const embed = baseEmbed(cfg, {
         title: ended ? 'Giveaway Ended' : giveaway.sponsor ? `Giveaway | Sponsored by ${giveaway.sponsor}` : 'Giveaway',
         bannerKey: 'giveaway',
-        description: `**Prize:** ${giveaway.prize}`,
+        description: [
+            `**Prize:** ${giveaway.prize}`,
+            '',
+            `**Odds of winning:** ${odds===null?'Calculated after the first entry':odds.toFixed(2)+'%'}`,
+            '_Odds reflect the current entrants and can change until the giveaway ends._',
+            ...(giveaway.sponsor || giveaway.sponsorInvite ? [
+                '',
+                '_If this giveaway is sponsored by another server, claim your prize by opening a ticket in the sponsoring server — not Astra Customs._',
+            ] : []),
+        ].join('\n'),
         fields: [
             { name: 'Winners', value: `${giveaway.winnerCount}`, inline: true },
             { name: 'Entrants', value: `${giveaway.entrantIds.length}`, inline: true },
@@ -25,8 +35,9 @@ function buildEmbed(cfg, giveaway) {
         footer: `Giveaway #${giveaway.id}`,
     });
 
-    if (giveaway.sponsor) {
-        embed.addFields({ name: 'Sponsored by', value: giveaway.sponsorInvite ? `[${giveaway.sponsor}](${giveaway.sponsorInvite})` : giveaway.sponsor, inline: true });
+    if (giveaway.sponsor || giveaway.sponsorInvite) {
+        const sponsorName=giveaway.sponsor||'Sponsoring server';
+        embed.addFields({ name: 'Sponsored by', value: giveaway.sponsorInvite ? `[${sponsorName}](${giveaway.sponsorInvite})` : sponsorName, inline: true });
     }
 
     if (ended) {
@@ -50,13 +61,29 @@ function buildRow(giveaway) {
             .setStyle(ended ? ButtonStyle.Secondary : ButtonStyle.Success)
             .setDisabled(ended),
     ];
+    if (!ended) {
+        buttons.push(new ButtonBuilder().setCustomId(`giveaway_leave_${giveaway.id}`)
+            .setLabel('Leave Giveaway').setEmoji('🚪').setStyle(ButtonStyle.Secondary));
+    }
     if (giveaway.sponsorInvite) {
-        buttons.push(new ButtonBuilder().setLabel(`Join ${giveaway.sponsor || 'Sponsor'}`).setStyle(ButtonStyle.Link).setURL(giveaway.sponsorInvite).setEmoji('🔗'));
+        buttons.push(new ButtonBuilder().setLabel(`Join ${giveaway.sponsor || 'Sponsor'}`.slice(0,80))
+            .setStyle(ButtonStyle.Link).setURL(giveaway.sponsorInvite).setEmoji('🔗'));
     }
     return new ActionRowBuilder().addComponents(buttons);
 }
 
 /** Builds the message content (ping text) + allowedMentions for a giveaway announcement. */
+function winnerAnnouncement(giveaway,winners,{reroll=false}={}) {
+    const mentions = winners.map(id=>userMention(id)).join(', ');
+    const intro = reroll ? '🎉 **Giveaway Reroll** — ' : '🎉 **Giveaway Winners!** — ';
+    const sponsorText = (giveaway.sponsor || giveaway.sponsorInvite)
+        ? '\n\n**Sponsored giveaway:** Your prize is provided by **'+(giveaway.sponsor||'the sponsoring server')+'**. '+
+          (giveaway.sponsorInvite?'Join the sponsor server: '+giveaway.sponsorInvite+'\n':'')+
+          '**Open a ticket in the sponsoring server to claim your prize. Do not open a claim ticket in Astra Customs.**'
+        : '\nOpen an Astra Customs support ticket to claim your prize.';
+    return intro+mentions+' won **'+giveaway.prize+'**!'+sponsorText;
+}
+
 function buildPing(giveaway) {
     if (giveaway.pingType === 'everyone') return { content: '@everyone', allowedMentions: { parse: ['everyone'] } };
     if (giveaway.pingType === 'here') return { content: '@here', allowedMentions: { parse: ['everyone'] } };
@@ -68,6 +95,7 @@ module.exports = {
     buildEmbed,
     buildRow,
     buildPing,
+    winnerAnnouncement,
 
     data: new SlashCommandBuilder()
         .setName('giveaway')
@@ -117,6 +145,12 @@ module.exports = {
             if (pingType === 'role' && !pingRole) {
                 return interaction.reply({ content: 'Pick a `ping_role` when `ping` is set to "A specific role".', ephemeral: true });
             }
+            if(sponsor && !sponsorInvite){
+                return interaction.reply({content:'Sponsored giveaways need a valid \`sponsor_invite\` so winners know which server to open their claim ticket in.',flags:64});
+            }
+            if(sponsorInvite && !sponsor){
+                return interaction.reply({content:'Please set \`sponsor\` to the sponsoring server name when adding a sponsor invite.',flags:64});
+            }
             if (sponsorInvite && !/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\//i.test(sponsorInvite)) {
                 return interaction.reply({ content: 'Please provide a valid Discord invite link for `sponsor_invite` (e.g. https://discord.gg/...).', ephemeral: true });
             }
@@ -164,7 +198,7 @@ module.exports = {
                 if (message) await message.edit({ embeds: [buildEmbed(cfg, updated)], components: [buildRow(updated)] }).catch(() => {});
             }
 
-            return interaction.reply({ content: `Rerolled — new winner(s): ${newWinners.map((w) => userMention(w)).join(', ')}`, allowedMentions: { users: newWinners } });
+            return interaction.reply({ content: winnerAnnouncement(updated,newWinners,{reroll:true}), allowedMentions: { users: newWinners } });
         }
     },
 };

@@ -289,7 +289,7 @@ module.exports = {
             const order = orders.findOrder(guildId, id);
             if (!order) return interaction.reply({ content: `No order found with ID \`#${id}\`.`, ephemeral: true });
 
-            if(!progress.authorized(interaction.member,cfg,status))return interaction.reply({content:'Management approval is required for payment, delivery or cancellation statuses.',flags:64});
+            if(!progress.authorized(interaction.member,cfg,status,order))return interaction.reply({content:'Management approval is required for payment, delivery or cancellation statuses.',flags:64});
             await interaction.deferReply({flags:64});
             let updated;
             try {
