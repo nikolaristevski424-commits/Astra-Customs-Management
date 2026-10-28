@@ -20,7 +20,7 @@ const CATEGORIES = [
     { name: '🤝 Partnerships & Ads', value: '\`/partnership\` — management post with up to five representatives. Ownership: \`/paid ad\` — sponsored advertisement with optional giveaway-style ping. \`/health\` — staff diagnostics.' },
     { name: '🛠️ Staff & HR', value: '`/addstaff`, `/infract issue|void`, `/promote issue|void`, `/logs`, `/loa request|return|list`' },
     { name: '🖌️ Design Tools', value: '`/watermark`, `/say`' },
-    { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications|portfolio|affiliations|honeypot`, `/dashboard`, `/status`, `/service`, `/text edit`' },
+    { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications|portfolio|affiliations|honeypot`, `/dashboard`, `/status`, `/text edit`' },
     { name: '📈 Activity', value: '`/activity check` — executive role activity check with live reactions' },
     { name: '🏆 Leaderboards', value: '`/leaderboard designers|credits` — top designers and store-credit rankings' },
     { name: '🤖 Bot Info', value: '`/help`, `/ping`' },

@@ -4,7 +4,7 @@ const {ChannelType,MessageFlags}=require('discord.js');
 const config=require('../utils/config');
 const availability=require('../utils/serviceAvailability');
 const status=require('../commands/status');
-const service=require('../commands/service');
+const manager=require('../utils/serviceStatusManager');
 const panel=require('../commands/panel');
 const {createCatalogThread}=require('../utils/catalogThreads');
 
@@ -26,7 +26,8 @@ test('preserves signal bars before each exact three-part status emoji',()=>{
     assert.equal(availability.badgeIcons[status],badges[status]);
     assert.equal(availability.icons[status],signal[status]+badges[status]);
   }
-  assert.deepEqual(status.data.toJSON().options[1].choices,service.data.toJSON().options[1].choices);
+  assert.equal(status.data.toJSON().name,'status');
+  assert.equal(require('fs').existsSync(require('path').join(__dirname,'../commands/service.js')),false);
 });
 test('order status panel and the order selector show updated custom emojis',()=>{
   const cfg=config.defaultConfig();cfg.brandName='Astra Customs';cfg.serviceStatus={liveries:'delayed',uniforms:'closed',websites:'premium'};
@@ -94,4 +95,55 @@ test('permission failures in text review channels fall back to ordinary messages
   assert.equal(result.fallback,true);
   assert.equal(result.id,'text2');
   assert.match(result.reason,/Missing Permissions/);
+});
+
+test('legacy capitalized Liveries value no longer overrides a newer canonical setting',()=>{
+ const cfg={serviceStatus:{Liveries:'delayed',liveries:'open'}};
+ assert.equal(availability.status(cfg,'liveries'),'open');
+ assert.equal(availability.status({serviceStatus:{Liveries:'delayed'}},'liveries'),'delayed');
+});
+test('/status cleans old duplicate keys and saves the requested status',()=>{
+ const gid='status-migration-'+Date.now();
+ config.setConfig(gid,{serviceStatus:{Liveries:'delayed',liveries:'delayed','Graphics':'closed'}});
+ const updated=manager.set(gid,'liveries','open');
+ assert.equal(updated.serviceStatus.liveries,'open');
+ assert.equal(availability.status(config.getConfig(gid),'liveries'),'open');
+ assert.equal(Object.keys(updated.serviceStatus).filter(k=>k.toLowerCase()==='liveries').length,1);
+ assert.equal(updated.serviceStatus.graphics,'closed');
+});
+test('legacy visible status embed with no title is discovered and edited automatically',async()=>{
+ const gid='visible-status-'+Date.now(),updates=[];
+ const id=panel.PANEL_CHANNELS['order-status'];
+ config.setConfig(gid,{serviceStatus:{Liveries:'delayed',liveries:'open'}});
+ const message={id:'1550000000000000001',channelId:id,author:{id:'bot1'},
+   embeds:[{description:'**Discord** <:StatusEMOJIGreen:1545902027299627018> Open\n**Liveries** Delayed\n**Graphics** Open\n**Uniforms** Open\n**Bots** Open\n**Logos** Open\n**Embeds** Open\n**Websites** Open\n**ELS** Open'}],
+   components:[],flags:{has:()=>false},edit:async payload=>{updates.push(payload)}};
+ const collection={values:function*(){yield message}};
+ const client={user:{id:'bot1'},channels:{fetch:async (channelId)=>({
+   messages:{fetch:async input=>typeof input==='object'?collection:null}
+ })}};
+ const result=await panel.refreshPanels(client,gid,{discover:true});
+ const statusResult=result.find(x=>x.type==='order-status');
+ assert.equal(statusResult.updated,true);
+ assert.equal(statusResult.count,1);
+ assert.equal(statusResult.messageIds[0],message.id);
+ assert.equal(updates.length,1);
+ assert.match(JSON.stringify(updates[0]),/OpenedEmoji1/);
+ assert.match(JSON.stringify(updates[0]),/\*\*Liveries\*\*.*Open/);
+ assert.equal(config.getConfig(gid).orderStatusPanel.messageId,message.id);
+});
+test('refresh does not claim success when the message edit fails',async()=>{
+ const gid='failed-edit-'+Date.now();
+ const id=panel.PANEL_CHANNELS['order-status'];
+ const message={id:'1550000000000000002',channelId:id,author:{id:'bot1'},
+   embeds:[{description:'Discord Open Liveries Delayed Graphics Open Uniforms Open Bots Open Logos Open Embeds Open Websites Open ELS Open'}],
+   components:[],flags:{has:()=>false},edit:async ()=>{throw Error('Missing Permissions')}};
+ const collection={values:function*(){yield message}};
+ const client={user:{id:'bot1'},channels:{fetch:async ()=>({
+    messages:{fetch:async input=>typeof input==='object'?collection:null}
+ })}};
+ const result=await panel.refreshPanels(client,gid,{discover:true});
+ const statusResult=result.find(x=>x.type==='order-status');
+ assert.equal(statusResult.updated,false);
+ assert.match(statusResult.error,/Missing Permissions/);
 });

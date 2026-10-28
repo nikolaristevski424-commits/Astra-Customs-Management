@@ -313,7 +313,7 @@ designer applications, and joining the Discord. `/ad` is restricted to staff.
 `/tax` (Roblox's 30% marketplace tax, both directions), `/pricelist`,
 `/quote` (interactive calculator), `/watermark` (faded tiled brand
 text by default), `/infract`, `/promote`, `/logs`, `/loa`,
-`/addstaff`, `/affiliate`, `/service`, `/text edit`, `/panel
+`/addstaff`, `/affiliate`, `/status`, `/text edit`, `/panel
 dashboard|prices|tickets|portfolio|guidelines|order-status|affiliations|honeypot`, prefix shortcuts (`-dashboard`,
 `-pricelist`, etc. — staff only, deletes the trigger message), a
 honeypot trap channel (auto-softban), `/help`, `/ping`.

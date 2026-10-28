@@ -9,7 +9,7 @@
 // getConfig(). That's the only way to configure this bot; there is no
 // in-Discord setup command. config.setConfig()/setNested() still exist for
 // a few runtime-state fields written by other commands (e.g. /text edit,
-// /service), and those explicit writes always win over .env for that field.
+// /status), and those explicit writes always win over .env for that field.
 
 function parseIdList(value) {
     return (value || '')

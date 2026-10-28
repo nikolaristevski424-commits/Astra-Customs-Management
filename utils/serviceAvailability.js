@@ -8,11 +8,28 @@ const aliases={
   website:'websites',websites:'websites',els:'els'};
 const normalize = (name) => aliases[String(name||'').trim().toLowerCase()]||null;
 function status(cfg,type){
-  const entries=Object.entries(cfg.serviceStatus||{});
-  const exact=entries.find(([k])=>k.toLowerCase()===type);
-  const matching=exact||entries.find(([k])=>normalize(k)===type);
-  const raw=matching?.[1]||'open';
-  return ({available:'open',limited:'delayed',unavailable:'closed'}[raw]||raw);
+  const key=normalize(type);
+  if(!key) return 'open';
+  const entries=cfg?.serviceStatus||{};
+  // Prefer the exact canonical key: old versions could leave both
+  // "Liveries" and "liveries" in the store with contradictory states.
+  let raw=Object.prototype.hasOwnProperty.call(entries,key) ? entries[key] : undefined;
+  if(raw===undefined){
+    const matches=Object.entries(entries).filter(([entry])=>normalize(entry)===key);
+    raw=matches.length?matches[matches.length-1][1]:'open';
+  }
+  const result=({available:'open',limited:'delayed',unavailable:'closed'}[raw]||raw);
+  return ['open','delayed','closed','premium'].includes(result)?result:'open';
+}
+function canonicalizeStatuses(current){
+  const normalized={};
+  // Preserve unknown keys (future extensions) while canonicalizing known services.
+  for(const [key,value] of Object.entries(current||{})){
+    const service=normalize(key);
+    if(service) normalized[service]=value;
+    else normalized[key]=value;
+  }
+  return normalized;
 }
 // Keep the Wi-Fi/signal strength indicator AND the complete three-piece status badge.
 // The signal indicators were used in Astra's original order-status design.
@@ -32,4 +49,4 @@ const icons=Object.freeze(Object.fromEntries(
   Object.keys(badgeIcons).map(status=>[status,signalIcons[status]+badgeIcons[status]])
 ));
 const labels=Object.freeze({open:'Open',delayed:'Delayed',closed:'Closed',premium:'Premium / Boosters Only'});
-module.exports={normalize,status,icons,signalIcons,badgeIcons,labels};
+module.exports={normalize,status,canonicalizeStatuses,icons,signalIcons,badgeIcons,labels};

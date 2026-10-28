@@ -6,7 +6,7 @@ const STORE = 'config';
 // Everything here is configured from .env (see utils/env.js's
 // ENV_FIELD_MAP) — that's the only way to set most of this. The JSON
 // store still exists for the handful of fields other commands write
-// at runtime (e.g. /text edit, /service, the honeypot counter), and
+// at runtime (e.g. /text edit, /status, the honeypot counter), and
 // those explicit writes always win over .env for that field.
 function defaultConfig() {
     return {
@@ -128,7 +128,7 @@ function defaultConfig() {
 /**
  * Effective config = hardcoded default < .env < explicit runtime override.
  * The JSON store only ever holds what a command explicitly wrote via
- * setConfig/setNested (e.g. /text edit, /service), so changing .env
+ * setConfig/setNested (e.g. /text edit, /status), so changing .env
  * always takes effect immediately unless a field was specifically
  * written that way.
  */

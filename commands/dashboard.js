@@ -19,7 +19,7 @@ function countActiveGiveaways(guildId) {
 
 function summarizeServices(cfg) {
     const serviceStatus = cfg.serviceStatus || {};
-    if (!Object.keys(serviceStatus).length) return 'No service statuses set yet — use /service or /status to set them.';
+    if (!Object.keys(serviceStatus).length) return 'No service statuses set yet — use /status to set them.';
 
     const counts = { open: 0, delayed: 0, closed: 0, premium: 0 };
     const lines = [];

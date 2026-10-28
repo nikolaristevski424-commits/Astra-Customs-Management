@@ -142,11 +142,56 @@ function hasPanelMarker(message,type,clientUserId){
     const body=JSON.stringify(message.components?.map(c=>c.toJSON?.()||c)||[]);
     const legacy=JSON.stringify(message.embeds?.map(e=>e.toJSON?.()||e)||[]);
     if(type==='order-status') {
-      return (/Order Status/i.test(body) && /Current availability|Order Now/i.test(body)) ||
-        (/Order Status/i.test(legacy) && /Liveries|Graphics|Uniforms|Discord/i.test(legacy));
+      const text=[String(message.content||''),body,legacy].join(' ');
+      // Older status embeds were simple rows (no title, no Order Status header).
+      // Identify them by their full service roster and availability badges.
+      const names=['Discord','Liveries','Graphics','Uniforms','Bots','Logos','Embeds','Websites','ELS'];
+      const matches=names.filter(n=>new RegExp('\\b'+n+'\\b','i').test(text)).length;
+      const availabilityText=/OpenedEmoji|ClosedEmoji|DeleyaedEmoji|StatusEMOJI|OPENED|DELAYED|CLOSED|Premium/i.test(text);
+      return (/Order Status/i.test(text)&&/Current availability|Order Now|Live availability|Liveries/i.test(text))
+          || (matches>=7 && availabilityText);
     }
     if(type==='order') return body.includes('astra_order_type') && !/Order Status/i.test(body);
     return false;
+}
+function extractMessages(result){
+    if(!result)return [];
+    if(result.values && typeof result.values==='function')return [...result.values()];
+    if(Array.isArray(result))return result;
+    if(result.find && typeof result.find==='function'){
+      // Supports older lightweight message collections from tests.
+      return [result.find(x=>!!x)].filter(Boolean);
+    }
+    return [];
+}
+async function discoverPanels(client,guildId,type,cfg){
+    const record=cfg[type==='order'?'orderPanel':'orderStatusPanel'];
+    const channels=[record?.channelId,PANEL_CHANNELS[type]].filter(Boolean);
+    const found=new Map();
+    const errors=[];
+    for(const id of new Set(channels)){
+        let channel;
+        try{channel=await client.channels.fetch(id);}
+        catch(error){errors.push('Channel '+id+': '+error.message);continue;}
+        if(!channel?.messages?.fetch)continue;
+        try {
+          let before=null;
+          // Older status posts may no longer be among the newest 100 messages.
+          for(let page=0;page<3;page++){
+            const args={limit:100,...(before?{before}:{})};
+            const collection=await channel.messages.fetch(args);
+            const messages=extractMessages(collection);
+            if(!messages.length)break;
+            for(const message of messages){
+              if(hasPanelMarker(message,type,client.user.id))found.set(message.id,message);
+            }
+            if(messages.length<100)break;
+            before=messages[messages.length-1]?.id;
+            if(!before)break;
+          }
+        }catch(error){errors.push('Channel '+id+': '+error.message);}
+    }
+    return {messages:[...found.values()].slice(0,8),errors};
 }
 function legacyStatusPayload(cfg,message){
     const old=message.embeds?.[0];
@@ -159,7 +204,7 @@ function legacyStatusPayload(cfg,message){
           '\n\nAvailability updates when management uses \`/status\`.').setTimestamp();
     const image=old?.image?.url;
     if(image)embed.setImage(image);
-    return withFooter({embeds:[embed],components:[],allowedMentions:{parse:[]}},cfg);
+    return withFooter({embeds:[embed],components:message.components||[],allowedMentions:{parse:[]}},cfg);
 }
 async function discoverPanel(client,guildId,type,cfg){
     const id=cfg[type==='order'?'orderPanel':'orderStatusPanel']?.channelId || PANEL_CHANNELS[type];
@@ -187,36 +232,53 @@ module.exports = {
         const results=[];
         for(const [type,key] of [['order','orderPanel'],['order-status','orderStatusPanel']]){
             const record=cfg[key];
-            let message=null;
-            let error=null;
-            if(record?.channelId && record?.messageId){
+            const toEdit=new Map();
+            const errors=[];
+            if(record?.channelId&&record?.messageId){
                 try{
                     const channel=await client.channels.fetch(record.channelId);
-                    if(channel?.messages?.fetch)message=await channel.messages.fetch(record.messageId);
-                }catch(e){error=e.message;}
+                    const saved=await channel?.messages?.fetch(record.messageId);
+                    if(saved?.author?.id===client.user.id)
+                        toEdit.set(saved.id,saved);
+                    else errors.push('Recorded message is missing or belongs to another bot.');
+                }catch(error){errors.push('Recorded message: '+error.message);}
             }
-            if(!message && discover){
-                try{message=await discoverPanel(client,guildId,type,cfg);}catch(e){error=e.message;}
+            if(discover && (type==='order-status'||!toEdit.size)){
+                const found=await discoverPanels(client,guildId,type,cfg);
+                for(const message of found.messages)toEdit.set(message.id,message);
+                errors.push(...found.errors);
             }
-            if(!message){results.push({type,updated:false,...(error?{error}:{} )});continue;}
-            if(message.author?.id!==client.user.id){
-                results.push({type,updated:false,error:'Stored panel belongs to a different author.'});
+            if(!toEdit.size){
+                results.push({type,updated:false,count:0,
+                    error:errors.join(' | ')||'No recognizable bot-authored panel found. Use /panel track-status to connect its message ID.'});
                 continue;
             }
-            try{
-                const isLegacy=type==='order-status' && message.embeds?.length &&
-                    !message.flags?.has?.(MessageFlags.IsComponentsV2);
-                const payload=isLegacy ? legacyStatusPayload(cfg,message):
-                    withFooter({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)},cfg);
-                await message.edit(payload);
-                // Recover tracking when the old ID was deleted or the panel was not registered.
-                if(record?.messageId!==message.id || record?.channelId!==message.channelId)
-                    config.setNested(guildId,key,{channelId:message.channelId,messageId:message.id});
-                results.push({type,updated:true,messageId:message.id});
-            }catch(e){
-                console.warn('[panel] Refresh failed for '+type+': '+e.message);
-                results.push({type,updated:false,error:e.message});
+            const edited=[];
+            let channelId=null;
+            for(const message of toEdit.values()){
+                try{
+                    const isLegacy=type==='order-status'&&!!message.embeds?.length &&
+                        !message.flags?.has?.(MessageFlags.IsComponentsV2);
+                    const payload=isLegacy?legacyStatusPayload(cfg,message):
+                        withFooter({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)},cfg);
+                    await message.edit(payload);
+                    edited.push(message.id);
+                    channelId=message.channelId;
+                }catch(error){
+                    errors.push('Message '+message.id+': '+error.message);
+                    console.warn('[panel] '+type+' update failed for '+message.id+': '+error.message);
+                }
             }
+            if(edited.length){
+                // The latest visible status message becomes the registered target.
+                const id=edited[edited.length-1];
+                const last=toEdit.get(id);
+                if(record?.messageId!==id||record?.channelId!==last.channelId)
+                    config.setNested(guildId,key,{channelId:last.channelId,messageId:id});
+                channelId=last.channelId;
+            }
+            results.push({type,updated:edited.length>0,count:edited.length,messageIds:edited,
+                channelId,...(errors.length?{error:errors.join(' | ').slice(0,700)}:{})});
         }
         return results;
     },
@@ -248,7 +310,8 @@ module.exports = {
         if(type==='refresh'){
             await interaction.deferReply({flags:MessageFlags.Ephemeral});
             const results=await module.exports.refreshPanels(interaction.client,guildId,{discover:true});
-            const detail=results.map(r=>'**'+r.type+'**: '+(r.updated?'✅ Updated':'⚠️ Not updated'+(r.error?' ('+r.error+')':''))).join('\n');
+            const detail=results.map(r=>'**'+r.type+'**: '+(r.updated?'✅ Edited '+r.count+' message(s)':'⚠️ No message edited')+
+                (r.error?' ('+r.error.slice(0,160)+')':'')).join('\n');
             return interaction.editReply(detail+'\nIf a panel is missing, republish it with \`/panel order-status\` or \`/panel order\`.');
         }
         if(type==='track-status'){
