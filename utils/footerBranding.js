@@ -2,7 +2,7 @@ const { EmbedBuilder, ContainerBuilder, ActionRowBuilder, MediaGalleryBuilder, M
 
 // Publicly accessible Astra Customs asset. Override via FOOTER_URL if desired.
 const DEFAULT_FOOTER_URL =
-  'https://raw.githubusercontent.com/nikolaristevski424-commits/Astra-Customs-Management/main/assets/banners/footer-banner.png';
+  'https://raw.githubusercontent.com/nikolaristevski424-commits/Astra-Customs-Management/main/assets/banners/astra-footer-2026.webp';
 
 function footerUrl(cfg = {}) {
   return cfg.footerUrl || process.env.FOOTER_URL || DEFAULT_FOOTER_URL;
@@ -21,10 +21,7 @@ function footerGallery(url) {
   return new MediaGalleryBuilder().addItems([{media:{url}}]);
 }
 function hasFooter(payload, url) {
-  return payload.components.some(c => {
-    const value=JSON.stringify(json(c));
-    return value.includes(url) || value.includes('footer-banner.png');
-  });
+  return payload.components.some(c => JSON.stringify(json(c)).includes(url));
 }
 function isButtonRow(component) {
   return component?.type===1 && component.components?.length>0 &&
@@ -40,12 +37,17 @@ function isButtonRow(component) {
 function addFooterToV2(payload,url) {
   if(hasFooter(payload,url))return payload;
 
-  const components=[...payload.components];
+  // Replace the old, incorrect footer as panels are refreshed.
+  // Preserve header graphics, select menus, and every button.
+  const components=payload.components.filter(c=>{
+    const raw=json(c);
+    return !(raw?.type===12 && JSON.stringify(raw).includes('footer-banner.png'));
+  });
   const containerIndex=components.findIndex(c => json(c)?.type===17);
   if(containerIndex<0) return {...payload,components:[...components,footerGallery(url)]};
 
   const raw=json(components[containerIndex]);
-  const inside=[...(raw.components||[])];
+  const inside=[...(raw.components||[])].filter(c=>!(c.type===12 && JSON.stringify(c).includes('footer-banner.png')));
 
   // Pull only trailing button rows out of the container. This matches
   // the dashboard example without moving select menus or content blocks.
@@ -71,8 +73,10 @@ function withFooter(payload,cfg={}) {
   if(!/^https:\/\//i.test(url))return payload;
 
   if(Array.isArray(payload.embeds) && payload.embeds.length) {
-    if(payload.embeds.some(e=>isFooterImage(e,url)) || payload.embeds.length>=10)return payload;
-    return {...payload,embeds:[...payload.embeds,new EmbedBuilder().setImage(url)]};
+    if(payload.embeds.some(e=>isFooterImage(e,url)))return payload;
+    const oldRemoved=payload.embeds.filter(e=>!String(json(e)?.image?.url||'').includes('footer-banner.png'));
+    if(oldRemoved.length>=10)return payload;
+    return {...payload,embeds:[...oldRemoved,new EmbedBuilder().setImage(url)]};
   }
   if(Array.isArray(payload.components) && payload.components.length && isComponentsV2(payload)) {
     return addFooterToV2(payload,url);

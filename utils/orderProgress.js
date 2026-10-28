@@ -23,7 +23,8 @@ function controls(order){
  const rows=[new ActionRowBuilder().addComponents(btns)];
  if(order.ticketChannelId)rows.push(new ActionRowBuilder().addComponents(
    new ButtonBuilder().setCustomId('ticket_claim_'+order.ticketChannelId).setLabel(order.designerId?'Designer Assigned':'Claim Order').setStyle(ButtonStyle.Secondary).setDisabled(!!order.designerId),
-   new ButtonBuilder().setCustomId('ticket_close_'+order.ticketChannelId).setLabel('Close Ticket').setStyle(ButtonStyle.Danger)
+   new ButtonBuilder().setCustomId('ticket_close_'+order.ticketChannelId).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
+   new ButtonBuilder().setCustomId('ticket_close_instant_'+order.ticketChannelId).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger)
  ));
  return rows;
 }

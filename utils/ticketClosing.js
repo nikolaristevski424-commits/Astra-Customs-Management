@@ -1,4 +1,6 @@
 const { AttachmentBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const tickets = require('./tickets');
 
 async function buildTranscript(channel) {
@@ -34,8 +36,7 @@ async function closeTicket(client, guildId, cfg, channelId, closedBy) {
         return null;
     });
     if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
-        tickets.update(guildId, channelId, { closedAt: Date.now(), closedBy, closeRequest: null });
-        console.error(`[tickets] Ticket ${channelId} was untracked as closed because its channel is unavailable.`);
+        console.error(`[tickets] Ticket ${channelId} is unavailable; preserving the open record for staff review.`);
         return false;
     }
 
@@ -44,8 +45,18 @@ async function closeTicket(client, guildId, cfg, channelId, closedBy) {
     let transcript;
     try {
         transcript = await buildTranscript(channel);
-    } catch (error) {
-        console.error(`[tickets] Failed to build transcript for ${channelId}:`, error.message);
+        if(!/^\d{10,22}$/.test(String(guildId)) || !/^\d{10,22}$/.test(String(channelId))) {
+            throw new Error('Invalid Discord identifiers for archive storage.');
+        }
+        const dir = path.join(__dirname, '..', 'data', 'ticket-transcripts', String(guildId));
+        fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+        // Archive first, so channel deletion never loses the only transcript copy.
+        const file = path.join(dir, `${channelId}.txt`);
+        fs.writeFileSync(file, transcript, { mode: 0o600 });
+    } catch(error) {
+        console.error(`[tickets] Could not archive transcript for ${channelId}; keeping ticket open:`,error.message);
+        tickets.update(guildId,channelId,{closingAt:null});
+        return false;
     }
 
     const fileName = `transcript-${channel.name}.txt`;
@@ -86,20 +97,22 @@ async function closeTicket(client, guildId, cfg, channelId, closedBy) {
         }
     }
 
+    try {
+        await channel.delete(`Ticket closed by ${closedBy || 'automatic 24-hour close request'}`);
+    } catch (error) {
+        // Channel is still open: release the lock so staff can retry /closee.
+        tickets.update(guildId, channelId, { closingAt: null });
+        console.error(`[tickets] Could not delete ticket channel ${channelId}:`, error.message);
+        return false;
+    }
+
+    // Only record closure once Discord confirms channel deletion.
     tickets.update(guildId, channelId, {
         closedAt: Date.now(),
         closedBy,
         closeRequest: null,
         closingAt: null,
     });
-
-    try {
-        await channel.delete(`Ticket closed by ${closedBy || 'automatic 24-hour close request'}`);
-    } catch (error) {
-        console.error(`[tickets] Could not delete closed ticket channel ${channelId}:`, error.message);
-        return false;
-    }
-
     return true;
 }
 

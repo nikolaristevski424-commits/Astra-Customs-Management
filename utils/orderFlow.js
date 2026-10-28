@@ -75,7 +75,8 @@ async function modal(interaction){
   quantity,price:total,deadline:date,budget,details:brief,references:refs,staffRoleIds:roles});
  const row=new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId('ticket_claim_'+channel.id).setLabel('Claim Order').setStyle(ButtonStyle.Success),
-  new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Close').setStyle(ButtonStyle.Danger)
+  new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId('ticket_close_instant_'+channel.id).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger)
  );
  try{
   const sent=await channel.send(withFooter({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),

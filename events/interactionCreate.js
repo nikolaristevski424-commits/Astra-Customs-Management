@@ -588,6 +588,28 @@ async function handleButton(interaction) {
         return;
     }
 
+    // Immediate staff-only closure: no 24-hour delay or confirmation modal.
+    if (customId.startsWith('ticket_close_instant_')) {
+        const channelId = customId.slice('ticket_close_instant_'.length);
+        const ticket = tickets.get(guildId, channelId);
+        if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
+            return interaction.reply({content:'This is not an open ticket.',flags:MessageFlags.Ephemeral});
+        }
+        if (!perms.isTicketStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg)) {
+            return interaction.reply({content:'Only ticket staff or managers can close a ticket instantly.',flags:MessageFlags.Ephemeral});
+        }
+        if (ticket.closingAt) {
+            return interaction.reply({content:'This ticket is already closing.',flags:MessageFlags.Ephemeral});
+        }
+        await interaction.deferReply({flags:MessageFlags.Ephemeral});
+        const success = await closeTicket(interaction.client,guildId,cfg,channelId,interaction.user.id);
+        await interaction.editReply(success
+            ? 'Ticket closed. The transcript was sent where configured.'
+            : 'Could not close this ticket. Check the bot Manage Channels permission and logs.')
+          .catch(err=>console.warn('[tickets] Could not acknowledge instant closure:',err.message));
+        return;
+    }
+
     if (customId.startsWith('ticket_close_now_')) {
         const channelId = customId.replace('ticket_close_now_', '');
         const ticket = tickets.get(guildId, channelId);
@@ -722,7 +744,8 @@ async function handleModal(interaction) {
         const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details, style, references });
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
         );
         await channel.send(withFooter({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
@@ -782,7 +805,8 @@ async function handleModal(interaction) {
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
         );
 
         await channel.send(withFooter({

@@ -15,6 +15,8 @@ const CATEGORIES = [
     { name: '🖼️ Portfolio', value: '`/portfolio add|view|remove|profile`' },
     { name: '✅ Quality Control', value: '`/qc submit` — submit work for QC approval' },
     { name: '🎉 Fun', value: '`/release`, `/giveaway start|reroll`, `/fact`, `/reverse`, `/wanted`, `/8ball`, `/coinflip`, `/roll`, `/rps`, `/ship`, `/wouldyourather`, `/avatar`' },
+    { name: '🎫 Ticket Operations', value: '`/close request` — 24-hour close request. Staff: `/closee` for immediate closure, `/ticket info|list|stats|add|remove|rename|priority|claim|assign|unclaim|lock|unlock|transcript`' },
+    { name: '🤝 Partnerships & Ads', value: '\`/partnership\` — management post with up to five representatives. Ownership: \`/paid ad\` — sponsored advertisement with optional giveaway-style ping. \`/health\` — staff diagnostics.' },
     { name: '🛠️ Staff & HR', value: '`/addstaff`, `/infract issue|void`, `/promote issue|void`, `/logs`, `/loa request|return|list`' },
     { name: '🖌️ Design Tools', value: '`/watermark`, `/say`' },
     { name: '📋 Panels & status', value: '`/panel order-status|tickets|order|applications|portfolio|affiliations|honeypot`, `/dashboard`, `/status`, `/service`, `/text edit`' },

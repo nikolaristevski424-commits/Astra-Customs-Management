@@ -22,7 +22,7 @@ const BANNERS = Object.freeze({
     loa: `${ASSET_BASE}default-banner.png`,
 });
 
-const FOOTER = `${ASSET_BASE}footer-banner.png`;
+const FOOTER = `${ASSET_BASE}astra-footer-2026.webp`;
 
 function banner(key = 'default') {
     return BANNERS[key] || BANNERS.default;
