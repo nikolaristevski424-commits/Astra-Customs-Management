@@ -8,11 +8,24 @@ const service=require('../commands/service');
 const panel=require('../commands/panel');
 const {createCatalogThread}=require('../utils/catalogThreads');
 
-test('exact three-segment Astra status emojis are used throughout',()=>{
-  assert.equal(availability.icons.open,'<:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>');
-  assert.equal(availability.icons.closed,'<:ClosedEmoji1:1545902477621072022><:ClosedEmoji2:1545902533703245914><:ClosedEmoji3:1545902589403594903>');
-  assert.equal(availability.icons.delayed,'<:DeleyaedEmoji1:1558226588980617268><:DeleyaedEmojimiddle:1558226618160259072><:DeleyaedEmoji:1558226651148582973>');
-  assert.equal(availability.icons.premium,'<:P12:1558228368883978295><:P13:1558228373975597146><:P12:1558228377511526523>');
+test('preserves signal bars before each exact three-part status emoji',()=>{
+  const signal={
+    open:'<:StatusEMOJIGreen:1545902027299627018>',
+    delayed:'<:StatusEmojiYellow:1545902089186705459>',
+    closed:'<:StatusEmojiRed:1545902134258827294>',
+    premium:'<:StatusEMOJIGreen:1545902027299627018>'
+  };
+  const badges={
+    open:'<:OpenedEmoji1:1545902291469467668><:OpenedEmoji2:1545902335421841509><:OpenedEmoji3:1545902388961878188>',
+    closed:'<:ClosedEmoji1:1545902477621072022><:ClosedEmoji2:1545902533703245914><:ClosedEmoji3:1545902589403594903>',
+    delayed:'<:DeleyaedEmoji1:1558226588980617268><:DeleyaedEmojimiddle:1558226618160259072><:DeleyaedEmoji:1558226651148582973>',
+    premium:'<:P12:1558228368883978295><:P13:1558228373975597146><:P12:1558228377511526523>'
+  };
+  for(const status of Object.keys(signal)){
+    assert.equal(availability.signalIcons[status],signal[status]);
+    assert.equal(availability.badgeIcons[status],badges[status]);
+    assert.equal(availability.icons[status],signal[status]+badges[status]);
+  }
   assert.deepEqual(status.data.toJSON().options[1].choices,service.data.toJSON().options[1].choices);
 });
 test('order status panel and the order selector show updated custom emojis',()=>{
@@ -21,7 +34,9 @@ test('order status panel and the order selector show updated custom emojis',()=>
   const orderView=JSON.stringify(panel.BUILDERS.order(cfg));
   for(const style of ['delayed','closed','premium'])assert.ok(statusView.includes(availability.icons[style]));
   assert.ok(orderView.includes(availability.icons.delayed));
-  assert.ok(!statusView.includes('StatusEmojiYellow'));
+  assert.ok(statusView.includes(availability.signalIcons.open+availability.badgeIcons.open));
+  assert.ok(orderView.includes(availability.signalIcons.premium+availability.badgeIcons.premium));
+  assert.ok(statusView.includes('StatusEmojiYellow'));
 });
 test('live status update edits the registered message rather than posting duplicates',async()=>{
   const guildId='panel-test-'+Date.now(),cfg=config.getConfig(guildId);
