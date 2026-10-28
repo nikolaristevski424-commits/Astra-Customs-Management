@@ -6,6 +6,7 @@ const pool = require('../utils/paymentPool');
 const roblox = require('../utils/roblox');
 const discounts = require('../utils/discounts');
 const packages = require('../utils/packages');
+const delivery=require('../utils/packageDelivery');
 const orders=require('../utils/orders');
 const { baseEmbed } = require('../utils/embeds');
 
@@ -82,9 +83,9 @@ module.exports = {
         const focused = interaction.options.getFocused().toLowerCase();
         if (sub === 'create' && interaction.options.getFocused(true).name === 'package_id') {
             const approved = packages.list(guildId, 'approved')
-                .filter((pkg) => pkg.files?.length && (`${pkg.id}`.includes(focused) || pkg.name.toLowerCase().includes(focused)))
+                .filter((pkg) => delivery.hasDelivery(pkg) && (`${pkg.id}`.includes(focused) || pkg.name.toLowerCase().includes(focused)))
                 .slice(0, 25);
-            return interaction.respond(approved.map((pkg) => ({ name: `#${pkg.id} ${pkg.name} (${pkg.files.length} files)`, value: pkg.id })));
+            return interaction.respond(approved.map((pkg) => ({ name: `#${pkg.id} ${pkg.name} (${delivery.summary(pkg)})`.slice(0,100), value: pkg.id })));
         }
         const statuses = pool.listStatus(guildId);
         const relevant = sub === 'release' ? statuses.filter((s) => s.reserved) : statuses;
@@ -171,8 +172,8 @@ module.exports = {
                 if (!packageRecord || packageRecord.status !== 'approved') {
                     return interaction.reply({ content: 'That package does not exist or is not approved yet.', ephemeral: true });
                 }
-                if (!packageRecord.files?.length) {
-                    return interaction.reply({ content: 'That package has no delivery files attached. Edit the package and add its files before creating a payment link.', ephemeral: true });
+                if (!delivery.hasDelivery(packageRecord)) {
+                    return interaction.reply({ content: 'That package has no deliverable files, text or links. Add delivery content before creating a payment link.', ephemeral: true });
                 }
             }
             const discountCode = interaction.options.getString('discount_code');

@@ -7,6 +7,7 @@ const { baseEmbed } = require('../utils/embeds');
 const { robloxToDiscord } = require('../utils/bloxlink');
 const credits = require('../utils/credits');
 const packages = require('../utils/packages');
+const delivery=require('../utils/packageDelivery');
 const paymentPool = require('../utils/paymentPool');
 const orders = require('../utils/orders');
 const receipts = require('../utils/purchaseReceipts');
@@ -197,15 +198,18 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
     }
     if(reservation.packageId && !receipt.delivered) {
       const pkg=packages.find(guildId,reservation.packageId);
-      if(pkg?.files?.length && linkedCustomer){
-        try {
-          const user=await client.users.fetch(linkedCustomer);
-          await user.send({content:'Your Astra Customs purchase of **'+pkg.name+'** was verified. Files:',files:pkg.files.map(f=>({attachment:f.url,name:f.name}))});
-          receipt=receipts.update(guildId,key,{delivered:true});
-        } catch(error) {
-          receipts.update(guildId,key,{deliveryError:error.message});
-          throw new Error('Payment confirmed but automatic delivery failed: '+error.message);
-        }
+      if(!delivery.hasDelivery(pkg) || !linkedCustomer){
+        receipts.update(guildId,key,{reviewRequired:true,deliveryError:'Package content or verified customer unavailable'});
+        throw new Error('Package delivery requires staff review: missing content or customer');
+      }
+      try {
+        const user=await client.users.fetch(linkedCustomer);
+        const messages=delivery.deliveryMessages(pkg);
+        for(const payload of messages)await user.send(payload);
+        receipt=receipts.update(guildId,key,{delivered:true});
+      } catch(error) {
+        receipts.update(guildId,key,{deliveryError:error.message});
+        throw new Error('Payment confirmed but automatic delivery failed: '+error.message);
       }
     }
     paymentPool.release(guildId,itemId);

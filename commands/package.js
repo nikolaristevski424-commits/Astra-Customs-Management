@@ -17,16 +17,22 @@ const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const { isExecutive } = require('../utils/env');
 const packages = require('../utils/packages');
+const delivery=require('../utils/packageDelivery');
 const { addPanelBanner, parseColor } = require('../utils/embeds');
 const { createCatalogThread } = require('../utils/catalogThreads');
 const { collectAttachmentFiles } = require('../utils/respond');
 
-function buildPackageContainer(cfg, pkg) {
+function addLongText(container, content) {
+    // Discord text-display components have size limits; preserve long text/code.
+    const value=String(content||'');
+    for(let offset=0;offset<value.length;offset+=3400)
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(value.slice(offset,offset+3400)));
+}
+
+function buildPackageContainer(cfg, pkg, { includePrivate = false } = {}) {
     const container = new ContainerBuilder().setAccentColor(pkg.status==='approved'?0x2caa80:pkg.status==='denied'?0xe05252:parseColor(cfg.accentColor));
     addPanelBanner(container, cfg, 'marketplace');
-    container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-            [
+    addLongText(container,[
                 `## ${pkg.name}`,
                 `**Price:** R$${pkg.price}`,
                 `**Created by:** <@${pkg.createdBy}>`,
@@ -34,10 +40,13 @@ function buildPackageContainer(cfg, pkg) {
                 ...(pkg.decidedBy?[`**Reviewed by:** <@${pkg.decidedBy}>`]:[]),
                 '',
                 pkg.description || 'No description.',
-                pkg.files?.length ? `\n**Delivery files:** ${pkg.files.map((file) => `[${file.name}](${file.url})`).join(', ')}` : '\n**Delivery files:** None attached.',
-            ].join('\n')
-        )
-    );
+                `**Delivery:** ${delivery.summary(pkg)}`,
+            ].join('\n'));
+    if(includePrivate) {
+        if(pkg.files?.length)addLongText(container,`**Files (staff only):** ${pkg.files.map(file=>file.name).join(', ')}`);
+        if(pkg.deliveryLinks?.length)addLongText(container,`**Private links (staff only):**\n${pkg.deliveryLinks.join('\n')}`);
+        if(pkg.deliveryText?.trim())addLongText(container,`**Private text/code (staff only):**\n${pkg.deliveryText}`);
+    }
     if (pkg.images?.length) {
         container.addSeparatorComponents(new SeparatorBuilder());
         container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(pkg.images.map((url) => ({ media: { url } }))));
@@ -78,12 +87,17 @@ module.exports = {
                 .addAttachmentOption((o) => o.setName('file3').setDescription('Delivery file 3'))
                 .addAttachmentOption((o) => o.setName('file4').setDescription('Delivery file 4'))
                 .addAttachmentOption((o) => o.setName('file5').setDescription('Delivery file 5'))
+                .addStringOption((o)=>o.setName('text').setDescription('Private delivery text, codes or instructions').setMaxLength(4000))
+                .addStringOption((o)=>o.setName('links').setDescription('Private HTTPS links, separated by spaces or new lines').setMaxLength(1700))
         )
         .addSubcommand((sub) =>
             sub
                 .setName('request')
                 .setDescription('Submit one of your draft packages for approval')
                 .addIntegerOption((o) => o.setName('package_id').setDescription('Package ID from /package list').setRequired(true).setAutocomplete(true))
+                .addStringOption((o)=>o.setName('text').setDescription('Private text or codes to deliver (optional)').setMaxLength(4000))
+                .addStringOption((o)=>o.setName('links').setDescription('Private HTTPS links to deliver (optional)').setMaxLength(1700))
+                .addAttachmentOption((o)=>o.setName('file').setDescription('Optional additional delivery file'))
         )
         .addSubcommand((sub) =>
             sub
@@ -148,7 +162,13 @@ module.exports = {
                 .filter(Boolean)
                 .map((file) => ({ name: file.name, url: file.url }));
 
-            const pkg = packages.create(guildId, { name, price, description, images, files, createdBy: interaction.user.id });
+            let deliveryLinks,deliveryText;
+            try{
+                deliveryLinks=delivery.parseLinks(interaction.options.getString('links'));
+                deliveryText=delivery.normalizeText(interaction.options.getString('text'));
+            }catch(error){return interaction.reply({content:error.message,flags:MessageFlags.Ephemeral});}
+            const pkg = packages.create(guildId, { name, price, description, images, files,
+                deliveryText,deliveryLinks,createdBy: interaction.user.id });
             return interaction.reply({
                 content: `Package \`#${pkg.id}\` **${name}** saved as a draft. Run \`/package request package_id:${pkg.id}\` to submit it for approval.`,
                 ephemeral: true,
@@ -166,13 +186,29 @@ module.exports = {
                 return interaction.reply({ content: `Package \`#${id}\` is already **${pkg.status}**.`, ephemeral: true });
             }
 
-            const updated = packages.updateStatus(guildId, id, 'pending');
-
+            let moreLinks,moreText;
+            const textOption=interaction.options.getString('text');
+            const linkOption=interaction.options.getString('links');
+            const extraFile=interaction.options.getAttachment('file');
+            try{
+                moreLinks=linkOption===null?undefined:delivery.parseLinks(linkOption);
+                moreText=textOption===null?undefined:delivery.normalizeText(textOption);
+            }catch(error){return interaction.reply({content:error.message,flags:MessageFlags.Ephemeral});}
+            const merged={...pkg,
+                deliveryText:moreText===undefined?pkg.deliveryText:moreText,
+                deliveryLinks:moreLinks===undefined?pkg.deliveryLinks:moreLinks,
+                files:[...(pkg.files||[]),...(extraFile?[{name:extraFile.name,url:extraFile.url}]:[])]};
+            if(!delivery.hasDelivery(merged))
+                return interaction.reply({content:'Add at least one delivery file, text/code, or HTTPS link before requesting approval.',flags:MessageFlags.Ephemeral});
             const targetChannelId = cfg.packageBundleChannelId || cfg.packageReviewChannelId || interaction.channelId;
             const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
-            if (!channel) {
-                return interaction.reply({ content: 'Submitted, but the catalog channel is not reachable. Set `PACKAGE_BUNDLE_CHANNEL_ID` in `.env`.', ephemeral: true });
+            if (!channel?.isTextBased?.()) {
+                return interaction.reply({ content: 'The package review channel is unavailable. Check PACKAGE_BUNDLE_CHANNEL_ID and try again.', flags: MessageFlags.Ephemeral });
             }
+            const updated = packages.updateDelivery(guildId,id,{
+                deliveryText:moreText,deliveryLinks:moreLinks,files:extraFile?[{name:extraFile.name,url:extraFile.url}]:[]
+            });
+            packages.updateStatus(guildId, id, 'pending');
 
             const container = buildPackageContainer(cfg, updated);
             const row = new ActionRowBuilder().addComponents(buildReviewButtons(updated));
@@ -180,7 +216,10 @@ module.exports = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [container, row],
             }).catch(() => null);
-            if (!thread) return interaction.reply({ content: 'Submitted, but its review thread could not be created. Check the bot has permission to create threads in `PACKAGE_BUNDLE_CHANNEL_ID`.', ephemeral: true });
+            if (!thread) {
+                packages.updateStatus(guildId,id,pkg.status);
+                return interaction.reply({ content: 'Review thread could not be created, so the package remains **'+pkg.status+'**. Check Create Threads and Send Messages permissions.', flags: MessageFlags.Ephemeral });
+            }
 
             return interaction.reply({ content: `Package \`#${id}\` submitted in <#${thread.id}> for approval.`, ephemeral: true });
         }
@@ -212,7 +251,7 @@ module.exports = {
             if (pkg.status !== 'approved' && !perms.isStaff(interaction.member, cfg)) {
                 return interaction.reply({ content: 'This package isn\'t public yet.', ephemeral: true });
             }
-            const container = buildPackageContainer(cfg, pkg);
+            const container = buildPackageContainer(cfg, pkg, {includePrivate:perms.isStaff(interaction.member,cfg)});
             const files = collectAttachmentFiles([container]);
             return interaction.reply(withFooter({ flags: MessageFlags.IsComponentsV2, components: [container], ...(files.length ? { files } : {}), ephemeral: true }));
         }

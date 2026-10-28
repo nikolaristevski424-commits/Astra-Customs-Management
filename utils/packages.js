@@ -44,6 +44,21 @@ function updateStatus(guildId, id, status, extra = {}) {
     return updated;
 }
 
+function updateDelivery(guildId,id,changes){
+    let updated=null;
+    store.update(STORE,guildId,defaultState(),state=>{
+        const record=state.list.find(p=>p.id===Number(id));
+        if(record){
+            if(changes.deliveryText!==undefined)record.deliveryText=changes.deliveryText;
+            if(changes.deliveryLinks!==undefined)record.deliveryLinks=changes.deliveryLinks;
+            if(changes.files?.length)record.files=[...(record.files||[]),...changes.files];
+            updated=record;
+        }
+        return state;
+    });
+    return updated;
+}
+
 function setPrice(guildId, id, price, changedBy) {
     let updated = null;
     store.update(STORE, guildId, defaultState(), (state) => {
@@ -62,4 +77,4 @@ function markDelivered(guildId, id, deliveredTo) {
     return updateStatus(guildId, id, 'delivered', { deliveredAt: Date.now(), deliveredTo });
 }
 
-module.exports = { create, find, listByCreator, list, updateStatus, setPrice, markDelivered };
+module.exports = { create, find, listByCreator, list, updateStatus, updateDelivery, setPrice, markDelivered };
