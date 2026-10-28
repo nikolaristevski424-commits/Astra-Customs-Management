@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const pricelistUtil = require('../utils/pricelist');
@@ -72,7 +73,7 @@ module.exports = {
             return interaction.reply({ content: 'No priced items are configured yet.', ephemeral: true });
         }
 
-        const reply = await interaction.reply({ embeds: [buildSummaryEmbed(cfg, guildId, {})], components, ephemeral: true, fetchReply: true });
+        const reply = await interaction.reply(withFooter({ embeds: [buildSummaryEmbed(cfg, guildId, {})], components, ephemeral: true, fetchReply: true }));
         state.set(reply.id, {});
     },
 
@@ -86,6 +87,6 @@ module.exports = {
         current[section] = interaction.values;
         state.set(interaction.message.id, current);
 
-        await interaction.update({ embeds: [buildSummaryEmbed(cfg, guildId, current)] });
+        await interaction.update(withFooter({ embeds: [buildSummaryEmbed(cfg, guildId, current)] }));
     },
 };

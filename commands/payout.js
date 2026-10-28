@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
@@ -99,7 +100,7 @@ module.exports = {
             }
 
             const row = new ActionRowBuilder().addComponents(buildButtons(record));
-            await channel.send({ embeds: [buildEmbed(cfg, record)], components: [row], allowedMentions: { parse: [] } });
+            await channel.send(withFooter({ embeds: [buildEmbed(cfg, record)], components: [row], allowedMentions: { parse: [] } }));
 
             return interaction.reply({ content: `Payout request \`#${record.id}\` submitted for R$${amount}. The team will send it manually (or attempt an auto-send) and mark it paid.`, ephemeral: true });
         }

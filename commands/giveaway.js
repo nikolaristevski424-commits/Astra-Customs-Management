@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, userMention } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
@@ -173,7 +174,7 @@ module.exports = {
             }
 
             const ping = buildPing(giveaway);
-            const sent = await channel.send({ content: ping.content, embeds: [buildEmbed(cfg, giveaway)], components: [buildRow(giveaway)], allowedMentions: ping.allowedMentions });
+            const sent = await channel.send(withFooter({ content: ping.content, embeds: [buildEmbed(cfg, giveaway)], components: [buildRow(giveaway)], allowedMentions: ping.allowedMentions }));
             giveaways.attachMessage(guildId, giveaway.id, sent.id, sent.channelId);
 
             return interaction.reply({ content: `Giveaway \`#${giveaway.id}\` started for **${prize}**, ending <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`, ephemeral: true });
@@ -195,7 +196,7 @@ module.exports = {
             if (updated.channelId && updated.messageId) {
                 const channel = await interaction.client.channels.fetch(updated.channelId).catch(() => null);
                 const message = await channel?.messages.fetch(updated.messageId).catch(() => null);
-                if (message) await message.edit({ embeds: [buildEmbed(cfg, updated)], components: [buildRow(updated)] }).catch(() => {});
+                if (message) await message.edit(withFooter({ embeds: [buildEmbed(cfg, updated)], components: [buildRow(updated)] })).catch(() => {});
             }
 
             return interaction.reply({ content: winnerAnnouncement(updated,newWinners,{reroll:true}), allowedMentions: { users: newWinners } });

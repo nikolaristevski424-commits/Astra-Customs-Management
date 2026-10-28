@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const economy = require('../utils/economy');
@@ -78,6 +79,6 @@ module.exports = {
         const top = economy.leaderboard(guildId);
         if (!top.length) return interaction.reply({ content: 'No one has earned Astra Coins yet.', ephemeral: true });
         const lines = top.map((entry, index) => `**#${index + 1}** <@${entry.userId}> — 🪙 ${entry.amount.toLocaleString()}`);
-        return interaction.reply({ embeds: [new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Astra Coins Leaderboard').setDescription(lines.join('\n')).setFooter({ text: 'Astra Coins are virtual and have no Robux value.' })], allowedMentions: { users: [] } });
+        return interaction.reply(withFooter({ embeds: [new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Astra Coins Leaderboard').setDescription(lines.join('\n')).setFooter({ text: 'Astra Coins are virtual and have no Robux value.' })], allowedMentions: { users: [] } }));
     },
 };

@@ -1,3 +1,4 @@
+const { withFooter } = require('./footerBranding');
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const orders=require('./orders');
 const tickets=require('./tickets');
@@ -51,7 +52,7 @@ async function refresh(client,guildId,cfg,order){
      const channel=await client.channels.fetch(order.ticketChannelId);
      if(order.requestMessageId){
        const msg=await channel.messages.fetch(order.requestMessageId);
-       await msg.edit({embeds:[embed(cfg,order,ticket)],components:controls(order),allowedMentions:{parse:[]}});
+       await msg.edit(withFooter({embeds:[embed(cfg,order,ticket)],components:controls(order),allowedMentions:{parse:[]}}));
      }
    }catch(err){console.warn('[orderProgress] Ticket panel refresh failed #'+order.id+': '+err.message)}
  }
@@ -59,8 +60,8 @@ async function refresh(client,guildId,cfg,order){
    try{const channel=await client.channels.fetch(order.channelId);
        const msg=await channel.messages.fetch(order.messageId);
        const orderCmd=require('../commands/order');
-       await msg.edit({embeds:[orderCmd.orderEmbed(cfg,order)],
-            components:[new ActionRowBuilder().addComponents(orderCmd.orderButtons(order))]});
+       await msg.edit(withFooter({embeds:[orderCmd.orderEmbed(cfg,order)],
+            components:[new ActionRowBuilder().addComponents(orderCmd.orderButtons(order))]}));
    }catch(err){console.warn('[orderProgress] Ledger refresh failed #'+order.id+': '+err.message)}
  }
 }

@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 // Periodically checks every guild for giveaways whose timer has run
 // out, picks winners, and edits the original message to show them.
 
@@ -22,7 +23,7 @@ function start(client) {
                     try {
                         const channel = await client.channels.fetch(updated.channelId);
                         const message = await channel.messages.fetch(updated.messageId);
-                        await message.edit({ embeds: [giveawayCmd.buildEmbed(cfg, updated)], components: [giveawayCmd.buildRow(updated)] });
+                        await message.edit(withFooter({ embeds: [giveawayCmd.buildEmbed(cfg, updated)], components: [giveawayCmd.buildRow(updated)] }));
 
                         if (winners.length) {
                             await channel.send({

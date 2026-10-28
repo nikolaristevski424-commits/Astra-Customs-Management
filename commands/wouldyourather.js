@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const prompts = require('../utils/wouldyourather');
 
@@ -10,9 +11,9 @@ module.exports = {
             new ButtonBuilder().setCustomId('wyr_a').setLabel('Option A').setEmoji('🅰️').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId('wyr_b').setLabel('Option B').setEmoji('🅱️').setStyle(ButtonStyle.Primary),
         );
-        return interaction.reply({
+        return interaction.reply(withFooter({
             content: `🤔 **Would you rather...**\n🅰️ ${a}\n**or**\n🅱️ ${b}`,
             components: [row],
-        });
+        }));
     },
 };

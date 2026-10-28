@@ -17,6 +17,7 @@ const affiliations = require('./affiliate');
 const portfolio = require('../utils/portfolio');
 const { parseColor, addPanelBanner } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
+const {withFooter} = require('../utils/footerBranding');
 const { isExecutive } = require('../utils/env');
 const { APPLICATIONS, STATUSES, getStatus } = require('../utils/applicationStatus');
 
@@ -154,7 +155,7 @@ module.exports = {
                 const channel=await client.channels.fetch(record.channelId);
                 if(!channel?.messages?.fetch)continue;
                 const message=await channel.messages.fetch(record.messageId);
-                await message.edit({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)});
+                await message.edit(withFooter({flags:MessageFlags.IsComponentsV2,...BUILDERS[type](cfg,guildId)},cfg));
             }catch(error){console.warn('[panel] Refresh failed for '+type+': '+error.message);}
         }
     },

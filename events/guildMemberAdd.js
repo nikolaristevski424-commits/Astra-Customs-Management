@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 
@@ -37,7 +38,7 @@ module.exports = {
             new ButtonBuilder().setLabel('Shop').setStyle(ButtonStyle.Link).setURL(channelUrl(shopChannelId)),
         );
         await channel
-            .send({ embeds: [embed], components: [row], allowedMentions: { users: [member.id] } })
+            .send(withFooter({ embeds: [embed], components: [row], allowedMentions: { users: [member.id] } }))
             .catch((err) => console.error('[welcome] Failed to send welcome message:', err.message));
     },
 };

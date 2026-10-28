@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const ordersUtil = require('../utils/orders');
@@ -80,6 +81,6 @@ module.exports = {
         const cfg = config.getConfig(guildId);
         const embeds = [buildDashboardEmbed(cfg, guildId)];
         const files = collectAttachmentFiles(embeds);
-        return interaction.reply({ embeds, ...(files.length ? { files } : {}) });
+        return interaction.reply(withFooter({ embeds, ...(files.length ? { files } : {}) }));
     },
 };

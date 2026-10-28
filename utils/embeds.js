@@ -7,7 +7,7 @@ const {
     SeparatorBuilder,
     EmbedBuilder,
 } = require('discord.js');
-const { banner, FOOTER } = require('./brandAssets');
+const { banner } = require('./brandAssets');
 
 const BANNERS_DIR = path.join(__dirname, '..', 'assets', 'banners');
 
@@ -43,7 +43,6 @@ function addPanelBanner(container, config, bannerKey = 'dashboard') {
  */
 function buildPanel(config, { heading, body, extraBlocks = [], mention, bannerKey = 'dashboard', accentColor = config.accentColor } = {}) {
     const container = new ContainerBuilder().setAccentColor(parseColor(accentColor));
-    const footerUrl = config.footerUrl || (fs.existsSync(path.join(BANNERS_DIR, 'footer-banner.png')) ? FOOTER : null);
 
     addPanelBanner(container, config, bannerKey);
 
@@ -56,12 +55,6 @@ function buildPanel(config, { heading, body, extraBlocks = [], mention, bannerKe
     for (const block of extraBlocks) {
         container.addSeparatorComponents(new SeparatorBuilder());
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(block));
-    }
-
-    if (footerUrl) {
-        container.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems([{ media: { url: footerUrl } }])
-        );
     }
 
     return container;

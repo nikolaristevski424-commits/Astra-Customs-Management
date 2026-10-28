@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const credits = require('../utils/credits');
@@ -50,7 +51,7 @@ module.exports = {
             }
             const balance = credits.getBalance(guildId, user.id);
             const embed = new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Store Credit').setDescription(`**${user.tag}** has **R$${balance}** in store credit.`).setFooter({ text: 'Store credit is tied to real orders and is not Astra Coins.' });
-            return interaction.reply({ embeds: [embed], ephemeral: true, allowedMentions: { users: [] } });
+            return interaction.reply(withFooter({ embeds: [embed], ephemeral: true, allowedMentions: { users: [] } }));
         }
 
         if (sub === 'history') {
@@ -76,7 +77,7 @@ module.exports = {
 
             const lines = top.map((entry, i) => `**#${i + 1}** <@${entry.userId}> — R$${entry.amount}`);
             const embed = new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Store Credit Leaderboard').setDescription(lines.join('\n'));
-            return interaction.reply({ embeds: [embed], allowedMentions: { users: [] } });
+            return interaction.reply(withFooter({ embeds: [embed], allowedMentions: { users: [] } }));
         }
 
         if (!perms.isCreditManager(interaction.member, cfg)) {

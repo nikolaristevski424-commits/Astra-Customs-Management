@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../utils/config');
 const { isExecutive } = require('../utils/env');
@@ -68,7 +69,7 @@ module.exports = {
         const memberCount = members.length;
         let message;
         try {
-            message = await interaction.channel.send({ embeds: [buildEmbed(cfg, record, memberCount)], components: [buildRow(record)] });
+            message = await interaction.channel.send(withFooter({ embeds: [buildEmbed(cfg, record, memberCount)], components: [buildRow(record)] }));
         } catch (error) {
             activity.cancel(interaction.guildId, record.id);
             console.error(`[activity] Could not post activity check #${record.id}:`, error.message);

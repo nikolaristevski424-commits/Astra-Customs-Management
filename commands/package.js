@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const {
     SlashCommandBuilder,
     ActionRowBuilder,
@@ -213,7 +214,7 @@ module.exports = {
             }
             const container = buildPackageContainer(cfg, pkg);
             const files = collectAttachmentFiles([container]);
-            return interaction.reply({ flags: MessageFlags.IsComponentsV2, components: [container], ...(files.length ? { files } : {}), ephemeral: true });
+            return interaction.reply(withFooter({ flags: MessageFlags.IsComponentsV2, components: [container], ...(files.length ? { files } : {}), ephemeral: true }));
         }
     },
 };

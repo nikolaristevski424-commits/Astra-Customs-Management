@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 // Closes activity checks after 24 hours and records a Notice for each
 // member who was in the selected role when the check was posted but did
 // not respond before the deadline.
@@ -87,10 +88,10 @@ async function processCheck(client, guildId, guild, cfg, record) {
             const messageChannel = await client.channels.fetch(record.channelId);
             const message = await messageChannel.messages.fetch(record.messageId);
             const updatedRecord = activity.find(guildId, record.id);
-            await message.edit({
+            await message.edit(withFooter({
                 embeds: [activityCmd.buildEmbed(cfg, updatedRecord, targetIds.length)],
                 components: [activityCmd.buildRow(updatedRecord)],
-            });
+            }));
         } catch (error) {
             console.error(`[activityCheckExpiry] Could not close activity check #${record.id} in guild ${guildId}:`, error.message);
         }

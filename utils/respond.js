@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { AttachmentBuilder } = require('discord.js');
+const {withFooter} = require('./footerBranding');
 
 // For "panel"-style commands (pricelist, portfolio, tax, dashboard, etc.)
 // the user wants the channel to just show the resulting embed/panel, not
@@ -49,8 +50,9 @@ function collectAttachmentFiles(value, files = [], seen = new Set()) {
 }
 
 async function sendWithAttachments(destination, payload) {
-    const files = collectAttachmentFiles(payload);
-    const messagePayload = files.length ? { ...payload, files } : payload;
+    const branded = withFooter(payload);
+    const files = collectAttachmentFiles(branded);
+    const messagePayload = files.length ? { ...branded, files } : branded;
     return destination.send(messagePayload);
 }
 

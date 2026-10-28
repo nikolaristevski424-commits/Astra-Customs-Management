@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
 const loa = require('../utils/loa');
@@ -51,7 +52,7 @@ async function submitRequest(interaction, { startInput, endInput, reason }) {
         new ButtonBuilder().setCustomId(`loa_deny_${record.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
     );
 
-    if (channel) await channel.send({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
+    if (channel) await channel.send(withFooter({ embeds: [embed], components: [row], allowedMentions: { parse: [] } }));
     return { ok: true, message: `LOA request submitted. ID: \`${record.id}\`` };
 }
 

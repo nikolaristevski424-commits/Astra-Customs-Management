@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
@@ -10,6 +11,6 @@ module.exports = {
         const target = interaction.options.getUser('user') || interaction.user;
         const url = target.displayAvatarURL({ extension: 'png', size: 1024 });
         const embed = new EmbedBuilder().setTitle(`${target.username}'s avatar`).setImage(url).setColor(0x2d2d31);
-        return interaction.reply({ embeds: [embed] });
+        return interaction.reply(withFooter({ embeds: [embed] }));
     },
 };

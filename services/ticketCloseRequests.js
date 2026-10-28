@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const config = require('../utils/config');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
@@ -24,10 +25,10 @@ async function processDueRequests(client, now = Date.now()) {
                     const channel = await client.channels.fetch(ticket.channelId).catch(() => null);
                     const message = await channel?.messages?.fetch(request.messageId).catch(() => null);
                     if (message) {
-                        await message.edit({
+                        await message.edit(withFooter({
                             content: 'No one responded to the close request within 24 hours. This ticket is now closing.',
                             components: [],
-                        }).catch((error) => {
+                        })).catch((error) => {
                             console.error(`[ticketCloseRequests] Could not update close request ${request.messageId}:`, error.message);
                         });
                     }

@@ -1,3 +1,4 @@
+const { withFooter } = require('./footerBranding');
 const {ActionRowBuilder,StringSelectMenuBuilder,ModalBuilder,TextInputBuilder,TextInputStyle,ChannelType,PermissionsBitField,MessageFlags,ButtonBuilder,ButtonStyle} = require('discord.js');
 const config=require('./config'), tickets=require('./tickets'), orders=require('./orders'), progress=require('./orderProgress');
 const catalog=require('./catalog'), service=require('./serviceAvailability');
@@ -12,7 +13,7 @@ function categories(cfg){
  );
 }
 async function start(interaction){
- return interaction.reply({flags:ephemeral,content:'**Astra Customs — Place an Order**\nSelect a service. Read the [Terms of Service]('+TERMS+') before continuing.',components:[categories(config.getConfig(interaction.guildId))]});
+ return interaction.reply(withFooter({flags:ephemeral,content:'**Astra Customs — Place an Order**\nSelect a service. Read the [Terms of Service]('+TERMS+') before continuing.',components:[categories(config.getConfig(interaction.guildId))]}));
 }
 async function category(interaction){
  const type=interaction.values?.[0],cfg=config.getConfig(interaction.guildId),group=catalog.TYPES[type];
@@ -20,8 +21,8 @@ async function category(interaction){
  if(!open(cfg,type))return interaction.reply({flags:ephemeral,content:group.label+' orders are currently '+service.status(cfg,type)+'. Please use support for questions.'});
  const menu=new StringSelectMenuBuilder().setCustomId('astra_order_item_'+type).setPlaceholder('Choose your product...')
    .addOptions(group.items.map(([id,name,price])=>({label:name.slice(0,100),value:id,description:price===null?'Staff quote required':'R$'+price+' per item'})));
- return interaction.reply({flags:ephemeral,content:'**'+group.label+'**\nChoose a product. We will show an estimate before payment; complex orders need designer approval.\n[Terms of Service]('+TERMS+')',
- components:[new ActionRowBuilder().addComponents(menu)]});
+ return interaction.reply(withFooter({flags:ephemeral,content:'**'+group.label+'**\nChoose a product. We will show an estimate before payment; complex orders need designer approval.\n[Terms of Service]('+TERMS+')',
+ components:[new ActionRowBuilder().addComponents(menu)]}));
 }
 async function item(interaction){
  const type=interaction.customId.slice('astra_order_item_'.length),p=catalog.byId(interaction.values?.[0]);
@@ -77,9 +78,9 @@ async function modal(interaction){
   new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Close').setStyle(ButtonStyle.Danger)
  );
  try{
-  const sent=await channel.send({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),
+  const sent=await channel.send(withFooter({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),
     embeds:[progress.embed(cfg,record,tickets.get(interaction.guildId,channel.id))],
-    components:progress.controls(record),allowedMentions:{users:[interaction.user.id],roles:guild.roles.cache.has(p.role)?[p.role]:[]}});
+    components:progress.controls(record),allowedMentions:{users:[interaction.user.id],roles:guild.roles.cache.has(p.role)?[p.role]:[]}}));
   orders.updateOrder(interaction.guildId,record.id,{requestMessageId:sent.id});
   tickets.update(interaction.guildId,channel.id,{orderMessageId:sent.id});
   await channel.send({content:'**Before you continue:** Please read our Terms of Service: '+TERMS+'\nRoblox shop: '+SHOP+'\nA designer will confirm your final price before payment.'});

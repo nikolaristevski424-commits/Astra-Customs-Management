@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
@@ -124,7 +125,7 @@ module.exports = {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setLabel(assetType === 'gamepass' ? 'Open Game Pass' : 'Open Asset').setStyle(ButtonStyle.Link).setURL(link)
             );
-            return interaction.editReply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
+            return interaction.editReply(withFooter({ embeds: [embed], components: [row], allowedMentions: { parse: [] } }));
         }
 
         if (!pool.getPoolIds().length) {
@@ -145,7 +146,7 @@ module.exports = {
 
         if (group === 'verify' && sub === 'link') {
             const id = interaction.options.getString('gamepass_id', true);
-            return interaction.reply({ content: buildLinkMessage(cfg, id), components: [buildLinkButtons(cfg, id)] });
+            return interaction.reply(withFooter({ content: buildLinkMessage(cfg, id), components: [buildLinkButtons(cfg, id)] }));
         }
 
         if (sub === 'create') {
@@ -217,7 +218,7 @@ module.exports = {
                 }
             }
 
-            return interaction.editReply({ content: buildLinkMessage(cfg, gamePassId, finalPrice, discount ? { original: price, savings: discount.savings, code: discount.code } : null), components: [buildLinkButtons(cfg, gamePassId)] });
+            return interaction.editReply(withFooter({ content: buildLinkMessage(cfg, gamePassId, finalPrice, discount ? { original: price, savings: discount.savings, code: discount.code } : null), components: [buildLinkButtons(cfg, gamePassId)] }));
         }
     },
 };

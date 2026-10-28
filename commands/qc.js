@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, userMention, ChannelType } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
@@ -79,12 +80,12 @@ module.exports = {
 
         const row = new ActionRowBuilder().addComponents(buildButtons(record));
         const qcMention = cfg.qcRoleIds.length ? cfg.qcRoleIds.map((id) => `<@&${id}>`).join(' ') : '';
-        const sent = await channel.send({
+        const sent = await channel.send(withFooter({
             content: `${qcMention} ${userMention(interaction.user.id)}`.trim(),
             embeds: [buildEmbed(cfg, record)],
             components: [row],
             allowedMentions: { roles: cfg.qcRoleIds, users: [interaction.user.id] },
-        });
+        }));
 
         qualityControl.attachMessage(guildId, record.id, sent.id, sent.channelId);
 

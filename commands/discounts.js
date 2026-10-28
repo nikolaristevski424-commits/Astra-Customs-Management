@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const discounts = require('../utils/discounts');
@@ -26,7 +27,7 @@ module.exports = {
             const active = discounts.list(guildId);
             if (!active.length) return interaction.reply({ content: 'There are no active discount codes right now.', ephemeral: true });
             const lines = active.map((d) => `**${d.code}** — ${display(d)} — ${d.maxUses - d.uses} use(s) left — expires <t:${Math.floor(d.expiresAt / 1000)}:R>`);
-            return interaction.reply({ embeds: [new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Active Discount Codes').setDescription(lines.join('\n')).setFooter({ text: 'Discounts apply to eligible order subtotals only.' })], ephemeral: true });
+            return interaction.reply(withFooter({ embeds: [new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle('Active Discount Codes').setDescription(lines.join('\n')).setFooter({ text: 'Discounts apply to eligible order subtotals only.' })], ephemeral: true }));
         }
 
         if (sub === 'redeem') {

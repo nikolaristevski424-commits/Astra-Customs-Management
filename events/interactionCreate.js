@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const {
     Events,
     MessageFlags,
@@ -111,7 +112,7 @@ async function handleButton(interaction) {
         const updated = activityUtil.addVote(guildId, id, interaction.user.id);
         if (!updated) return interaction.reply({ content: 'This activity check is closed.', ephemeral: true });
         const memberCount = record.targetIds?.length || 0;
-        await interaction.update({ embeds: [activityCmd.buildEmbed(cfg, updated, memberCount)], components: [activityCmd.buildRow(updated)] });
+        await interaction.update(withFooter({ embeds: [activityCmd.buildEmbed(cfg, updated, memberCount)], components: [activityCmd.buildRow(updated)] }));
         return;
     }
 
@@ -140,7 +141,7 @@ async function handleButton(interaction) {
         const updated = orders.updateOrder(guildId, id, { status: newStatus,statusUpdatedAt:Date.now() });
         await orderProgress.refresh(interaction.client,guildId,cfg,updated);
 
-        await interaction.update({ embeds: [orderCmd.orderEmbed(cfg, updated)], components: [new ActionRowBuilder().addComponents(orderCmd.orderButtons(updated))] });
+        await interaction.update(withFooter({ embeds: [orderCmd.orderEmbed(cfg, updated)], components: [new ActionRowBuilder().addComponents(orderCmd.orderButtons(updated))] }));
         if (newStatus === 'Void') await interaction.followUp({ content: `Order **#${id}** has been marked **VOIDED** by <@${interaction.user.id}>.`, allowedMentions: { users: [interaction.user.id] } });
         return;
     }
@@ -165,7 +166,7 @@ async function handleButton(interaction) {
                 return interaction.reply({ content: 'You do not have permission to delete this.', ephemeral: true });
             }
             jobsUtil.deleteInstance(guildId, orderNumber, instanceNum);
-            return interaction.update({ content: `Instance ${instanceNum} of Order ${orderNumber} deleted.`, embeds: [], components: [] });
+            return interaction.update(withFooter({ content: `Instance ${instanceNum} of Order ${orderNumber} deleted.`, embeds: [], components: [] }));
         }
 
         if (customId.startsWith('job_request_')) {
@@ -185,11 +186,11 @@ async function handleButton(interaction) {
                     new ButtonBuilder().setCustomId(`jobreq_accept_${orderNumber}_${instanceNum}`).setLabel('Assign Designer').setEmoji('✅').setStyle(ButtonStyle.Success),
                     new ButtonBuilder().setCustomId(`jobreq_deny_${orderNumber}_${instanceNum}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
                 );
-                await reviewChannel.send({
+                await reviewChannel.send(withFooter({
                     content: `<@${interaction.user.id}> is requesting Order ${orderNumber} (instance ${instanceNum}/${job.instances.length}, **${job.type}**).`,
                     components: [row],
                     allowedMentions: { parse: [] },
-                });
+                }));
             }
 
             return interaction.reply({ content: `Request sent for Order ${orderNumber}. A supervisor will review it shortly.`, ephemeral: true });
@@ -206,7 +207,7 @@ async function handleButton(interaction) {
         const found = jobsUtil.findInstance(guildId, orderNumber, instanceNum);
         if (!found) {
             const disabled = disableAllButtons(interaction.message.components);
-            await interaction.update({ components: disabled });
+            await interaction.update(withFooter({ components: disabled }));
             return interaction.followUp({ content: 'That job instance no longer exists.', ephemeral: true });
         }
 
@@ -222,7 +223,7 @@ async function handleButton(interaction) {
           .setDescription('**Order #'+orderNumber+' · Instance '+instanceNum+'**\n'+(approve?'✅ The designer has been assigned.':'❌ The request was declined; the job is open for other designers.'))
           .addFields({name:'Requested by',value:'<@'+requesterId+'>',inline:true},{name:'Reviewed by',value:'<@'+interaction.user.id+'>',inline:true})
           .setTimestamp();
-        await interaction.update({content:null,embeds:[e],components:disabled,allowedMentions:{parse:[]}});
+        await interaction.update(withFooter({content:null,embeds:[e],components:disabled,allowedMentions:{parse:[]}}));
         return;
     }
 
@@ -240,7 +241,7 @@ async function handleButton(interaction) {
 
         const embed = bundleCmd.buildEmbed(cfg, updated);
         const buttons = bundleCmd.buildButtons(updated);
-        await interaction.update({ embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] });
+        await interaction.update(withFooter({ embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] }));
 
         return;
     }
@@ -259,7 +260,7 @@ async function handleButton(interaction) {
 
         const container = packageCmd.buildPackageContainer(cfg, updated);
         const buttons = packageCmd.buildReviewButtons(updated);
-        await interaction.update({ components: buttons.length ? [container, new ActionRowBuilder().addComponents(buttons)] : [container] });
+        await interaction.update(withFooter({ components: buttons.length ? [container, new ActionRowBuilder().addComponents(buttons)] : [container] }));
         return;
     }
 
@@ -341,7 +342,7 @@ async function handleButton(interaction) {
         });
         const row = new ActionRowBuilder().addComponents(payoutCmd.buildButtons(updated));
         try {
-            await interaction.message.edit({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] });
+            await interaction.message.edit(withFooter({ embeds: [payoutCmd.buildEmbed(cfg, updated)], components: payoutCmd.buildButtons(updated).length ? [row] : [] }));
         } catch (error) {
             console.error(`[payout] Auto-send succeeded for request #${id}, but its message could not be updated:`, error);
         }
@@ -362,7 +363,7 @@ async function handleButton(interaction) {
         if (updated.reactedUserIds.length >= updated.goal) {
             releasesUtil.updateStatus(guildId, id, 'reached');
             const finalRelease = releasesUtil.find(guildId, id);
-            await interaction.update({ embeds: [releaseCmd.buildEmbed(cfg, finalRelease)], components: [] });
+            await interaction.update(withFooter({ embeds: [releaseCmd.buildEmbed(cfg, finalRelease)], components: [] }));
 
             if(finalRelease.text){
                 const chunks=finalRelease.text.match(/[\s\S]{1,1700}/g)||[];
@@ -390,7 +391,7 @@ async function handleButton(interaction) {
             return;
         }
 
-        await interaction.update({ embeds: [releaseCmd.buildEmbed(cfg, updated)], components: [releaseCmd.buildRow(updated)] });
+        await interaction.update(withFooter({ embeds: [releaseCmd.buildEmbed(cfg, updated)], components: [releaseCmd.buildRow(updated)] }));
         return;
     }
 
@@ -425,10 +426,10 @@ async function handleButton(interaction) {
         await interaction.editReply(leaving
             ? 'You left the giveaway for **'+giveaway.prize+'**. Your entry has been removed.'
             : 'You entered the giveaway for **'+giveaway.prize+'**! Current odds: **'+(odds===null?'N/A':odds.toFixed(2)+'%')+'** (may change as others join or leave).');
-        await interaction.message.edit({
+        await interaction.message.edit(withFooter({
             embeds: [giveawayCmd.buildEmbed(cfg, updated)],
             components: [giveawayCmd.buildRow(updated)],
-        }).catch(error=>console.warn('[giveaway] Could not refresh the public giveaway display:',error.message));
+        })).catch(error=>console.warn('[giveaway] Could not refresh the public giveaway display:',error.message));
         return;
     }
 
@@ -449,7 +450,7 @@ async function handleButton(interaction) {
         }
 
         const disabled = disableAllButtons(interaction.message.components);
-        await interaction.update({ components: disabled });
+        await interaction.update(withFooter({ components: disabled }));
         await interaction.followUp({ content: `LOA \`${id}\` ${approve ? 'approved' : 'denied'} by <@${interaction.user.id}>.`, allowedMentions: { parse: [] } });
         return;
     }
@@ -556,7 +557,7 @@ async function handleButton(interaction) {
                   footer: { text: `Ticket ID: ${channelId}` },
               };
         if(updated.type==='order' && updated.orderId)return interaction.editReply('Order claimed. Your assignment is now visible on the order progress panel.');
-        await interaction.message.edit({embeds:[embed],components:interaction.message.components});
+        await interaction.message.edit(withFooter({embeds:[embed],components:interaction.message.components}));
         return interaction.editReply('Ticket successfully claimed.');
     }
 
@@ -574,16 +575,16 @@ async function handleButton(interaction) {
         }
         if (Date.now() >= ticket.closeRequest.deadlineAt) {
             tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'auto-closing', resolvedAt: Date.now() } });
-            await interaction.update({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] });
+            await interaction.update(withFooter({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] }));
             await closeTicket(interaction.client, guildId, cfg, channelId, 'automatic 24-hour timeout');
             return;
         }
         tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'kept-open', resolvedBy: interaction.user.id, resolvedAt: Date.now() } });
-        await interaction.update({
+        await interaction.update(withFooter({
             content: `Ticket kept open by <@${interaction.user.id}>.`,
             components: [],
             allowedMentions: { users: [] },
-        });
+        }));
         return;
     }
 
@@ -601,18 +602,18 @@ async function handleButton(interaction) {
         }
         if (Date.now() >= ticket.closeRequest.deadlineAt) {
             tickets.update(guildId, channelId, { closeRequest: { ...ticket.closeRequest, status: 'auto-closing', resolvedAt: Date.now() } });
-            await interaction.update({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] });
+            await interaction.update(withFooter({ content: 'The 24-hour close request expired. This ticket is now closing.', components: [] }));
             await closeTicket(interaction.client, guildId, cfg, channelId, 'automatic 24-hour timeout');
             return;
         }
         tickets.update(guildId, channelId, {
             closeRequest: { ...ticket.closeRequest, status: 'closed-now', resolvedBy: interaction.user.id, resolvedAt: Date.now() },
         });
-        await interaction.update({
+        await interaction.update(withFooter({
             content: `Ticket closure confirmed by <@${interaction.user.id}>. Closing now and preparing the transcript.`,
             components: [],
             allowedMentions: { users: [] },
-        });
+        }));
         await closeTicket(interaction.client, guildId, cfg, channelId, interaction.user.id);
         return;
     }
@@ -623,7 +624,7 @@ async function handleButton(interaction) {
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
         }
-        await interaction.update({ content: 'Closing this ticket and preparing the transcript...', components: [] });
+        await interaction.update(withFooter({ content: 'Closing this ticket and preparing the transcript...', components: [] }));
         await closeTicket(interaction.client, guildId, cfg, channelId, interaction.user.id);
         return;
     }
@@ -634,7 +635,7 @@ async function handleButton(interaction) {
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to cancel this close action.', ephemeral: true });
         }
-        await interaction.update({ content: `Close cancelled by <@${interaction.user.id}>.`, components: [], allowedMentions: { users: [] } });
+        await interaction.update(withFooter({ content: `Close cancelled by <@${interaction.user.id}>.`, components: [], allowedMentions: { users: [] } }));
         return;
     }
 
@@ -648,7 +649,7 @@ async function handleButton(interaction) {
             new ButtonBuilder().setCustomId(`ticket_close_confirm_${channelId}`).setLabel('Confirm Close').setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`ticket_close_cancel_${channelId}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
         );
-        return interaction.reply({ content: 'Are you sure you want to close this ticket?', components: [row], ephemeral: false });
+        return interaction.reply(withFooter({ content: 'Are you sure you want to close this ticket?', components: [row], ephemeral: false }));
     }
 
     // ---- Quality control: accept/deny ----
@@ -664,7 +665,7 @@ async function handleButton(interaction) {
 
         const embed = qcCmd.buildEmbed(cfg, updated);
         const buttons = qcCmd.buildButtons(updated);
-        await interaction.update({ embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] });
+        await interaction.update(withFooter({ embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] }));
         return;
     }
 }
@@ -723,7 +724,7 @@ async function handleModal(interaction) {
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
         );
-        await channel.send({
+        await channel.send(withFooter({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
             embeds: [{
                 title: 'New Order Request',
@@ -743,7 +744,7 @@ async function handleModal(interaction) {
             }],
             components: [row],
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
-        });
+        }));
         return interaction.editReply(`Your order request is ready: <#${channel.id}>`);
     }
 
@@ -784,7 +785,7 @@ async function handleModal(interaction) {
             new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Close').setStyle(ButtonStyle.Danger),
         );
 
-        await channel.send({
+        await channel.send(withFooter({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
             embeds: [
                 {
@@ -800,7 +801,7 @@ async function handleModal(interaction) {
             ],
             components: [row],
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
-        });
+        }));
 
         await channel.send({content:'**Astra Customs | Terms of Service**\nPlease read before continuing: https://astra-customs-terms.vercel.app/\nA team member will respond soon.',allowedMentions:{parse:[]}});
         await interaction.editReply(`Ticket opened: <#${channel.id}>`);
@@ -836,10 +837,10 @@ async function handleModal(interaction) {
         try {
             const channel = await interaction.client.channels.fetch(channelId);
             const requestMessage = await channel.messages.fetch(messageId);
-            await requestMessage.edit({
+            await requestMessage.edit(withFooter({
                 embeds: [payoutCmd.buildEmbed(cfg, updated)],
                 components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [],
-            });
+            }));
             panelUpdated = true;
         } catch (error) {
             console.error(`[payout] Updated request #${id}, but could not update its message:`, error);
@@ -848,14 +849,14 @@ async function handleModal(interaction) {
         const statusColor = paid ? 0x2ecc71 : 0xe74c3c;
         try {
             const requester = await interaction.client.users.fetch(record.requestedBy);
-            await requester.send({
+            await requester.send(withFooter({
                 embeds: [new EmbedBuilder()
                     .setColor(statusColor)
                     .setTitle(`Payout Request ${paid ? 'Paid' : 'Denied'}`)
                     .setDescription(`Your payout request **#${id}** for **R$${record.amount}** has been ${paid ? 'paid' : 'denied'}.`)
                     .addFields({ name: 'Decision reason', value: decisionReason }, { name: 'Reviewed by', value: `<@${interaction.user.id}>`, inline: true })
                     .setTimestamp()],
-            });
+            }));
         } catch (error) {
             console.warn(`[payout] Could not notify requester ${record.requestedBy} about request #${id}:`, error.message);
         }
@@ -907,10 +908,10 @@ async function handleModal(interaction) {
             .setTimestamp();
 
         try {
-            await applicationMessage.edit({
+            await applicationMessage.edit(withFooter({
                 embeds: [updatedEmbed],
                 components: disableAllButtons(applicationMessage.components),
-            });
+            }));
         } catch (error) {
             console.error(`[applications] Could not update the original application for ${applicantId}:`, error);
             return interaction.reply({ content: 'The decision could not be applied to the application message. No result notification was sent.', flags: MessageFlags.Ephemeral });
@@ -941,7 +942,7 @@ async function handleModal(interaction) {
         if (cfg.applicationResultsChannelId) {
             try {
                 const resultsChannel = await interaction.client.channels.fetch(cfg.applicationResultsChannelId);
-                await resultsChannel.send({ embeds: [resultEmbed] });
+                await resultsChannel.send(withFooter({ embeds: [resultEmbed] }));
             } catch (error) {
                 console.error(`[applications] Could not post the decision result for applicant ${applicantId}:`, error);
             }
@@ -949,7 +950,7 @@ async function handleModal(interaction) {
 
         try {
             const applicant = await interaction.client.users.fetch(applicantId);
-            await applicant.send({
+            await applicant.send(withFooter({
                 embeds: [new EmbedBuilder()
                     .setColor(color)
                     .setTitle(`Application ${status}`)
@@ -959,7 +960,7 @@ async function handleModal(interaction) {
                         { name: 'Reviewed by', value: reviewerMention, inline: true },
                     )
                     .setTimestamp()],
-            });
+            }));
         } catch (error) {
             console.warn(`[applications] Could not DM applicant ${applicantId} about the decision:`, error.message);
         }
@@ -1010,12 +1011,12 @@ async function handleModal(interaction) {
             );
         }
         try {
-            await channel.send({
+            await channel.send(withFooter({
                 content: cfg.applicationReviewerRoleIds.length ? cfg.applicationReviewerRoleIds.map((roleId) => `<@&${roleId}>`).join(' ') : undefined,
                 embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
                 components: [row],
                 allowedMentions: { roles: cfg.applicationReviewerRoleIds },
-            });
+            }));
         } catch (error) {
             console.error('[applications] Failed to send application:', error.message);
             return interaction.editReply('Your application could not be delivered. Please contact an administrator to check the applications channel permissions.');
@@ -1067,7 +1068,7 @@ async function handleModal(interaction) {
             if (reviewMessage) {
                 const container = packageCmd.buildPackageContainer(cfg, updated);
                 const buttons = packageCmd.buildReviewButtons(updated);
-                await reviewMessage.edit({ components: buttons.length ? [container, new ActionRowBuilder().addComponents(buttons)] : [container] }).catch(() => {});
+                await reviewMessage.edit(withFooter({ components: buttons.length ? [container, new ActionRowBuilder().addComponents(buttons)] : [container] })).catch(() => {});
             }
         }
 

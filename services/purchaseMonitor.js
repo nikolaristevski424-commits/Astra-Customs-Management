@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 // Astra Customs payment tracking. Roblox may return 5xx; never interpret those as a successful or failed purchase.
 // Persistent receipts prevent credits, logs and delivery from being replayed on every retry.
 const axios = require('axios');
@@ -170,7 +171,7 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
         {name:'Verification',value:receipt.verification,inline:true},
       ]
     });
-    const message=await target.send({embeds:[record],allowedMentions:{parse:[]}});
+    const message=await target.send(withFooter({embeds:[record],allowedMentions:{parse:[]}}));
     receipt=receipts.update(guildId,key,{logged:true,logMessageId:message.id});
   }
   if(!receipt.credited && receipt.creditAttempted) {

@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const { parseColor } = require('../utils/embeds');
@@ -32,6 +33,6 @@ module.exports = {
             .setTitle(`${cfg.brandName} — Commands`)
             .setDescription(`Staff can also use \`${cfg.prefix}orderstatus\`, \`${cfg.prefix}tickets\`, \`${cfg.prefix}order\`, or \`${cfg.prefix}applications\` as shortcuts for the retained panels.`)
             .addFields(CATEGORIES);
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply(withFooter({ embeds: [embed], ephemeral: true }));
     },
 };

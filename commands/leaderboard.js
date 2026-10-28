@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../utils/config');
 const credits = require('../utils/credits');
@@ -75,7 +76,7 @@ module.exports = {
                 (entry) => `<@${entry.userId}> — R$${entry.total}`,
                 'No designer earnings have been logged yet.'
             );
-            return interaction.reply({ embeds: [embed], allowedMentions: { users: [] } });
+            return interaction.reply(withFooter({ embeds: [embed], allowedMentions: { users: [] } }));
         }
 
         const entries = buildCreditLeaderboard(guildId, limit);
@@ -86,6 +87,6 @@ module.exports = {
             (entry) => `<@${entry.userId}> — R$${entry.amount}`,
             'No one has store credit yet.'
         );
-        return interaction.reply({ embeds: [embed], allowedMentions: { users: [] } });
+        return interaction.reply(withFooter({ embeds: [embed], allowedMentions: { users: [] } }));
     },
 };

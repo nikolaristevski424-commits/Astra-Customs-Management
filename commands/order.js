@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const {
     SlashCommandBuilder,
     EmbedBuilder,
@@ -64,10 +65,10 @@ async function refreshOrderMessage(client, cfg, order) {
     try {
         const channel = await client.channels.fetch(order.channelId);
         const message = await channel.messages.fetch(order.messageId);
-        await message.edit({
+        await message.edit(withFooter({
             embeds: [orderEmbed(cfg, order)],
             components: [new ActionRowBuilder().addComponents(orderButtons(order))],
-        });
+        }));
     } catch (err) {
         console.error('[order] Failed to refresh order message:', err.message);
     }
@@ -217,11 +218,11 @@ module.exports = {
                         ].join('\n')
                     )
                 );
-                await channel.send({
+                await channel.send(withFooter({
                     flags: MessageFlags.IsComponentsV2,
                     components: [container],
                     allowedMentions: { roles: [designerRole.id], users: [interaction.user.id] },
-                });
+                }));
             }
 
             return interaction.editReply(`Job \`${job.orderNumber}\` posted with ${quantity} open instance(s).`);
@@ -237,7 +238,7 @@ module.exports = {
                 const job = jobs.findJob(guildId, item.orderNumber);
                 const instance = job.instances.find((i) => i.instance === item.instance);
                 const row = new ActionRowBuilder().addComponents(jobInstanceButtons(job, instance));
-                await interaction.followUp({ embeds: [jobInstanceEmbed(cfg, job, instance)], components: [row], ephemeral: true });
+                await interaction.followUp(withFooter({ embeds: [jobInstanceEmbed(cfg, job, instance)], components: [row], ephemeral: true }));
             }
             return;
         }
@@ -274,7 +275,7 @@ module.exports = {
             }
 
             const row = new ActionRowBuilder().addComponents(orderButtons(created));
-            const sent = await channel.send({ embeds: [orderEmbed(cfg, created)], components: [row] });
+            const sent = await channel.send(withFooter({ embeds: [orderEmbed(cfg, created)], components: [row] }));
             orders.updateOrder(guildId, created.id, { channelId: sent.channelId, messageId: sent.id });
 
             return interaction.editReply(`Order \`#${created.id}\` logged. Designer earning: R$${designerEarning}.`);
@@ -299,7 +300,7 @@ module.exports = {
                 await progress.refresh(interaction.client,guildId,cfg,updated);
               } else return interaction.editReply('Invalid transition from **'+order.status+'** to **'+status+'**. Move through the order stages in sequence.');
             }catch(error){return interaction.editReply('Could not update order status: '+error.message);}
-            return interaction.editReply({ content: `Order \`#${id}\` status set to **${status}**.`, embeds: [orderEmbed(cfg, updated)] });
+            return interaction.editReply(withFooter({ content: `Order \`#${id}\` status set to **${status}**.`, embeds: [orderEmbed(cfg, updated)] }));
         }
 
         if (sub === 'status') {
@@ -307,14 +308,14 @@ module.exports = {
             const order = orders.findOrder(guildId, id);
             if (!order) return interaction.reply({ content: `No order found with ID \`#${id}\`.`, ephemeral: true });
             if(order.customerId!==interaction.user.id && !perms.isStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg))return interaction.reply({content:'You can only view your own orders.',flags:64});
-            return interaction.reply({ content: `Current status for order \`#${id}\`: **${order.status}**`, embeds: [orderEmbed(cfg, order)], ephemeral: true });
+            return interaction.reply(withFooter({ content: `Current status for order \`#${id}\`: **${order.status}**`, embeds: [orderEmbed(cfg, order)], ephemeral: true }));
         }
 
         if (sub === 'view') {
             const id = interaction.options.getInteger('order_id', true);
             const order = orders.findOrder(guildId, id);
             if (!order) return interaction.reply({ content: `No order found with ID \`#${id}\`.`, ephemeral: true });
-            return interaction.reply({ embeds: [orderEmbed(cfg, order)], ephemeral: true });
+            return interaction.reply(withFooter({ embeds: [orderEmbed(cfg, order)], ephemeral: true }));
         }
 
         if (sub === 'history') {
@@ -340,7 +341,7 @@ module.exports = {
                 .setDescription(lines.join('\n'))
                 .setFooter({ text: `Showing ${lines.length} of ${results.length} matching orders` });
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.reply(withFooter({ embeds: [embed], ephemeral: true }));
         }
 
         if (sub === 'reset') {

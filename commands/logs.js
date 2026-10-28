@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, EmbedBuilder, userMention } = require('discord.js');
 const config = require('../utils/config');
 const hr = require('../utils/hr');
@@ -67,6 +68,6 @@ module.exports = {
             return embed;
         });
 
-        return interaction.reply({ embeds, ephemeral: true, allowedMentions: { users: [] } });
+        return interaction.reply(withFooter({ embeds, ephemeral: true, allowedMentions: { users: [] } }));
     },
 };

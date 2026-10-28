@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder } = require('discord.js');
 const config = require('../utils/config');
 const hr = require('../utils/hr');
@@ -135,7 +136,7 @@ module.exports = {
                                 heading: 'Infraction Voided',
                                 details: `Infraction \`${id}\` for <@${removed.userId}> has been voided.`,
                             });
-                            await panelMessage.reply({
+                            await panelMessage.reply(withFooter({
                                 embeds: [{
                                     title: 'Infraction Voided',
                                     description: `Infraction \`${id}\` for <@${removed.userId}> has been voided.`,
@@ -147,7 +148,7 @@ module.exports = {
                                     timestamp: new Date().toISOString(),
                                 }],
                                 allowedMentions: { parse: [] },
-                            });
+                            }));
                             announcementUpdated = true;
                         } catch (error) {
                             announcementError = error;

@@ -1,3 +1,4 @@
+const { withFooter } = require('../utils/footerBranding');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
@@ -41,11 +42,11 @@ module.exports = {
                 .setLabel('Keep Ticket Open')
                 .setStyle(ButtonStyle.Secondary),
         );
-        await interaction.reply({
+        await interaction.reply(withFooter({
             content: `A ticket close request was opened by <@${interaction.user.id}>. Choose an option below; if no one responds, this ticket will automatically close <t:${Math.floor(deadlineAt / 1000)}:R>.`,
             components: [row],
             allowedMentions: { users: [interaction.user.id] },
-        });
+        }));
         const message = await interaction.fetchReply();
         tickets.update(interaction.guildId, interaction.channelId, {
             closeRequest: {
