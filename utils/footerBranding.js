@@ -1,49 +1,81 @@
-const { EmbedBuilder, MediaGalleryBuilder, MessageFlags } = require('discord.js');
+const { EmbedBuilder, ContainerBuilder, ActionRowBuilder, MediaGalleryBuilder, MessageFlags } = require('discord.js');
 
-// A stable publicly accessible copy of the Astra-branded asset already in assets/banners.
-// Set FOOTER_URL in the host environment to replace this image without editing code.
+// Publicly accessible Astra Customs asset. Override via FOOTER_URL if desired.
 const DEFAULT_FOOTER_URL =
   'https://raw.githubusercontent.com/nikolaristevski424-commits/Astra-Customs-Management/main/assets/banners/footer-banner.png';
 
 function footerUrl(cfg = {}) {
   return cfg.footerUrl || process.env.FOOTER_URL || DEFAULT_FOOTER_URL;
 }
-function isFooterImage(embed, url) {
-  const data = typeof embed?.toJSON === 'function' ? embed.toJSON() : embed;
-  return data?.image?.url === url;
+function json(component) {
+  return typeof component?.toJSON === 'function' ? component.toJSON() : component;
 }
-function hasV2Components(components) {
-  return components.some(c => {
-    const data = typeof c?.toJSON === 'function' ? c.toJSON() : c;
-    return [10,11,12,13,14,17].includes(data?.type);
+function isFooterImage(embed, url) {
+  return json(embed)?.image?.url === url;
+}
+function isComponentsV2(payload) {
+  if ((Number(payload.flags) & MessageFlags.IsComponentsV2) !== 0) return true;
+  return payload.components.some(c => [10,11,12,13,14,17].includes(json(c)?.type));
+}
+function footerGallery(url) {
+  return new MediaGalleryBuilder().addItems([{media:{url}}]);
+}
+function hasFooter(payload, url) {
+  return payload.components.some(c => {
+    const value=JSON.stringify(json(c));
+    return value.includes(url) || value.includes('footer-banner.png');
   });
 }
+function isButtonRow(component) {
+  return component?.type===1 && component.components?.length>0 &&
+    component.components.every(c => c.type===2);
+}
 /**
- * Add the full-width Astra footer *below* the original embed or V2 panel,
- * preserving the original banner and buttons. Does not mutate the input.
- * Discord embeds support only one main image, so a separate image-only
- * embed is required for classic messages.
+ * Discord layout: banner at the top of the container, text and selections,
+ * then a footer strip INSIDE the container, with buttons BELOW it.
+ *
+ * The container is rebuilt from its JSON so existing components are preserved.
+ * Only trailing button action rows move outside; dropdowns remain inside.
  */
-function withFooter(payload, cfg = {}) {
-  if(!payload || typeof payload !== 'object') return payload;
-  const url = footerUrl(cfg);
-  if(!/^https:\/\//i.test(url)) return payload;
-  if(Array.isArray(payload.embeds) && payload.embeds.length) {
-    if(payload.embeds.some(e=>isFooterImage(e,url)) || payload.embeds.length>=10) return payload;
-    const image = new EmbedBuilder().setImage(url);
-    return {...payload, embeds:[...payload.embeds,image]};
+function addFooterToV2(payload,url) {
+  if(hasFooter(payload,url))return payload;
+
+  const components=[...payload.components];
+  const containerIndex=components.findIndex(c => json(c)?.type===17);
+  if(containerIndex<0) return {...payload,components:[...components,footerGallery(url)]};
+
+  const raw=json(components[containerIndex]);
+  const inside=[...(raw.components||[])];
+
+  // Pull only trailing button rows out of the container. This matches
+  // the dashboard example without moving select menus or content blocks.
+  const buttons=[];
+  while(inside.length && isButtonRow(inside[inside.length-1])) {
+    buttons.unshift(inside.pop());
   }
-  if(Array.isArray(payload.components) && payload.components.length) {
-    const v2 = ((Number(payload.flags)||0) & MessageFlags.IsComponentsV2) !== 0
-      || hasV2Components(payload.components);
-    if(!v2) return payload;
-    const already = payload.components.some(c=> {
-      const data = typeof c?.toJSON === 'function' ? c.toJSON() : c;
-      return JSON.stringify(data).includes(url) || JSON.stringify(data).includes('footer-banner.png');
-    });
-    if(already) return payload;
-    const gallery = new MediaGalleryBuilder().addItems([{media:{url}}]);
-    return {...payload, components:[...payload.components,gallery]};
+  inside.push(footerGallery(url).toJSON());
+
+  const rebuilt=new ContainerBuilder({...raw,components:inside});
+  components.splice(containerIndex,1,rebuilt,...buttons.map(b=>new ActionRowBuilder(b)));
+  return {...payload,components};
+}
+
+/**
+ * Brand normal embeds and Components V2 messages with the Astra footer.
+ * A classic embed may only have one big image; a separate image-only embed
+ * keeps its original header and puts the footer above any message buttons.
+ */
+function withFooter(payload,cfg={}) {
+  if(!payload || typeof payload!=='object')return payload;
+  const url=footerUrl(cfg);
+  if(!/^https:\/\//i.test(url))return payload;
+
+  if(Array.isArray(payload.embeds) && payload.embeds.length) {
+    if(payload.embeds.some(e=>isFooterImage(e,url)) || payload.embeds.length>=10)return payload;
+    return {...payload,embeds:[...payload.embeds,new EmbedBuilder().setImage(url)]};
+  }
+  if(Array.isArray(payload.components) && payload.components.length && isComponentsV2(payload)) {
+    return addFooterToV2(payload,url);
   }
   return payload;
 }
