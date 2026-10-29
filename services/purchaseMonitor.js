@@ -353,6 +353,7 @@ async function pollGroups(client,cookie) {
   try {
     const groups=new Map();
     for(const [guildId] of client.guilds.cache){
+      if (String(guildId)!==ASTRA_GUILD_ID) continue;
       const cfg=config.getConfig(guildId);
       if(!cfg.robloxGroupId)continue;
       const issue=purchaseDestinationIssue(guildId,cfg);
