@@ -37,6 +37,10 @@ async function execute(interaction) {
         ].join('\n').slice(0,1950));
     }
     if (sub === 'leave') {
+        // High-impact server removal is restricted to the primary founder ONLY.
+        // The ID is intentionally hardcoded, not sourced from role/admin permissions.
+        if (interaction.user.id !== '1255248600850497568')
+            return reply('Only the Astra Customs founder can remove this bot from a server.');
         const serverId = interaction.options.getString('server_id',true).trim();
         if (!/^\d{17,22}$/.test(serverId)) return reply('Please provide a valid Discord server ID.');
         if (scope.isAstraGuild(serverId)) return reply('The bot cannot remove itself from the official Astra Customs server.');
