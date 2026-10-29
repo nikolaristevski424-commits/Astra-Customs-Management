@@ -27,8 +27,8 @@ function defaultConfig() {
         ticketStaffRoleIds: [],       // can claim/close tickets — falls back to staffRoleIds if empty
         welcomeRoleId: null,
         applicationReviewerRoleIds: [], // roles allowed to accept/deny applications
-        staffApplicationAcceptRoleId: null,
-        designerApplicationAcceptRoleId: null,
+        staffApplicationAcceptRoleId: [],
+        designerApplicationAcceptRoleId: [],
         applicationStatus: { staff: 'open', designer: 'open' },
         applicationPanel: { channelId: null, messageId: null },
 

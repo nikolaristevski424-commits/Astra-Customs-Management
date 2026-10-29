@@ -945,14 +945,16 @@ async function handleModal(interaction) {
         }
 
         let roleWarning = '';
-        const acceptedRoleId = type === 'staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
-        if (accepted && acceptedRoleId) {
+        const configuredRoles=type==='staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
+        const acceptedRoleIds=(Array.isArray(configuredRoles)?configuredRoles:String(configuredRoles||'').split(','))
+            .map(id=>String(id).trim()).filter(id=>/^\d{17,22}$/.test(id));
+        if (accepted && acceptedRoleIds.length) {
             try {
                 const member = await interaction.guild.members.fetch(applicantId);
-                await member.roles.add(acceptedRoleId);
+                await member.roles.add(acceptedRoleIds);
             } catch (error) {
-                roleWarning = ' The decision was recorded, but the applicant role could not be assigned.';
-                console.error(`[applications] Could not assign role ${acceptedRoleId} to applicant ${applicantId}:`, error);
+                roleWarning = ' The decision was recorded, but one or more applicant roles could not be assigned.';
+                console.error('[applications] Could not assign accepted roles to applicant '+applicantId+':', error);
             }
         }
 

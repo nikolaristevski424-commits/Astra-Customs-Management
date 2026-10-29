@@ -8,12 +8,13 @@ const data=new SlashCommandBuilder().setName('partnership')
   .setDescription('Announce a partner server and notify its representatives')
   .addStringOption(o=>o.setName('server').setDescription('Name of the partner server').setRequired(true).setMaxLength(100))
   .addStringOption(o=>o.setName('invite').setDescription('Invite: discord.gg/example or a full Discord invite URL').setRequired(true).setMaxLength(200))
+  .addStringOption(o=>o.setName('advertisement').setDescription('Full partner server advertisement (Discord formatting supported)').setRequired(true).setMaxLength(3000))
   .addUserOption(o=>o.setName('rep1').setDescription('First partner representative').setRequired(true))
   .addUserOption(o=>o.setName('rep2').setDescription('Second representative (optional)'))
   .addUserOption(o=>o.setName('rep3').setDescription('Third representative (optional)'))
   .addUserOption(o=>o.setName('rep4').setDescription('Fourth representative (optional)'))
   .addUserOption(o=>o.setName('rep5').setDescription('Fifth representative (optional)'))
-  .addStringOption(o=>o.setName('details').setDescription('What the partnership includes').setMaxLength(700));
+  .addStringOption(o=>o.setName('details').setDescription('Optional partnership notes for management').setMaxLength(700));
 module.exports={
  data,
  async execute(interaction){
@@ -28,13 +29,16 @@ module.exports={
    if(representativeIds.includes(interaction.user.id))return interaction.reply({content:'The partnership manager is already pinged automatically. Select the other server representatives instead.',flags:MessageFlags.Ephemeral});
    await interaction.deferReply({flags:MessageFlags.Ephemeral});
    const server=interaction.options.getString('server',true);
-   const details=interaction.options.getString('details')||'We are pleased to announce a new community partnership.';
+   const advertisement=interaction.options.getString('advertisement',true).trim();
+   if(!advertisement)return interaction.editReply('The partner advertisement cannot be blank.');
+   const details=interaction.options.getString('details')?.trim();
    const result=await partner.send(interaction,{
      title:'Astra Customs | New Partnership',
-     description:'We are partnering with **'+server+'**!\n\n'+details,
+     description:'**'+server+'**\n\n**Server Advertisement**\n'+advertisement+'\n\n*Official Astra Customs partnership.*',
      fields:[{name:'Partner server',value:server,inline:true},
        {name:'Astra management',value:'<@'+interaction.user.id+'>',inline:true},
-       {name:'Partner representatives',value:representativeIds.map(id=>'<@'+id+'>').join(', ')}],
+       {name:'Partner representatives',value:representativeIds.map(id=>'<@'+id+'>').join(', ')},
+       ...(details?[{name:'Partnership notes',value:details}]:[])],
      invite:inviteUrl,mentionUsers:[interaction.user.id,...representativeIds],
      ping:{content:'',parse:[],roles:[]},footer:'partnership'
    });

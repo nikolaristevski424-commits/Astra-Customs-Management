@@ -67,8 +67,8 @@ const ENV_FIELD_MAP = [
     ['TICKET_STAFF_ROLE_IDS', 'ticketStaffRoleIds', 'idlist'],
     ['WELCOME_ROLE_ID', 'welcomeRoleId', 'string'],
     ['APPLICATION_REVIEWER_ROLE_ID', 'applicationReviewerRoleIds', 'idlist'],
-    ['STAFF_APPLICATION_ACCEPT_ROLE_ID', 'staffApplicationAcceptRoleId', 'string'],
-    ['DESIGNER_APPLICATION_ACCEPT_ROLE_ID', 'designerApplicationAcceptRoleId', 'string'],
+    ['STAFF_APPLICATION_ACCEPT_ROLE_ID', 'staffApplicationAcceptRoleId', 'idlist'],
+    ['DESIGNER_APPLICATION_ACCEPT_ROLE_ID', 'designerApplicationAcceptRoleId', 'idlist'],
     ['LOA_ROLE_ID', 'loaRoleId', 'string'],
 
     // Commission
