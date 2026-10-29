@@ -16,6 +16,7 @@ const {
 } = require('discord.js');
 
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const perms = require('../utils/permissions');
 const orders = require('../utils/orders');
 const jobsUtil = require('../utils/jobs');
@@ -53,6 +54,17 @@ module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         try {
+            // Stop ALL shop commands, old buttons, and modals in non-Astra guilds.
+            // The /servers command is available only inside the official guild.
+            if (interaction.guildId && !serverScope.isAstraGuild(interaction.guildId)) {
+                if (interaction.isRepliable?.()) {
+                    await interaction.reply({
+                        content:'Astra Customs Management is only available in the official Astra Customs server.',
+                        flags:MessageFlags.Ephemeral
+                    }).catch(()=>{});
+                }
+                return;
+            }
             if (interaction.isChatInputCommand()) return await handleSlash(interaction);
             if (interaction.isAutocomplete()) return await handleAutocomplete(interaction);
             if (interaction.isButton()) return await handleButton(interaction);
