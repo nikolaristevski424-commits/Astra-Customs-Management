@@ -83,3 +83,17 @@ test('auto leave setting targets only other guilds, never official Astra',async(
     assert.equal((await scope.checkGuild(other,{autoLeave:true})).status,'left');
     assert.equal(left,1);
 });
+
+test('old interactions in another server are blocked even before command dispatch',async()=>{
+    const event=require('../events/interactionCreate');
+    let response;
+    const interaction={
+      guildId:OTHER,commandName:'payout',customId:'payout_autosend_1',
+      isRepliable:()=>true,
+      reply:async payload=>{response=payload},
+      isChatInputCommand:()=>true,
+      client:{commands:new Map([['payout',{execute:async()=>{throw new Error('should not execute')}}]])}
+    };
+    await event.execute(interaction);
+    assert.match(response.content,/only available in the official Astra Customs server/i);
+});
