@@ -33,6 +33,17 @@ function purchaseLogChannel(guildId,cfg={}) {
     ? ASTRA_PURCHASE_CHANNEL_ID
     : (cfg.purchaseLogChannelId || null);
 }
+// Environment settings are shared by every guild the bot joins. A second
+// guild must never try to publish its receipts in Astra Customs' channel.
+function purchaseDestinationIssue(guildId,cfg={}) {
+  const channelId=purchaseLogChannel(guildId,cfg);
+  if(!channelId)return 'No purchase log channel is configured for this guild.';
+  if(String(guildId)!==ASTRA_GUILD_ID && String(channelId)===ASTRA_PURCHASE_CHANNEL_ID)
+    return 'The shared PURCHASE_LOG_CHANNEL_ID points to Astra Customs guild '+ASTRA_GUILD_ID+
+      ', not guild '+guildId+'. Skipping this destination; Astra sales monitoring stays active.';
+  return null;
+}
+const warnedInvalidGuilds=new Set();
 
 const STATE_STORE = 'purchaseMonitor';
 let started = false;
@@ -185,9 +196,12 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
   // Make the purchase log retryable independently from payment-credit/fulfilment stages.
   if(!receipt.logged) {
     const target=await client.channels.fetch(destChannelId).catch(()=>null);
-    if(!target?.send || target.guildId && target.guildId!==guildId) {
-      saveGroupState(groupId,{lastAlertError:'Purchase channel '+destChannelId+' is missing, inaccessible or belongs to a different server.'});
-      throw new Error('Cannot post to purchase channel '+destChannelId+'; check bot access.');
+    if(!target?.send || (target.guildId && String(target.guildId)!==String(guildId))) {
+      const reason=!target?.send
+        ? 'Channel missing or inaccessible to the bot.'
+        : 'Channel belongs to guild '+target.guildId+', but this receipt is for guild '+guildId+'.';
+      saveGroupState(groupId,{lastAlertError:'Purchase channel '+destChannelId+': '+reason});
+      throw new Error('Cannot post to purchase channel '+destChannelId+' for guild '+guildId+': '+reason);
     }
     const effectivePermissions=target.permissionsFor?.(client.user?.id);
     if(effectivePermissions && (!effectivePermissions.has('SendMessages')||!effectivePermissions.has('EmbedLinks'))) {
@@ -341,6 +355,14 @@ async function pollGroups(client,cookie) {
     for(const [guildId] of client.guilds.cache){
       const cfg=config.getConfig(guildId);
       if(!cfg.robloxGroupId)continue;
+      const issue=purchaseDestinationIssue(guildId,cfg);
+      if(issue) {
+        if(!warnedInvalidGuilds.has(String(guildId))) {
+          console.warn('[purchaseMonitor] Skipping guild '+guildId+': '+issue);
+          warnedInvalidGuilds.add(String(guildId));
+        }
+        continue;
+      }
       const groupId=String(cfg.robloxGroupId);
       if(!groups.has(groupId))groups.set(groupId,[]);
       groups.get(groupId).push({guildId,cfg});
@@ -388,4 +410,4 @@ function retryNow(groupId){
 }
 module.exports={start,fetchRecentTransactions,scanSince,processGroup,pollGroups,transactionKey,retryDelay,
   getGroupState,recordPurchase,retryNow,nextEligiblePollAt,purchaseLogChannel,
-  POLL_INTERVAL_MS,PAGE_GAP_MS,INITIAL_RECOVERY_MS,LOOKBACK_MS,ASTRA_GUILD_ID,ASTRA_PURCHASE_CHANNEL_ID};
+  POLL_INTERVAL_MS,PAGE_GAP_MS,INITIAL_RECOVERY_MS,LOOKBACK_MS,ASTRA_GUILD_ID,ASTRA_PURCHASE_CHANNEL_ID,purchaseDestinationIssue};
