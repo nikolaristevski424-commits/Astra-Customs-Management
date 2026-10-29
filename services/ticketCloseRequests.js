@@ -1,5 +1,6 @@
 const { withFooter } = require('../utils/footerBranding');
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
 
@@ -13,6 +14,7 @@ async function processDueRequests(client, now = Date.now()) {
 
     try {
         for (const [guildId] of client.guilds.cache) {
+            if (!serverScope.isAstraGuild(guildId)) continue;
             const cfg = config.getConfig(guildId);
             for (const ticket of tickets.list(guildId)) {
                 const request = ticket.closeRequest;
