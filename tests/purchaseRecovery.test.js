@@ -22,6 +22,13 @@ test('Astra guild purchase alerts use the correct channel, independent of missin
   assert.equal(monitor.purchaseLogChannel('other-guild',{purchaseLogChannelId:'custom-channel'}),'custom-channel');
   assert.equal(monitor.purchaseLogChannel('other-guild',{}),null);
 });
+test('a second server with shared .env cannot post into Astra Customs purchase channel',()=>{
+  const channel=monitor.ASTRA_PURCHASE_CHANNEL_ID;
+  assert.equal(monitor.purchaseDestinationIssue(monitor.ASTRA_GUILD_ID,{purchaseLogChannelId:channel}),null);
+  assert.match(monitor.purchaseDestinationIssue('999999999999999999',{purchaseLogChannelId:channel}),/shared PURCHASE_LOG_CHANNEL_ID/);
+  assert.equal(monitor.purchaseDestinationIssue('999999999999999999',{purchaseLogChannelId:'111111111111111111'}),null);
+  assert.match(monitor.purchaseDestinationIssue('999999999999999999',{}),/No purchase log channel/);
+});
 test('Roblox id zero does not collapse different group transactions into one sale',()=>{
   const now=Date.now();
   const a=makeTx(0,now,'1000','111');
