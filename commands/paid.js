@@ -14,7 +14,8 @@ module.exports={
    if(!isOwner(interaction))
      return interaction.reply({content:'Only Astra Customs ownership can publish paid advertisements.',flags:MessageFlags.Ephemeral});
    const invite=interaction.options.getString('invite',true);
-   if(!partner.isInvite(invite))return interaction.reply({content:'A valid Discord invite link is required.',flags:MessageFlags.Ephemeral});
+   const inviteUrl=partner.normalizeInvite(invite);
+   if(!inviteUrl)return interaction.reply({content:'Use a Discord invite such as \`discord.gg/example\`.',flags:MessageFlags.Ephemeral});
    const ping=partner.pingOptions(interaction);
    if(ping.error)return interaction.reply({content:ping.error,flags:MessageFlags.Ephemeral});
    await interaction.deferReply({flags:MessageFlags.Ephemeral});
@@ -25,7 +26,7 @@ module.exports={
      description:'**'+server+'**\n\n'+message+'\n\n*Paid promotion • Advertisement provided by the sponsor.*',
      fields:[{name:'Advertiser',value:server,inline:true},
        {name:'Posted by',value:'<@'+interaction.user.id+'>',inline:true}],
-     invite,mentionUsers:[interaction.user.id],ping,footer:'paid'
+     invite:inviteUrl,mentionUsers:[interaction.user.id],ping,footer:'paid'
    });
    return interaction.editReply(result.error||'Paid ad published in <#'+result.message.channelId+'>: '+result.message.url);
  }

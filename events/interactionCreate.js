@@ -45,6 +45,7 @@ const quoteCmd = require('../commands/quote');
 const textCmd = require('../commands/text');
 const activityUtil = require('../utils/activity');
 const activityCmd = require('../commands/activity');
+const deadchatCmd = require('../commands/deadchat');
 const applicationStatus = require('../utils/applicationStatus');
 
 module.exports = {
@@ -93,6 +94,8 @@ async function handleSelect(interaction) {
 
 async function handleButton(interaction) {
     const { customId } = interaction;
+    if(customId.startsWith('deadchat_vote_')||customId.startsWith('community_vote_')) return deadchatCmd.handleVote(interaction);
+
     const guildId = interaction.guildId;
     const cfg = config.getConfig(guildId);
 
