@@ -3,7 +3,7 @@ const config=require('../utils/config');
 const perms=require('../utils/permissions');
 const tickets=require('../utils/tickets');
 const monitor=require('../services/purchaseMonitor');
-const fs=require('fs');
+const {isOwner}=require('../utils/ownership');
 
 function uptime(ms){
  const seconds=Math.floor(ms/1000);
@@ -14,7 +14,7 @@ module.exports={
    .setDescription('Check Astra Customs bot health and ticket/payment configuration (staff only)'),
  async execute(interaction){
    const cfg=config.getConfig(interaction.guildId);
-   if(!perms.isTicketStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg))
+   if(!perms.isTicketStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg) && !isOwner(interaction))
      return interaction.reply({content:'Only staff can view operational diagnostics.',flags:MessageFlags.Ephemeral});
    const ping=Math.round(interaction.client.ws.ping);
    const open=tickets.list(interaction.guildId).filter(t=>!t.closedAt);
@@ -24,6 +24,7 @@ module.exports={
       !cfg.transcriptChannelId && 'TRANSCRIPT_CHANNEL_ID',
    ].filter(Boolean);
    const st=cfg.robloxGroupId ? monitor.getGroupState(String(cfg.robloxGroupId)) : null;
+   const purchaseChannel=monitor.purchaseLogChannel(interaction.guildId,cfg);
    const status=st?.lastSuccessAt?'<t:'+Math.floor(st.lastSuccessAt/1000)+':R>':'Not yet';
    const next=st?monitor.nextEligiblePollAt(st):null;
    const lines=[
@@ -34,13 +35,19 @@ module.exports={
      '**Commands loaded:** '+(interaction.client.commands?.size||0),
      '**Open tickets:** '+open.length,
      '**Configuration:** '+(missing.length?'Review '+missing.join(', '):'Ticket, order and transcript channels configured'),
-     '**Roblox monitoring:** '+(st?'Configured':'No Roblox group configured'),
+     '**Roblox group:** '+(cfg.robloxGroupId||'❌ Not configured'),
+     '**Roblox credentials:** '+(process.env.ROBLOX_COOKIE?.trim()?'Set (not verified)':'❌ ROBLOX_COOKIE missing'),
+     '**Purchase notifications:** '+(purchaseChannel?'<#'+purchaseChannel+'>':'❌ Channel missing'),
    ];
    if(st){
      lines.push('**Last Roblox check:** '+status,
        '**Next eligible check:** '+(next>Date.now()?'<t:'+Math.floor(next/1000)+':R>':'Ready'),
-       '**Consecutive transaction errors:** '+st.consecutiveFailures);
+       '**Consecutive transaction errors:** '+st.consecutiveFailures,
+       '**Last Roblox error:** '+(st.lastError||'None'),
+       '**Last Discord alert error:** '+(st.lastAlertError||'None'),
+       '**Last posted purchase:** '+(st.lastAlertAt?'<t:'+Math.floor(st.lastAlertAt/1000)+':R>':'Never'));
    }
+   lines.push('Use \`/purchases diagnose\` for the detailed purchase tracking report.');
    return interaction.reply({content:lines.join('\n'),flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}});
  }
 };

@@ -20,7 +20,20 @@ const PAGE_GAP_MS = 3_000;
 const LIMIT = 100;
 const PAGE_CAP = 8;
 const MAX_SEEN = 1500;
-const LOOKBACK_MS = 15 * 60_000;
+// Roblox sometimes posts group sales late. Scan a wider window, without
+// increasing the request frequency; transaction IDs keep processing idempotent.
+const LOOKBACK_MS = 24 * 60 * 60_000;
+const INITIAL_RECOVERY_MS = 2 * 60 * 60_000;
+// Only Astra Customs' guild defaults to the requested log channel. No
+// cross-server purchase details should ever be sent to this channel.
+const ASTRA_GUILD_ID = '1488378242846036070';
+const ASTRA_PURCHASE_CHANNEL_ID = '1550931224195768471';
+function purchaseLogChannel(guildId,cfg={}) {
+  return String(guildId)===ASTRA_GUILD_ID
+    ? ASTRA_PURCHASE_CHANNEL_ID
+    : (cfg.purchaseLogChannelId || null);
+}
+
 const STATE_STORE = 'purchaseMonitor';
 let started = false;
 let polling = false;
@@ -29,7 +42,7 @@ let polling = false;
 function getGroupState(groupId) {
   const state = store.get(STATE_STORE, 'global', {})[String(groupId)] || {};
   return { initialized:false, baselineCutoff:0, lastSeenAt:0, seenIds:[], nextRequestAt:0, lastPolledAt:0,
-    consecutiveFailures:0, lastError:null, lastSuccessAt:0, ...state };
+    consecutiveFailures:0, lastError:null, lastSuccessAt:0, lastSaleAt:0, lastTransactionCount:0, lastAlertAt:0, lastAlertError:null, ...state };
 }
 function saveGroupState(groupId, patch) {
   return store.update(STATE_STORE, 'global', {}, all => {
@@ -59,9 +72,18 @@ function nextEligiblePollAt(state, globalLast = globalLastPollAt()) {
 }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function transactionKey(tx) {
-  return String(tx.id ?? [
-    Date.parse(tx.created), tx.agent?.id || '', tx.details?.id || tx.details?.gamepassId || '', tx.currency?.amount ?? '',
-  ].join(':'));
+  // Roblox frequently returns id: 0 for EVERY group sale. Using "0" as
+  // the key silently collapses unrelated purchases into one receipt.
+  const identifier=String(tx.id??'').trim();
+  if(identifier && identifier!=='0' && identifier!=='null')return 'id:'+identifier;
+  // Milliseconds can fluctuate in Roblox transaction responses; round to
+  // the second to keep the same sale stable between scans.
+  const timestamp=Date.parse(tx.created);
+  const second=Number.isFinite(timestamp)?Math.floor(timestamp/1000):'unknown';
+  return 'sale:'+[
+    second,String(tx.agent?.id??''),String(tx.details?.gamepassId||tx.details?.id||tx.details?.assetId||''),
+    String(tx.currency?.amount??'')
+  ].join(':');
 }
 function createdAt(tx) { return Date.parse(tx.created); }
 function canRetry(error) { const status = error.response?.status; return !status || status === 429 || status >= 500; }
@@ -118,11 +140,11 @@ async function scanSince(groupId, cookie, state) {
     for(const tx of result.data) {
       const ts=createdAt(tx);
       if (!Number.isFinite(ts)) continue;
-      if(state.initialized && ts<state.lastSeenAt-LOOKBACK_MS && seen.has(transactionKey(tx))) continue;
+      if(state.initialized && ts<Date.now()-LOOKBACK_MS && seen.has(transactionKey(tx))) continue;
       transactions.push(tx);
     }
     const oldest=Math.min(...result.data.map(createdAt).filter(Number.isFinite));
-    if(!result.nextPageCursor || !result.data.length || (state.initialized && oldest < state.lastSeenAt - LOOKBACK_MS)) {
+    if(!result.nextPageCursor || !result.data.length || (Number.isFinite(oldest) && oldest<Date.now()-LOOKBACK_MS)) {
       return {transactions,hasMore:false};
     }
     cursor=result.nextPageCursor;more=!!cursor;
@@ -132,48 +154,73 @@ async function scanSince(groupId, cookie, state) {
 async function recordPurchase(client,guildId,cfg,groupId,tx) {
   const txId=transactionKey(tx),key=String(groupId)+':'+txId;
   let receipt=receipts.get(guildId,key);
-  if(receipt?.complete) return;
-  const itemId=String(tx.details?.gamepassId || tx.details?.id || '');
+  const destChannelId=purchaseLogChannel(guildId,cfg);
+  if(!destChannelId)throw new Error('PURCHASE_LOG_CHANNEL_ID is missing; purchases cannot be logged.');
+  // An already-complete receipt might still need a Discord alert if the
+  // channel used to be misconfigured. Never repeat fulfillment/credit.
+  if(receipt?.complete && receipt.logged) return;
+  const itemId=String(tx.details?.gamepassId || tx.details?.id || tx.details?.assetId || '');
+
   const itemName=String(tx.details?.name||'Unknown item').slice(0,100);
   const buyerId=String(tx.agent?.id||'');
   const buyerName=String(tx.agent?.name||'Unknown buyer').slice(0,90);
   const amount=Number(tx.currency?.amount);
-  if(!Number.isFinite(amount) || amount<0 || !buyerId || !itemId) {
-    receipts.update(guildId,key,{reviewRequired:true,error:'Incomplete transaction payload',complete:true,transactionId:txId});
-    console.warn('[purchaseMonitor] Incomplete transaction needs manual review: '+key);
-    return;
-  }
-  const buyerDiscordId=buyerId ? await robloxToDiscord(cfg.discordServerIdForBloxlink,buyerId).catch(()=>null) : null;
+  const incomplete=!Number.isFinite(amount) || amount<0 || !buyerId || !itemId;
+  // Log even partial records so staff know a sale appeared instead of
+  // silently dismissing it. Partial data must never trigger auto-fulfilment.
+  const buyerDiscordId=!incomplete && cfg.discordServerIdForBloxlink && buyerId
+    ? await robloxToDiscord(cfg.discordServerIdForBloxlink,buyerId).catch(()=>null) : null;
   const reservation=paymentPool.findReservation(guildId,itemId);
   const linkedCustomer=reservation?.customerDiscordId||null;
   // Do not associate a payment with a customer if the Roblox buyer cannot be verified.
   const verifiedBuyer=!!(linkedCustomer && buyerDiscordId && linkedCustomer===buyerDiscordId);
   const mismatch=!!(linkedCustomer && buyerDiscordId && linkedCustomer!==buyerDiscordId);
-  const reviewRequired=!!reservation && (!verifiedBuyer || mismatch);
+  const reviewRequired=!!receipt?.reviewRequired || incomplete || (!!reservation && (!verifiedBuyer || mismatch));
   receipt=receipts.update(guildId,key,{
     groupId:String(groupId),transactionId:txId,itemId,itemName,buyerId,buyerName,buyerDiscordId,
     amount,customerDiscordId:linkedCustomer,orderId:reservation?.orderId||null,
     reviewRequired,verification:verifiedBuyer?'linked-account-match':mismatch?'account-mismatch':'not-verified',
+    ...(incomplete?{error:'Incomplete transaction information; manual review required'}:{}),
   });
   // Make the purchase log retryable independently from payment-credit/fulfilment stages.
-  if(!receipt.logged && cfg.purchaseLogChannelId) {
-    const target=await client.channels.fetch(cfg.purchaseLogChannelId);
-    if(!target?.send) throw new Error('Configured purchase-log channel cannot send messages');
+  if(!receipt.logged) {
+    const target=await client.channels.fetch(destChannelId).catch(()=>null);
+    if(!target?.send || target.guildId && target.guildId!==guildId) {
+      saveGroupState(groupId,{lastAlertError:'Purchase channel '+destChannelId+' is missing, inaccessible or belongs to a different server.'});
+      throw new Error('Cannot post to purchase channel '+destChannelId+'; check bot access.');
+    }
+    const effectivePermissions=target.permissionsFor?.(client.user?.id);
+    if(effectivePermissions && (!effectivePermissions.has('SendMessages')||!effectivePermissions.has('EmbedLinks'))) {
+      saveGroupState(groupId,{lastAlertError:'Bot lacks Send Messages or Embed Links in '+destChannelId});
+      throw new Error('Missing Send Messages/Embed Links in purchase channel '+destChannelId);
+    }
     const record=baseEmbed(cfg,{
       title:'Astra Customs | Roblox Purchase Detected',
       color:reviewRequired?0xf5a623:0x38aa82,bannerKey:'order',
-      description:reviewRequired?'⚠️ Buyer identity requires staff verification before order fulfillment.':'Roblox reported a group sale.',
+      description:reviewRequired?'⚠️ Staff verification required before order fulfilment.':'Roblox reported a new group sale. This is a transaction notification, not proof of order fulfilment.',
       fields:[
         {name:'Roblox buyer',value:buyerName+' ('+buyerId+')',inline:true},
         {name:'Item',value:itemName+' ('+itemId+')',inline:true},
-        {name:'Robux after tax',value:'R$'+amount,inline:true},
+        {name:'Robux reported',value:Number.isFinite(amount)?'R$'+amount:'Unavailable',inline:true},
         {name:'Transaction ID',value:String(txId).slice(0,180),inline:false},
         {name:'Linked order',value:receipt.orderId?'#'+receipt.orderId:'Not linked',inline:true},
         {name:'Verification',value:receipt.verification,inline:true},
       ]
     });
-    const message=await target.send(withFooter({embeds:[record],allowedMentions:{parse:[]}}));
+    let message;
+    try {
+      message=await target.send(withFooter({embeds:[record],allowedMentions:{parse:[]}}));
+    }catch(error){
+      saveGroupState(groupId,{lastAlertError:'Discord notification failed for channel '+destChannelId+': '+error.message.slice(0,120)});
+      throw error;
+    }
     receipt=receipts.update(guildId,key,{logged:true,logMessageId:message.id});
+    saveGroupState(groupId,{lastAlertAt:Date.now(),lastAlertError:null,lastAlertChannelId:destChannelId});
+    console.log('[purchaseMonitor] Posted Roblox sale '+txId+' to guild '+guildId+' channel '+destChannelId);
+  }
+  if(receipt.complete || incomplete) {
+    receipts.update(guildId,key,{complete:true,reviewRequired:reviewRequired||!!receipt.reviewRequired});
+    return;
   }
   if(!receipt.credited && receipt.creditAttempted) {
     receipt=receipts.update(guildId,key,{reviewRequired:true,creditReviewRequired:true,
@@ -200,7 +247,9 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
       const pkg=packages.find(guildId,reservation.packageId);
       if(!delivery.hasDelivery(pkg) || !linkedCustomer){
         receipts.update(guildId,key,{reviewRequired:true,deliveryError:'Package content or verified customer unavailable'});
-        throw new Error('Package delivery requires staff review: missing content or customer');
+        receipt=receipts.update(guildId,key,{reviewRequired:true,deliveryError:'Missing deliverable content or customer; staff follow-up required'});
+        receipts.update(guildId,key,{complete:true});
+        return;
       }
       try {
         const user=await client.users.fetch(linkedCustomer);
@@ -209,7 +258,9 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
         receipt=receipts.update(guildId,key,{delivered:true});
       } catch(error) {
         receipts.update(guildId,key,{deliveryError:error.message});
-        throw new Error('Payment confirmed but automatic delivery failed: '+error.message);
+        receipts.update(guildId,key,{reviewRequired:true,complete:true,
+          deliveryError:'Automatic delivery failed; manual staff follow-up required: '+error.message.slice(0,120)});
+        return;
       }
     }
     paymentPool.release(guildId,itemId);
@@ -221,18 +272,66 @@ async function processGroup(client,groupId,destinations,transactions,{hasMore=fa
   const state=getGroupState(groupId),seen=new Set(state.seenIds||[]);
   const valid=transactions.filter(tx=>Number.isFinite(createdAt(tx)));
   if(!state.initialized) {
-    saveGroupState(groupId,{initialized:true,baselineCutoff:Math.max(0,...valid.map(createdAt)),lastSeenAt:Math.max(0,...valid.map(createdAt)),
-      seenIds:valid.map(transactionKey).slice(-MAX_SEEN),lastSuccessAt:Date.now()});
-    console.log('[purchaseMonitor] Baseline established for group '+groupId+'; historical sales not replayed.');
+    const cutoff=Date.now()-INITIAL_RECOVERY_MS;
+    const recovery=valid.filter(tx=>createdAt(tx)>=cutoff).sort((a,b)=>createdAt(a)-createdAt(b));
+    for(const tx of recovery){
+      for(const {guildId,cfg} of destinations) {
+        const key=String(groupId)+':'+transactionKey(tx);
+        const prior=receipts.get(guildId,key);
+        if(!prior?.logged){
+          // Baseline recovery only sends a notification; no credits or
+          // order fulfilment for historical purchases.
+          receipts.update(guildId,key,{complete:true,reviewRequired:true,
+            verification:'recent-sale-on-first-scan',processingNote:'Review recent sale detected on initial monitor scan'});
+          await recordPurchase(client,guildId,cfg,groupId,tx);
+        }
+      }
+    }
+    const latest=Math.max(0,...valid.map(createdAt));
+    saveGroupState(groupId,{initialized:true,baselineCutoff:latest,lastSeenAt:latest,
+      seenIds:valid.map(transactionKey).slice(-MAX_SEEN),lastSuccessAt:Date.now(),
+      lastTransactionCount:valid.length,recentRecoveryComplete:true});
+    console.log('[purchaseMonitor] Initial scan for group '+groupId+': '+recovery.length+
+      ' recent sale(s) recovered for review; no historical credits issued.');
     return;
   }
-  const pending=valid.filter(tx=>!seen.has(transactionKey(tx)) && createdAt(tx)>=state.lastSeenAt-LOOKBACK_MS && createdAt(tx)>=(state.baselineCutoff||0)).sort((a,b)=>createdAt(a)-createdAt(b));
+  // Migration for installations whose old baseline skipped purchases, or
+  // whose receipts became complete before the notification channel was set.
+  // Run once per group and only send notifications for the recent past.
+  if(!state.recentRecoveryComplete){
+    const candidates=valid.filter(tx=>createdAt(tx)>=Date.now()-INITIAL_RECOVERY_MS)
+      .sort((a,b)=>createdAt(b)-createdAt(a)).slice(0,40);
+    for(const tx of candidates){
+      for(const {guildId,cfg} of destinations){
+        const key=String(groupId)+':'+transactionKey(tx);
+        if(!receipts.get(guildId,key)?.logged){
+          receipts.update(guildId,key,{complete:true,reviewRequired:true,
+            processingNote:'Recent sale recovered after monitor update; verify manually'});
+          await recordPurchase(client,guildId,cfg,groupId,tx);
+        }
+      }
+    }
+    saveGroupState(groupId,{recentRecoveryComplete:true});
+  }
+  // Independently repair missed notifications, even if a transaction is
+  // already listed in the monitor checkpoint (which suppresses replay).
+  for(const tx of valid){
+    if(createdAt(tx)<Date.now()-LOOKBACK_MS)continue;
+    for(const {guildId,cfg} of destinations){
+      const prior=receipts.get(guildId,String(groupId)+':'+transactionKey(tx));
+      if(prior && !prior.logged)await recordPurchase(client,guildId,cfg,groupId,tx);
+    }
+  }
+  const pending=valid.filter(tx=>!seen.has(transactionKey(tx)) &&
+      createdAt(tx)>=Date.now()-LOOKBACK_MS).sort((a,b)=>createdAt(a)-createdAt(b));
   for(const tx of pending) {
     for(const {guildId,cfg} of destinations) await recordPurchase(client,guildId,cfg,groupId,tx);
     seen.add(transactionKey(tx));
-    saveGroupState(groupId,{lastSeenAt:Math.max(state.lastSeenAt,createdAt(tx)),seenIds:[...seen].slice(-MAX_SEEN)});
+    saveGroupState(groupId,{lastSeenAt:Math.max(state.lastSeenAt,createdAt(tx)),seenIds:[...seen].slice(-MAX_SEEN),
+      lastSaleAt:Math.max(getGroupState(groupId).lastSaleAt||0,createdAt(tx))});
   }
-  if(hasMore) console.warn('[purchaseMonitor] More than '+PAGE_CAP+' pages of sales exist; increase scan cap before assuming backfill is complete.');
+  saveGroupState(groupId,{lastTransactionCount:valid.length});
+  if(hasMore) console.warn('[purchaseMonitor] More than '+PAGE_CAP+' pages of sales exist; scan may be incomplete.');
 }
 async function pollGroups(client,cookie) {
   if(polling)return;
@@ -258,7 +357,8 @@ async function pollGroups(client,cookie) {
       try {
         const {transactions,hasMore}=await scanSince(groupId,cookie,state);
         await processGroup(client,groupId,destinations,transactions,{hasMore});
-        saveGroupState(groupId,{consecutiveFailures:0,nextRequestAt:0,lastError:null,lastSuccessAt:Date.now()});
+        saveGroupState(groupId,{consecutiveFailures:0,nextRequestAt:0,lastError:null,lastSuccessAt:Date.now(),
+          lastTransactionCount:transactions.length});
       }catch(error) {
         const failures=state.consecutiveFailures+1,delay=retryDelay(error,failures);
         saveGroupState(groupId,{consecutiveFailures:failures,nextRequestAt:Date.now()+delay,lastError:'HTTP '+(error.response?.status||'network')+': '+error.message.slice(0,180)});
@@ -270,8 +370,8 @@ async function pollGroups(client,cookie) {
 }
 function start(client){
   if(started)return;
-  const cookie=process.env.ROBLOX_COOKIE;
-  if(!cookie){console.log('[purchaseMonitor] Monitoring disabled: ROBLOX_COOKIE missing');return;}
+  const cookie=String(process.env.ROBLOX_COOKIE||'').trim().replace(/^\.ROBLOSECURITY=/,'');
+  if(!cookie){console.error('[purchaseMonitor] DISABLED: ROBLOX_COOKIE missing. Group transactions require a cookie authorized for group finances.');return;}
   started=true;
   console.log('[purchaseMonitor] Checking unique Roblox groups for new sales at most every 2 minutes (slower on errors); paginated requests are spaced.');
   const loop=async()=>{try{await pollGroups(client,cookie)}catch(e){console.error('[purchaseMonitor] Poll failed:',e)}finally{setTimeout(loop,POLL_INTERVAL_MS).unref?.();}};
@@ -286,4 +386,6 @@ function retryNow(groupId){
   saveGroupState(groupId,{nextRequestAt:0,consecutiveFailures:0});
   return {scheduled:true,nextRequestAt:nextEligiblePollAt(getGroupState(groupId))};
 }
-module.exports={start,fetchRecentTransactions,scanSince,processGroup,pollGroups,transactionKey,retryDelay,getGroupState,recordPurchase,retryNow,nextEligiblePollAt,POLL_INTERVAL_MS,PAGE_GAP_MS};
+module.exports={start,fetchRecentTransactions,scanSince,processGroup,pollGroups,transactionKey,retryDelay,
+  getGroupState,recordPurchase,retryNow,nextEligiblePollAt,purchaseLogChannel,
+  POLL_INTERVAL_MS,PAGE_GAP_MS,INITIAL_RECOVERY_MS,LOOKBACK_MS,ASTRA_GUILD_ID,ASTRA_PURCHASE_CHANNEL_ID};

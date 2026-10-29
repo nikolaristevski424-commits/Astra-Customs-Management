@@ -26,7 +26,7 @@ test('group transaction processing retains checkpoint and never repeats a record
  const id=String(Date.now())+'-test',guild='test-'+id,logs=[];
  const client={channels:{fetch:async()=>({send:async(payload)=>{logs.push(payload);return{id:'log-'+logs.length}}})},users:{fetch:async()=>null}};
  const cfg={purchaseLogChannelId:'testlogs',autoCreditPercent:0,discordServerIdForBloxlink:null};
- const baseline=tx('existing',Date.now()-60000);
+ const baseline=tx('existing',Date.now()-3*60*60*1000);
  const fresh=tx('fresh',Date.now());
  await monitor.processGroup(client,id,[{guildId:guild,cfg}],[baseline]);
  assert.equal(logs.length,0);
@@ -34,7 +34,7 @@ test('group transaction processing retains checkpoint and never repeats a record
  assert.equal(logs.length,1);
  await monitor.processGroup(client,id,[{guildId:guild,cfg}],[fresh,baseline]);
  assert.equal(logs.length,1);
- assert.equal(receipts.list(guild).filter(r=>r.transactionId==='fresh').length,1);
+ assert.equal(receipts.list(guild).filter(r=>r.transactionId==='id:fresh').length,1);
 });
 test('Roblox HTTP 500 uses one smaller-page fallback',async()=>{
  const original=axios.get;let calls=0;
