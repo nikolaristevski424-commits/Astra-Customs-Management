@@ -112,7 +112,6 @@ module.exports = {
                 .addStringOption((o) => o.setName('sponsor_invite').setDescription("Join link for the sponsor's server"))
                 .addStringOption((o) => o.setName('ping').setDescription('Who to notify (default: no ping)').addChoices(...PING_CHOICES))
                 .addRoleOption((o) => o.setName('ping_role').setDescription('Role to ping — only used when ping is set to "A specific role"'))
-                .addChannelOption(o=>o.setName('channel').setDescription('Optional channel to post the giveaway').addChannelTypes(ChannelType.GuildText,ChannelType.GuildAnnouncement))
                 .addChannelOption(o=>o.setName('channel').setDescription('Optional destination channel; defaults to the configured giveaway channel')
                     .addChannelTypes(ChannelType.GuildText,ChannelType.GuildAnnouncement))
         )
