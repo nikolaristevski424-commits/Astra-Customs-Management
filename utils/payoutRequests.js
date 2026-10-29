@@ -40,4 +40,16 @@ function updateStatus(guildId, id, status, extra = {}) {
     return updated;
 }
 
-module.exports = { create, find, list, updateStatus };
+function updatePublication(guildId,id,patch={}){
+    let result=null;
+    store.update(STORE,guildId,defaultState(),state=>{
+        const record=state.list.find(r=>r.id===Number(id));
+        if(record){
+            Object.assign(record,patch);
+            result=record;
+        }
+        return state;
+    });
+    return result;
+}
+module.exports = { create, find, list, updateStatus, updatePublication };
