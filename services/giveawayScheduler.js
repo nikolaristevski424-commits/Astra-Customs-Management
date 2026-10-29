@@ -3,6 +3,7 @@ const { withFooter } = require('../utils/footerBranding');
 // out, picks winners, and edits the original message to show them.
 
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const giveaways = require('../utils/giveaways');
 const giveawayCmd = require('../commands/giveaway');
 
@@ -11,6 +12,7 @@ const CHECK_INTERVAL_MS = 30_000;
 function start(client) {
     setInterval(async () => {
         for (const [guildId] of client.guilds.cache) {
+            if (!serverScope.isAstraGuild(guildId)) continue;
             try {
                 const cfg = config.getConfig(guildId);
                 const expired = giveaways.findExpired(guildId);
