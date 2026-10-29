@@ -2,6 +2,7 @@
 // passed, removes the LOA role, and marks them ended.
 
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const loa = require('../utils/loa');
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
@@ -9,6 +10,7 @@ const CHECK_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 function start(client) {
     setInterval(async () => {
         for (const [guildId, guild] of client.guilds.cache) {
+            if (!serverScope.isAstraGuild(guildId)) continue;
             try {
                 const cfg = config.getConfig(guildId);
                 const expired = loa.findExpired(guildId);
