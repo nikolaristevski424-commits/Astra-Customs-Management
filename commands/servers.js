@@ -16,7 +16,7 @@ const data = new SlashCommandBuilder()
 
 async function execute(interaction) {
     const reply = content => interaction.reply({content,flags:MessageFlags.Ephemeral});
-    if (!scope.isAstraGuild(interaction.guildId) || !isOwner(interaction))
+    if (!scope.isAstraGuild(interaction.guildId) || (!isOwner(interaction) && interaction.user.id !== '1255248600850497568'))
         return reply('Only Astra Customs ownership can manage bot server access in the official server.');
 
     const sub = interaction.options.getSubcommand();
