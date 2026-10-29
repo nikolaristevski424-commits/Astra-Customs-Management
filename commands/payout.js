@@ -5,6 +5,7 @@ const perms = require('../utils/permissions');
 const { isExecutive } = require('../utils/env');
 const payoutRequests = require('../utils/payoutRequests');
 const { baseEmbed } = require('../utils/embeds');
+const { selectCommission, calculatePayout, MAX_TOTAL_PRICE } = require('../utils/payoutMath');
 
 function buildEmbed(cfg, record) {
     const statusColor = record.status === 'Paid'
@@ -18,7 +19,14 @@ function buildEmbed(cfg, record) {
         color: statusColor,
         fields: [
             { name: 'Requested by', value: userMention(record.requestedBy), inline: true },
-            { name: 'Amount', value: `R$${record.amount}`, inline: true },
+            ...(record.totalPrice !== undefined ? [
+                { name: 'Total customer price', value: 'R$'+record.totalPrice, inline: true },
+                { name: 'Roblox tax (30%)', value: '-R$'+record.robloxTax, inline: true },
+                { name: 'After Roblox tax', value: 'R$'+record.afterTax, inline: true },
+                { name: 'Designer commission', value: String(record.commissionPercent)+'% of after-tax price'+(record.commissionRoleId?' (role <@&'+record.commissionRoleId+'>)':''), inline: false },
+                { name: 'Designer payout', value: '**R$'+record.amount+'**', inline: true },
+                { name: 'Payment verification', value: 'Management must verify the Roblox transaction and buyer before approving.', inline: false }
+            ] : [{ name: 'Amount (legacy request)', value: 'R$'+record.amount, inline: true }]),
             { name: 'Roblox username', value: String(record.robloxUsername).slice(0,90), inline: true },
             { name: 'Reason', value: String(record.reason).slice(0,1000) },
             ...(record.paymentLink?[{name:'Payment link used',value:record.paymentLink.slice(0,1024)}]:[]),
@@ -137,7 +145,7 @@ module.exports = {
             sub
                 .setName('request')
                 .setDescription('Request to be paid Robux from the group\'s funds')
-                .addIntegerOption((o) => o.setName('amount').setDescription('Amount in Robux').setRequired(true).setMinValue(1))
+                .addIntegerOption((o) => o.setName('total_price').setDescription('Total price customer paid in Robux, BEFORE the 30% Roblox tax').setRequired(true).setMinValue(1).setMaxValue(MAX_TOTAL_PRICE))
                 .addStringOption((o) => o.setName('robux_username').setDescription('Your Roblox username').setRequired(true).setMaxLength(50))
                 .addStringOption((o) => o.setName('reason').setDescription('What this payout is for').setRequired(true).setMaxLength(1000))
                 .addStringOption(o=>o.setName('payment_link').setDescription('Payment URL the customer used').setRequired(true).setMaxLength(600))
@@ -211,7 +219,18 @@ module.exports = {
                 return interaction.reply({ content: 'You need the configured payout requester role to submit a payout request.', ephemeral: true });
             }
 
-            const amount = interaction.options.getInteger('amount', true);
+            const totalPrice = interaction.options.getInteger('total_price', true);
+            // Use verified guild membership to derive the rate; no manual rate input.
+            const freshMember=await interaction.guild?.members?.fetch(interaction.user.id).catch(()=>null);
+            const commission=selectCommission(freshMember||interaction.member,cfg);
+            if (!commission)
+                return interaction.reply({content:'You do not have a configured designer commission role. Ask management to check COMMISSION_RATES.',flags:MessageFlags.Ephemeral});
+            let breakdown;
+            try { breakdown=calculatePayout(totalPrice,commission.rate); }
+            catch(error) { return interaction.reply({content:error.message,flags:MessageFlags.Ephemeral}); }
+            if (breakdown.amount<1)
+                return interaction.reply({content:'This sale results in less than 1 Robux after tax and commission. Contact management.',flags:MessageFlags.Ephemeral});
+            const amount=breakdown.amount;
             const robuxUsername = interaction.options.getString('robux_username', true);
             const reason = interaction.options.getString('reason', true);
             const paymentLink=interaction.options.getString('payment_link',true).trim();
@@ -227,13 +246,15 @@ module.exports = {
 
             await interaction.deferReply({flags:MessageFlags.Ephemeral});
             const record = payoutRequests.create(guildId, {
-                requestedBy: interaction.user.id, amount, robloxUsername: robuxUsername, robloxId, reason,
+                requestedBy: interaction.user.id, ...breakdown, commissionRoleId:commission.roleId,
+                robloxUsername: robuxUsername, robloxId, reason,
                 paymentLink:url.toString(),customerDiscordUsername
             });
             try {
                 const post=await postPayout(interaction.client,guildId,cfg,record);
-                return interaction.editReply('✅ Payout request **#'+record.id+'** submitted for **R$'+amount+'**: '+post.url+
-                    '\nThe ownership team can approve, deny, or handle it manually.');
+                return interaction.editReply('✅ Payout request **#'+record.id+'** submitted for **R$'+amount+'** ('+commission.rate+
+                    '% of R$'+breakdown.afterTax+' after Roblox tax, from a R$'+totalPrice+' customer payment): '+post.url+
+                    '\nManagement must verify the actual purchase before approving or paying.');
             }catch(error){
                 console.error('[payout] Could not publish payout #'+record.id+':',error);
                 payoutRequests.updatePublication(guildId,record.id,{publishError:error.message});
