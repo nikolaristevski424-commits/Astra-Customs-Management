@@ -1,5 +1,6 @@
 const { Events, MessageFlags } = require('discord.js');
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const perms = require('../utils/permissions');
 const panelCmd = require('../commands/panel');
 
@@ -17,7 +18,7 @@ const SHORTCUTS = {
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
-        if (message.author.bot || !message.guild) return;
+        if (message.author.bot || !message.guild || !serverScope.isAstraGuild(message.guild.id)) return;
 
         const guildId = message.guild.id;
         const cfg = config.getConfig(guildId);
