@@ -1,5 +1,6 @@
 const hr=require('../utils/hr');
 const config=require('../utils/config');
+const serverScope=require('../utils/serverScope');
 const ROLES={Suspension:'STAFF_SUSPENDED_ROLE_ID',Termination:'STAFF_TERMINATED_ROLE_ID','Staff Blacklist':'STAFF_BLACKLIST_ROLE_ID'};
 async function apply(client,guildId,record){
  if(!record || !ROLES[record.punishment])return;
@@ -21,6 +22,7 @@ async function apply(client,guildId,record){
 }
 async function expire(client){
  for(const [guildId,guild] of client.guilds.cache){
+   if(!serverScope.isAstraGuild(guildId))continue;
    const roleId=process.env.STAFF_SUSPENDED_ROLE_ID;
    if(!roleId)continue;
    const records=hr.listInfractions(guildId);
