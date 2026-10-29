@@ -1,5 +1,5 @@
 const { withFooter } = require('../utils/footerBranding');
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, userMention } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, userMention, ChannelType, MessageFlags } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const giveaways = require('../utils/giveaways');
@@ -112,6 +112,9 @@ module.exports = {
                 .addStringOption((o) => o.setName('sponsor_invite').setDescription("Join link for the sponsor's server"))
                 .addStringOption((o) => o.setName('ping').setDescription('Who to notify (default: no ping)').addChoices(...PING_CHOICES))
                 .addRoleOption((o) => o.setName('ping_role').setDescription('Role to ping — only used when ping is set to "A specific role"'))
+                .addChannelOption(o=>o.setName('channel').setDescription('Optional channel to post the giveaway').addChannelTypes(ChannelType.GuildText,ChannelType.GuildAnnouncement))
+                .addChannelOption(o=>o.setName('channel').setDescription('Optional destination channel; defaults to the configured giveaway channel')
+                    .addChannelTypes(ChannelType.GuildText,ChannelType.GuildAnnouncement))
         )
         .addSubcommand((sub) =>
             sub.setName('reroll').setDescription('Pick new winner(s) for an ended giveaway').addIntegerOption((o) => o.setName('giveaway_id').setDescription('Giveaway ID').setRequired(true))
@@ -156,28 +159,31 @@ module.exports = {
                 return interaction.reply({ content: 'Please provide a valid Discord invite link for `sponsor_invite` (e.g. https://discord.gg/...).', ephemeral: true });
             }
 
-            const giveaway = giveaways.create(guildId, {
-                prize,
-                winnerCount,
-                hostedBy: interaction.user.id,
-                endsAt: Date.now() + durationMs,
-                sponsor: sponsor || null,
-                sponsorInvite: sponsorInvite || null,
-                pingType,
-                pingRoleId: pingRole?.id || null,
+            const target=interaction.options.getChannel('channel');
+            const targetChannelId=target?.id||cfg.giveawayChannelId||interaction.channelId;
+            const channel=target||await interaction.client.channels.fetch(targetChannelId).catch(()=>null);
+            if(!channel?.send || (channel.guildId && channel.guildId!==guildId))
+                return interaction.reply({content:'Please choose a valid text channel for the giveaway.',flags:MessageFlags.Ephemeral});
+            await interaction.deferReply({flags:MessageFlags.Ephemeral});
+            const giveaway=giveaways.create(guildId,{
+                prize,winnerCount,hostedBy:interaction.user.id,
+                endsAt:Date.now()+durationMs,sponsor:sponsor||null,
+                sponsorInvite:sponsorInvite||null,pingType,pingRoleId:pingRole?.id||null
             });
-
-            const targetChannelId = cfg.giveawayChannelId || interaction.channelId;
-            const channel = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
-            if (!channel) {
-                return interaction.reply({ content: `Giveaway \`#${giveaway.id}\` saved, but the giveaway channel isn't reachable. Set \`GIVEAWAY_CHANNEL_ID\` in \`.env\`.`, ephemeral: true });
+            try{
+                const ping=buildPing(giveaway);
+                const sent=await channel.send(withFooter({
+                    content:ping.content,embeds:[buildEmbed(cfg,giveaway)],
+                    components:[buildRow(giveaway)],allowedMentions:ping.allowedMentions
+                },cfg));
+                giveaways.attachMessage(guildId,giveaway.id,sent.id,sent.channelId);
+                return interaction.editReply('✅ Giveaway **#'+giveaway.id+'** posted in <#'+sent.channelId+'>: '+sent.url);
+            }catch(error){
+                giveaways.setWinners(guildId,giveaway.id,[]);
+                console.error('[giveaway] Posting failed:',error);
+                return interaction.editReply('Giveaway could not be posted to <#'+targetChannelId+'>: '+error.message.slice(0,200));
             }
 
-            const ping = buildPing(giveaway);
-            const sent = await channel.send(withFooter({ content: ping.content, embeds: [buildEmbed(cfg, giveaway)], components: [buildRow(giveaway)], allowedMentions: ping.allowedMentions }));
-            giveaways.attachMessage(guildId, giveaway.id, sent.id, sent.channelId);
-
-            return interaction.reply({ content: `Giveaway \`#${giveaway.id}\` started for **${prize}**, ending <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`, ephemeral: true });
         }
 
         if (sub === 'reroll') {

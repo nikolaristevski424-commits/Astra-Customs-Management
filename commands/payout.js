@@ -21,6 +21,8 @@ function buildEmbed(cfg, record) {
             { name: 'Amount', value: `R$${record.amount}`, inline: true },
             { name: 'Roblox username', value: String(record.robloxUsername).slice(0,90), inline: true },
             { name: 'Reason', value: String(record.reason).slice(0,1000) },
+            ...(record.paymentLink?[{name:'Payment link used',value:record.paymentLink.slice(0,1024)}]:[]),
+            ...(record.customerDiscordUsername?[{name:'Customer Discord username',value:record.customerDiscordUsername.slice(0,250)}]:[]),
             { name: 'Decision', value: record.status==='Pending'?'🟠 Pending review':record.status==='Paid'?'🟢 Paid — recorded by management':'🔴 Denied', inline: true },
             ...(record.paidBy ? [{ name: 'Reviewed by', value: userMention(record.paidBy), inline: true }] : []),
             ...(record.deniedBy ? [{ name: 'Denied by', value: userMention(record.deniedBy), inline: true }] : []),
@@ -138,6 +140,8 @@ module.exports = {
                 .addIntegerOption((o) => o.setName('amount').setDescription('Amount in Robux').setRequired(true).setMinValue(1))
                 .addStringOption((o) => o.setName('robux_username').setDescription('Your Roblox username').setRequired(true).setMaxLength(50))
                 .addStringOption((o) => o.setName('reason').setDescription('What this payout is for').setRequired(true).setMaxLength(1000))
+                .addStringOption(o=>o.setName('payment_link').setDescription('Payment URL the customer used').setRequired(true).setMaxLength(600))
+                .addStringOption(o=>o.setName('customer_discord').setDescription('Discord username of the customer who purchased').setRequired(true).setMaxLength(100))
                 .addStringOption((o) => o.setName('roblox_id').setDescription('Your Roblox user ID, if known (speeds up an auto-send attempt)'))
         )
         .addSubcommand(sub=>sub.setName('publish').setDescription('Publish an existing saved payout request (executives only)')
@@ -210,11 +214,21 @@ module.exports = {
             const amount = interaction.options.getInteger('amount', true);
             const robuxUsername = interaction.options.getString('robux_username', true);
             const reason = interaction.options.getString('reason', true);
+            const paymentLink=interaction.options.getString('payment_link',true).trim();
+            const customerDiscordUsername=interaction.options.getString('customer_discord',true).trim();
+            let url;
+            try{url=new URL(paymentLink)}catch{}
+            if(!url || url.protocol!=='https:' || !url.hostname || url.username || url.password)
+                return interaction.reply({content:'A valid HTTPS payment URL is required.',flags:MessageFlags.Ephemeral});
+            if(!customerDiscordUsername)
+                return interaction.reply({content:'Enter the customer\'s Discord username.',flags:MessageFlags.Ephemeral});
+
             const robloxId = interaction.options.getString('roblox_id') || null;
 
             await interaction.deferReply({flags:MessageFlags.Ephemeral});
             const record = payoutRequests.create(guildId, {
-                requestedBy: interaction.user.id, amount, robloxUsername: robuxUsername, robloxId, reason
+                requestedBy: interaction.user.id, amount, robloxUsername: robuxUsername, robloxId, reason,
+                paymentLink:url.toString(),customerDiscordUsername
             });
             try {
                 const post=await postPayout(interaction.client,guildId,cfg,record);

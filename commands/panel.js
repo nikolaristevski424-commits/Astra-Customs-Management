@@ -91,23 +91,33 @@ function orderPanel(cfg){
 }
 
 function applicationsPanel(cfg) {
-    const container = baseContainer(cfg, 'applications');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Employee Applications\n\n*${cfg.brandName} is hiring!* Review the requirements below, then choose the application that fits you best.`));
-    container.addSeparatorComponents(new SeparatorBuilder());
-    const designerStatus = getStatus(cfg, 'designer');
-    const staffStatus = getStatus(cfg, 'staff');
-    const designerInfo = STATUSES[designerStatus];
-    const staffInfo = STATUSES[staffStatus];
+    const container=baseContainer(cfg,'applications');
+    const entries=[
+      ['designer','🎨','Portfolio and design experience'],
+      ['staff','🧑‍💼','Helpful support and customer communication'],
+      ['moderator','🛡️','Fair moderation and professional conduct'],
+      ['partnership','🤝','Community outreach and genuine partnerships']
+    ];
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        `**${APPLICATIONS.designer.name} — ${designerInfo.emoji} ${designerInfo.label}**\n> ${STATUSES.open.emoji} Past experience\n> ${STATUSES.open.emoji} 13+\n> ${STATUSES.open.emoji} Active, dedicated, and professional\n\n**${APPLICATIONS.staff.name} — ${staffInfo.emoji} ${staffInfo.label}**\n> ${STATUSES.open.emoji} 13+\n> ${STATUSES.open.emoji} Active and dedicated\n> ${STATUSES.open.emoji} At least 3 tickets per week`
-    ));
+      '## '+cfg.brandName+' | Team Applications\n\nJoin a team that helps Astra Customs grow. Review availability and choose the role that fits you.'));
     container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Answer every question honestly and with useful detail. Designers should prepare portfolio links and list their software or specialties. Submitting an application does not guarantee acceptance.'));
+    for(const [key,emoji,description] of entries){
+      const status=getStatus(cfg,key),info=STATUSES[status];
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        emoji+' **'+APPLICATIONS[key].name+'** — '+info.emoji+' **'+info.label+'**\n'+description));
+    }
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      '*Closed applications cannot be submitted. Delayed applications are accepted but may take longer to review. Please answer every question honestly.*'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('application_staff_open').setLabel(APPLICATIONS.staff.buttonLabel).setStyle(ButtonStyle.Primary).setEmoji('🧑‍💼').setDisabled(staffStatus === 'closed'),
-        new ButtonBuilder().setCustomId('application_designer_open').setLabel(APPLICATIONS.designer.buttonLabel).setStyle(ButtonStyle.Success).setEmoji('🎨').setDisabled(designerStatus === 'closed'),
+      new ButtonBuilder().setCustomId('application_designer_open').setLabel('Creative Team').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'designer')==='closed'),
+      new ButtonBuilder().setCustomId('application_staff_open').setLabel('Customer Support').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'staff')==='closed')
     ));
-    return { components: [container] };
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('application_moderator_open').setLabel('Discord Moderator').setStyle(ButtonStyle.Secondary).setDisabled(getStatus(cfg,'moderator')==='closed'),
+      new ButtonBuilder().setCustomId('application_partnership_open').setLabel('Partnership Team').setStyle(ButtonStyle.Secondary).setDisabled(getStatus(cfg,'partnership')==='closed')
+    ));
+    return {components:[container]};
 }
 
 function portfolioPanel(cfg, guildId) {

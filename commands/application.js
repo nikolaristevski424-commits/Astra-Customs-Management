@@ -2,7 +2,8 @@ const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const config = require('../utils/config');
 const perms = require('../utils/permissions');
 const { BUILDERS } = require('./panel');
-const { sendWithAttachments } = require('../utils/respond');
+const { withFooter }=require('../utils/footerBranding');
+const {isOwner}=require('../utils/ownership');
 const { APPLICATIONS, STATUSES, STATUS_CHOICES } = require('../utils/applicationStatus');
 
 module.exports = {
@@ -16,10 +17,7 @@ module.exports = {
                 .setName('application')
                 .setDescription('Application to update.')
                 .setRequired(true)
-                .addChoices(
-                    { name: APPLICATIONS.designer.name, value: 'designer' },
-                    { name: APPLICATIONS.staff.name, value: 'staff' },
-                ))
+                .addChoices(...Object.entries(APPLICATIONS).map(([value,app])=>({name:app.name,value}))))
             .addStringOption((option) => option
                 .setName('status')
                 .setDescription('Application availability.')
@@ -28,7 +26,7 @@ module.exports = {
 
     async execute(interaction) {
         const cfg = config.getConfig(interaction.guildId);
-        if (!perms.isStaff(interaction.member, cfg)) {
+        if (!perms.isManager(interaction.member,cfg) && !isOwner(interaction)) {
             return interaction.reply({ content: 'You do not have permission to change application status.', flags: MessageFlags.Ephemeral });
         }
 
@@ -38,42 +36,26 @@ module.exports = {
 
         const definition = APPLICATIONS[application];
         const statusInfo = STATUSES[status];
-        let panelMessage = '';
-        const panelLocation = updatedConfig.applicationPanel;
-        if (panelLocation?.channelId && panelLocation.messageId) {
-            try {
-                const channel = await interaction.client.channels.fetch(panelLocation.channelId);
-                if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
-                    throw new Error('The saved applications panel channel is unavailable or is not a server text channel.');
-                }
-
-                let previousPanel;
-                try {
-                    previousPanel = await channel.messages.fetch(panelLocation.messageId);
-                } catch (error) {
-                    console.warn('[applications] Could not fetch the previous panel; posting a replacement:', error.message);
-                }
-
-                const replacement = await sendWithAttachments(channel, {
-                    flags: MessageFlags.IsComponentsV2,
-                    ...BUILDERS.applications(updatedConfig),
-                });
-                config.setNested(interaction.guildId, 'applicationPanel', { channelId: replacement.channelId, messageId: replacement.id });
-                panelMessage = ' The applications panel was refreshed.';
-
-                if (previousPanel) {
-                    try {
-                        await previousPanel.delete();
-                    } catch (error) {
-                        console.warn('[applications] Could not remove the previous panel message:', error.message);
-                    }
-                }
-            } catch (error) {
-                console.error('[applications] Status saved, but the panel could not be refreshed:', error);
-                panelMessage = ' The status was saved, but the panel could not be refreshed. Run `/panel applications` to post it again.';
-            }
-        } else {
-            panelMessage = ' Run `/panel applications` once to publish the status panel.';
+        let panelMessage='';
+        const location=updatedConfig.applicationPanel;
+        if(location?.channelId&&location?.messageId){
+          try {
+            const channel=await interaction.client.channels.fetch(location.channelId);
+            const previous=await channel?.messages?.fetch(location.messageId);
+            if(!previous || previous.author?.id!==interaction.client.user.id)
+              throw Error('The saved panel is missing or was posted by a different bot.');
+            await previous.edit(withFooter({
+              flags:MessageFlags.IsComponentsV2,
+              ...BUILDERS.applications(updatedConfig)
+            },updatedConfig));
+            panelMessage=' ✅ Existing applications panel updated in place: '+previous.url;
+          }catch(error){
+            console.error('[application] Could not edit applications panel:',error);
+            panelMessage=' ⚠️ The status was saved but the existing panel could not be edited: '+error.message.slice(0,180)+
+              '. Run \`/panel applications\` to publish a new panel.';
+          }
+        }else{
+          panelMessage=' No published panel registered. Run \`/panel applications\` to publish one.';
         }
 
         return interaction.reply({

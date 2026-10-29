@@ -69,6 +69,8 @@ const ENV_FIELD_MAP = [
     ['APPLICATION_REVIEWER_ROLE_ID', 'applicationReviewerRoleIds', 'idlist'],
     ['STAFF_APPLICATION_ACCEPT_ROLE_ID', 'staffApplicationAcceptRoleId', 'idlist'],
     ['DESIGNER_APPLICATION_ACCEPT_ROLE_ID', 'designerApplicationAcceptRoleId', 'idlist'],
+    ['MODERATOR_APPLICATION_ACCEPT_ROLE_ID', 'moderatorApplicationAcceptRoleId', 'idlist'],
+    ['PARTNERSHIP_TEAM_ROLE_ID', 'partnershipApplicationAcceptRoleId', 'idlist'],
     ['LOA_ROLE_ID', 'loaRoleId', 'string'],
 
     // Commission

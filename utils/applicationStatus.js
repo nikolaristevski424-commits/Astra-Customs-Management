@@ -1,6 +1,8 @@
 const APPLICATIONS = Object.freeze({
     designer: { name: 'Creative Team', buttonLabel: 'Apply: Creative Team' },
     staff: { name: 'Customer Support', buttonLabel: 'Apply: Customer Support' },
+    moderator: { name: 'Discord Moderator', buttonLabel: 'Apply: Moderator' },
+    partnership: { name: 'Partnership Team', buttonLabel: 'Apply: Partnerships' },
 });
 
 const STATUSES = Object.freeze({

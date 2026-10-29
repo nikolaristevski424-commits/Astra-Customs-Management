@@ -47,6 +47,7 @@ const activityUtil = require('../utils/activity');
 const activityCmd = require('../commands/activity');
 const deadchatCmd = require('../commands/deadchat');
 const applicationStatus = require('../utils/applicationStatus');
+const {questionsFor}=require('../utils/applicationQuestions');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -478,28 +479,25 @@ async function handleButton(interaction) {
     }
 
     // ---- Dashboard: staff/designer applications ----
-    if (customId === 'application_staff_open' || customId === 'application_designer_open') {
-        const type = customId === 'application_staff_open' ? 'staff' : 'designer';
-        if (applicationStatus.getStatus(cfg, type) === 'closed') {
-            return interaction.reply({ content: `The **${applicationStatus.APPLICATIONS[type].name}** application is currently closed.`, flags: MessageFlags.Ephemeral });
-        }
-        const modal = new ModalBuilder().setCustomId(`application_${type}_modal`).setTitle(`${type === 'staff' ? 'Staff' : 'Designer'} Application`);
-        const questions = type === 'staff'
-            ? [
-                  ['why_join', 'Why should we choose you for the team?', TextInputStyle.Paragraph, 1000],
-                  ['activity', 'How active can you be from 1-10?', TextInputStyle.Short, 10],
-                  ['experience', 'What experience do you have?', TextInputStyle.Paragraph, 1000],
-                  ['difficult_customer', 'How would you handle a difficult customer?', TextInputStyle.Paragraph, 1000],
-                  ['roblox_username', 'Roblox Username', TextInputStyle.Short, 50],
-              ]
-            : [
-                  ['why_join', 'Why do you want to join as a designer?', TextInputStyle.Paragraph, 1000],
-                  ['portfolio', 'Portfolio link(s)', TextInputStyle.Short, 500],
-                  ['software', 'What software do you use?', TextInputStyle.Short, 300],
-                  ['specialties', 'What do you specialize in?', TextInputStyle.Paragraph, 700],
-                  ['roblox_username', 'Roblox Username', TextInputStyle.Short, 50],
-              ];
-        modal.addComponents(...questions.map(([id, label, style, maxLength]) => new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style).setRequired(true).setMaxLength(maxLength))));
+    if (/^application_(staff|designer|moderator|partnership)_open$/.test(customId)) {
+        const type=customId.split('_')[1];
+        const questions=questionsFor(type);
+        if (!questions || !applicationStatus.APPLICATIONS[type])
+            return interaction.reply({content:'Unknown application type.',flags:MessageFlags.Ephemeral});
+        if (applicationStatus.getStatus(cfg,type)==='closed')
+            return interaction.reply({content:'**'+applicationStatus.APPLICATIONS[type].name+'** applications are closed.',flags:MessageFlags.Ephemeral});
+        const modal=new ModalBuilder().setCustomId('application_'+type+'_modal')
+            .setTitle((applicationStatus.APPLICATIONS[type].name+' Application').slice(0,45));
+        modal.addComponents(...questions.map(q=>{
+            const input=new TextInputBuilder().setCustomId(q.id).setLabel(q.label)
+                .setStyle(q.short?TextInputStyle.Short:TextInputStyle.Paragraph)
+                .setRequired(true).setMaxLength(q.max);
+            if(q.id==='why_moderator'||q.id==='partner_role'||q.id==='partner_growth')
+                input.setPlaceholder('Please write at least two full sentences.');
+            if(q.id==='partner_ideas')
+                input.setPlaceholder('1. ...  2. ...  3. ...');
+            return new ActionRowBuilder().addComponents(input);
+        }));
         return interaction.showModal(modal);
     }
 
@@ -945,7 +943,12 @@ async function handleModal(interaction) {
         }
 
         let roleWarning = '';
-        const configuredRoles=type==='staff' ? cfg.staffApplicationAcceptRoleId : cfg.designerApplicationAcceptRoleId;
+        const configuredRoles=({
+            staff:cfg.staffApplicationAcceptRoleId,
+            designer:cfg.designerApplicationAcceptRoleId,
+            moderator:cfg.moderatorApplicationAcceptRoleId,
+            partnership:cfg.partnershipApplicationAcceptRoleId
+        })[type]||[];
         const acceptedRoleIds=(Array.isArray(configuredRoles)?configuredRoles:String(configuredRoles||'').split(','))
             .map(id=>String(id).trim()).filter(id=>/^\d{17,22}$/.test(id));
         if (accepted && acceptedRoleIds.length) {
@@ -997,63 +1000,58 @@ async function handleModal(interaction) {
         return interaction.reply({ content: `${appName} application ${status.toLowerCase()}.${roleWarning}`, flags: MessageFlags.Ephemeral });
     }
 
-    if (customId === 'application_staff_modal' || customId === 'application_designer_modal') {
-        const type = customId === 'application_staff_modal' ? 'staff' : 'designer';
-        if (applicationStatus.getStatus(cfg, type) === 'closed') {
-            return interaction.reply({ content: `The **${applicationStatus.APPLICATIONS[type].name}** application is currently closed. Your application was not submitted.`, flags: MessageFlags.Ephemeral });
+    if (/^application_(staff|designer|moderator|partnership)_modal$/.test(customId)) {
+        const type=customId.split('_')[1];
+        const questions=questionsFor(type);
+        if(!questions)return interaction.reply({content:'Unknown application type.',flags:MessageFlags.Ephemeral});
+        // Server-side gate: even an outdated button or an already-open modal
+        // cannot submit after management closes this application.
+        if(applicationStatus.getStatus(config.getConfig(guildId),type)==='closed')
+            return interaction.reply({content:'**'+applicationStatus.APPLICATIONS[type].name+'** applications are now closed. This application was not submitted.',flags:MessageFlags.Ephemeral});
+        const answers=questions.map(q=>({
+            ...q,value:interaction.fields.getTextInputValue(q.id).trim()
+        }));
+        if(answers.some(q=>!q.value))
+            return interaction.reply({content:'Please answer all of the questions.',flags:MessageFlags.Ephemeral});
+        const longAnswers=['why_moderator','partner_role','partner_growth'];
+        if(answers.some(q=>longAnswers.includes(q.id) && q.value.split(/[.!?]+\s+|[.!?]+$/).filter(v=>v.trim().length>1).length<2)){
+            return interaction.reply({content:'The motivation and partnership responses marked **2+ sentences** need at least two sentences. Please reopen the application and try again.',flags:MessageFlags.Ephemeral});
         }
-        const answers = Object.fromEntries(['why_join', 'activity', 'experience', 'difficult_customer', 'roblox_username', 'portfolio', 'software', 'specialties']
-            .map((field) => [field, interaction.fields.fields.has(field) ? interaction.fields.getTextInputValue(field) : null]));
-
-        await interaction.deferReply({ ephemeral: true });
-
-        if (!cfg.applicationsChannelId) {
-            return interaction.editReply('Applications are not configured yet. Ask an administrator to set `APPLICATIONS_CHANNEL_ID` in `.env`.');
+        if(type==='partnership' && answers.find(q=>q.id==='partner_ideas').value.split(/(?:^|\n)\s*(?:[123][.)-]|[-•])\s*/m).filter(x=>x.trim()).length<3){
+            // Do not require list numbering: freeform text might give 3 ideas
+            // without bullets, so avoid rejecting otherwise complete answers.
         }
-
-        const channel = await interaction.client.channels.fetch(cfg.applicationsChannelId).catch(() => null);
-        if (!channel?.isTextBased?.() || channel.isDMBased?.()) {
-            return interaction.editReply('The configured applications channel is not a usable server text channel. Please contact an administrator.');
-        }
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`app_accept_${type}_${interaction.user.id}`).setLabel('Approve Applicant').setEmoji('✅').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`app_deny_${type}_${interaction.user.id}`).setLabel('Deny Applicant').setEmoji('❌').setStyle(ButtonStyle.Danger),
+        await interaction.deferReply({flags:MessageFlags.Ephemeral});
+        if(!cfg.applicationsChannelId)
+            return interaction.editReply('Applications are not configured. Ask an administrator to set \`APPLICATIONS_CHANNEL_ID\`.');
+        const channel=await interaction.client.channels.fetch(cfg.applicationsChannelId).catch(()=>null);
+        if(!channel?.send)
+            return interaction.editReply('The application review channel is not reachable. Please contact management.');
+        const row=new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('app_accept_'+type+'_'+interaction.user.id).setLabel('Approve Applicant').setEmoji('✅').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('app_deny_'+type+'_'+interaction.user.id).setLabel('Deny Applicant').setEmoji('❌').setStyle(ButtonStyle.Danger),
         );
-        const fields = [
-            { name: 'Applicant', value: `<@${interaction.user.id}>`, inline: true },
-            { name: 'Application type', value: type === 'staff' ? 'Staff' : 'Designer', inline: true },
-            { name: 'Roblox Username', value: answers.roblox_username, inline: true },
-            { name: 'Why join?', value: answers.why_join },
+        const fields=[
+            {name:'Applicant',value:'<@'+interaction.user.id+'>',inline:true},
+            {name:'Application type',value:applicationStatus.APPLICATIONS[type].name,inline:true},
+            ...answers.map(q=>({name:q.question.slice(0,256),value:q.value.slice(0,1024)}))
         ];
-        if (type === 'staff') {
-            fields.push(
-                { name: 'Activity (1-10)', value: answers.activity, inline: true },
-                { name: 'Experience', value: answers.experience },
-                { name: 'Difficult customer response', value: answers.difficult_customer },
-            );
-        } else {
-            fields.push(
-                { name: 'Portfolio', value: answers.portfolio },
-                { name: 'Software', value: answers.software, inline: true },
-                { name: 'Specialties', value: answers.specialties },
-            );
-        }
-        try {
+        try{
             await channel.send(withFooter({
-                content: cfg.applicationReviewerRoleIds.length ? cfg.applicationReviewerRoleIds.map((roleId) => `<@&${roleId}>`).join(' ') : undefined,
-                embeds: [{ title: `${type === 'staff' ? 'Staff' : 'Designer'} Application`, color: 0x2d2d31, fields, footer: { text: 'Review the application and choose Accept or Deny.' }, timestamp: new Date().toISOString() }],
-                components: [row],
-                allowedMentions: { roles: cfg.applicationReviewerRoleIds },
-            }));
-        } catch (error) {
-            console.error('[applications] Failed to send application:', error.message);
-            return interaction.editReply('Your application could not be delivered. Please contact an administrator to check the applications channel permissions.');
+                content:cfg.applicationReviewerRoleIds.length?cfg.applicationReviewerRoleIds.map(id=>'<@&'+id+'>').join(' '):undefined,
+                embeds:[{title:applicationStatus.APPLICATIONS[type].name+' Application',
+                    color:0x3d66b9,fields,
+                    footer:{text:'Astra Customs | Management review'},
+                    timestamp:new Date().toISOString()}],
+                components:[row],
+                allowedMentions:{roles:cfg.applicationReviewerRoleIds,users:[]}
+            },cfg));
+        }catch(error){
+            console.error('[applications] Submission failed:',error);
+            return interaction.editReply('Your application could not be delivered. Please contact management.');
         }
-
-        await interaction.user.send(`Your **${type} application** was submitted to **${cfg.brandName}**. The team will review it and DM you when a decision is made.`).catch(() => {});
-
-        return interaction.editReply('Your application has been submitted!');
+        await interaction.user.send('Your **'+applicationStatus.APPLICATIONS[type].name+'** application to **'+cfg.brandName+'** was submitted. Management will contact you after review.').catch(()=>{});
+        return interaction.editReply('Your **'+applicationStatus.APPLICATIONS[type].name+'** application was submitted successfully!');
     }
 
     if (customId.startsWith('text_edit_')) {
