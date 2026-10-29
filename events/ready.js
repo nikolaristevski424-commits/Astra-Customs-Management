@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const purchaseMonitor = require('../services/purchaseMonitor');
+const serverScope = require('../utils/serverScope');
 const loaExpiry = require('../services/loaExpiry');
 const giveawayScheduler = require('../services/giveawayScheduler');
 const activityCheckExpiry = require('../services/activityCheckExpiry');
@@ -13,6 +14,7 @@ module.exports = {
         console.log(`[ready] Logged in as ${client.user.tag} — serving ${client.guilds.cache.size} server(s).`);
         client.user.setActivity('/help');
 
+        await serverScope.enforceGuilds(client);
         purchaseMonitor.start(client);
         loaExpiry.start(client);
         giveawayScheduler.start(client);
