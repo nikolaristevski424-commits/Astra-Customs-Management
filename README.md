@@ -36,6 +36,37 @@ commented — work through it section by section:
 - **Channels** — every channel the bot posts to (order log, tickets, applications, LOA, honeypot, giveaways, etc.) — right-click a channel → Copy Channel ID (needs Developer Mode on in Discord settings)
 - **Roblox** — group ID, universe ID, game pass pool, API key/cookie — see [Payments](#payments) below
 
+## Astra Customs-only server access
+
+This is a private bot restricted to the official Astra Customs Discord guild `1488378242846036070`.
+Slash commands, old message buttons/modals, purchase monitoring, and scheduled staff automation
+are disabled in every other guild, even if the bot is still physically installed there.
+
+Use `/servers list` inside Astra Customs to privately see its connected guilds and their IDs.
+Only Discord user `1255248600850497568` can use `/server leave server_id:<ID> confirm:true`
+(or the plural alias `/servers leave`) to remove the bot from another guild.
+The official Astra Customs guild cannot be removed with these commands.
+
+Wispbyte option `AUTO_LEAVE_OTHER_GUILDS=0` (default) keeps other guilds connected
+but blocked until removed manually. Set `AUTO_LEAVE_OTHER_GUILDS=1` and restart
+to make the bot automatically leave all other guilds and reject future joins.
+Changing this setting does not authorize anyone to use `/server leave`.
+
+## Payout calculation
+
+Designers submit `/payout request total_price:<gross customer price>`, their Roblox name,
+the original payment URL, and the customer's Discord username.
+The bot applies a 30% Roblox deduction, floors to whole Robux, then pays the
+highest matching configured designer role percentage (80%, 85%, 90%, or 95%)
+of the after-tax amount, also rounded down. The saved review embeds show
+the gross price, tax, after-tax proceeds, matched role/rate, and payout.
+
+`COMMISSION_RATES=1497420258900709426:80,1497420310599700560:85,1497420194807808174:90,1497420135814791301:95`
+
+These are *estimates based on entered purchase prices*, not evidence of payment.
+Management must confirm the transaction, buyer, and actual net Robux before paying.
+Old pending payout requests keep their existing payout amount and remain readable.
+
 ## 2. Deploy slash commands
 
 ```bash
