@@ -89,9 +89,9 @@ test('Moderator application launches exactly five response inputs',async()=>{
 test('giveaway start permits optional destination channel',()=>{
   const data=giveaway.data.toJSON();
   const start=data.options.find(o=>o.name==='start');
-  const channel=start.options.find(o=>o.name==='channel');
-  assert.ok(channel);
-  assert.equal(channel.required,false);
+  const channels=start.options.filter(o=>o.name==='channel');
+  assert.equal(channels.length,1,'Discord slash commands must not have duplicate option names');
+  assert.equal(channels[0].required,false);
 });
 test('payout request asks for payment link and buyer Discord username',()=>{
   const request=payout.data.toJSON().options.find(o=>o.name==='request');
