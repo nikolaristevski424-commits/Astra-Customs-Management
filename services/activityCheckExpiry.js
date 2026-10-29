@@ -4,6 +4,7 @@ const { withFooter } = require('../utils/footerBranding');
 // not respond before the deadline.
 
 const config = require('../utils/config');
+const serverScope = require('../utils/serverScope');
 const activity = require('../utils/activity');
 const hr = require('../utils/hr');
 const activityCmd = require('../commands/activity');
@@ -106,6 +107,7 @@ async function processDueChecks(client) {
 
     try {
         for (const [guildId, guild] of client.guilds.cache) {
+            if (!serverScope.isAstraGuild(guildId)) continue;
             try {
                 const cfg = config.getConfig(guildId);
                 for (const record of activity.listDue(guildId)) {
