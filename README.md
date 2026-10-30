@@ -73,6 +73,34 @@ Previously documented `ROGOID_ROBLOX_TO_DISCORD_URL`,
 `ROGOID_AUTH_SCHEME` settings are **no longer used** and may be removed
 from your `.env`.
 
+## Custom-emoji ticket dropdowns and connection health
+
+Use `/panel tickets` after updating the bot. The panel now has a single
+select menu with **Support Ticket**, **Management Ticket**, and **Report a User**,
+each with the Astra Customs custom emoji
+`<:ticketsupportroleicon:1559204224556863521>`.
+The same ticket menu appears in the order, order-status and portfolio panels.
+Existing older ticket buttons continue working for compatibility.
+A newly posted panel does not automatically delete previous messages; remove
+old posts manually if you do not want duplicate panels.
+
+`/health` is a **configuration/status summary**: "configured" means an
+environment variable is present, not that the provider accepted it.
+A manager can run `/health test_credentials:true` to perform **read-only**
+GET checks and distinguish:
+- Roblox cookie accepted or rejected, using Roblox's authenticated-user endpoint
+- Bloxlink verified account found, account not linked, access denied, or API error
+- RoGoid verified account found, not verified (404), invalid key (401), forbidden
+  (403), rate limited (429), or unavailable
+The checks are private, management-only, throttled per server to one run per
+minute, and never print the configured credentials. The API key
+`ROBLOX_API_KEY` is listed separately but is not live-tested by this command.
+A valid cookie login does **not** guarantee group-finance permissions or payout
+ability; valid verification lookup does **not** guarantee a completed purchase.
+RoGoid's endpoint is built in (`https://api.rogoid.xyz/v1/verifications/:discordId`).
+For RoGoid purchases, the bot checks Bloxlink first and falls back to comparing
+the reserved customer's RoGoid-verified Roblox ID with the reported buyer.
+
 ## Independent orders, help tickets, and LOA access
 
 Each member may have up to **3 simultaneously open help tickets** across
