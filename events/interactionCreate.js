@@ -24,6 +24,7 @@ const bundlesUtil = require('../utils/bundles');
 const loaUtil = require('../utils/loa');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
+const specialTickets = require('../utils/specialTickets');
 const packagesUtil = require('../utils/packages');
 const payoutRequestsUtil = require('../utils/payoutRequests');
 const releasesUtil = require('../utils/releases');
@@ -483,6 +484,9 @@ async function handleButton(interaction) {
     // ---- Dashboard: Help (open ticket) ----
     if(customId==='order_open') return orderFlow.start(interaction);
 
+    if (customId === 'management_ticket_open') return interaction.showModal(specialTickets.form('management'));
+    if (customId === 'report_ticket_open') return interaction.showModal(specialTickets.form('report'));
+
     if (customId === 'help_ticket_open') {
         const modal = new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Open a Ticket');
         const reasonInput = new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
@@ -783,6 +787,9 @@ async function handleModal(interaction) {
         }));
         return interaction.editReply(`Your order request is ready: <#${channel.id}>`);
     }
+
+    if (customId === 'special_ticket_management') return specialTickets.open(interaction,'management');
+    if (customId === 'special_ticket_report') return specialTickets.open(interaction,'report');
 
     if (customId === 'ticket_open_modal') {
         const reason = interaction.fields.getTextInputValue('reason');
