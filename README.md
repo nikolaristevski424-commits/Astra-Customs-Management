@@ -275,8 +275,10 @@ To automate delivery, create a payment link with `/payment request`, choose the
 approved `package_id`, and optionally choose the Discord `customer`. When the
 configured Roblox purchase monitor sees that exact payment Game Pass sold, it
 DMs the package files automatically. The buyer must either be selected as the
-customer when the link is created or be linked through Bloxlink. If neither is
-available, the purchase is logged for manual delivery.
+customer when the link is created or be linked through Bloxlink. When Bloxlink
+cannot find a match, RoGoid can verify a **selected Discord customer** by
+checking that the customer's verified Roblox ID matches the actual buyer.
+Otherwise, the purchase is logged for manual delivery.
 
 ## Store credit
 
@@ -284,7 +286,8 @@ available, the purchase is logged for manual delivery.
 history`), `/credit view`, `/credit history`, and `/credit
 leaderboard`. If `AUTO_CREDIT_PERCENT` is set above 0, every detected
 group purchase automatically awards that percentage of the sale as
-store credit to the buyer's linked Discord account (via Bloxlink) — a
+store credit to the buyer's verified Discord account (Bloxlink or an
+order-linked RoGoid match) — a
 simple built-in loyalty/rewards program.
 
 `/economy balance|daily|work|pay|coinflip|leaderboard` is a separate virtual
