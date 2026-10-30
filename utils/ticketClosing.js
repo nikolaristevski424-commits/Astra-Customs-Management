@@ -2,6 +2,7 @@ const { AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const tickets = require('./tickets');
+const specialTickets = require('./specialTickets');
 
 async function buildTranscript(channel) {
     const messages = [];
@@ -60,23 +61,42 @@ async function closeTicket(client, guildId, cfg, channelId, closedBy) {
     }
 
     const fileName = `transcript-${channel.name}.txt`;
-    if (transcript && cfg.transcriptChannelId) {
-        const transcriptChannel = await client.channels.fetch(cfg.transcriptChannelId).catch((error) => {
-            console.error(`[tickets] Could not fetch transcript channel ${cfg.transcriptChannelId}:`, error.message);
-            return null;
-        });
-        if (transcriptChannel?.isTextBased?.() && !transcriptChannel.isDMBased?.()) {
+    // Management and report transcripts are confidential: never fall back to
+    // the ordinary support transcript channel.
+    const privateType = specialTickets.routing(ticket.type);
+    const transcriptChannelId = privateType?.transcriptChannelId || cfg.transcriptChannelId;
+    const requirePrivateArchive = !!privateType;
+    if (transcript && (transcriptChannelId || requirePrivateArchive)) {
+        const transcriptChannel = transcriptChannelId
+            ? await client.channels.fetch(transcriptChannelId).catch((error) => {
+                console.error('[tickets] Could not fetch transcript channel '+transcriptChannelId+':', error.message);
+                return null;
+            }) : null;
+        const allowedChannel = transcriptChannel?.isTextBased?.()
+            && !transcriptChannel.isDMBased?.()
+            && (!transcriptChannel.guildId || String(transcriptChannel.guildId)===String(guildId));
+        let posted = false;
+        if (allowedChannel) {
             try {
                 await transcriptChannel.send({
-                    content: `Transcript for **#${channel.name}** (ticket opener: <@${ticket.userId}>).`,
+                    content: 'Transcript for **#'+channel.name+'** ('+
+                        (privateType?.label || ticket.type || 'support')+', ticket opener: <@'+ticket.userId+'>).',
                     files: [new AttachmentBuilder(transcript, { name: fileName })],
                     allowedMentions: { parse: [] },
                 });
+                posted = true;
             } catch (error) {
-                console.error(`[tickets] Failed to post transcript for ${channelId}:`, error.message);
+                console.error('[tickets] Failed to post transcript for '+channelId+':',error.message);
             }
         } else {
-            console.error(`[tickets] Configured transcript channel ${cfg.transcriptChannelId} is unavailable or not a server text channel.`);
+            console.error('[tickets] Transcript destination '+transcriptChannelId+' is unavailable or belongs to another server.');
+        }
+        if (requirePrivateArchive && !posted) {
+            // Keep a confidential ticket open until its specified archive channel
+            // actually accepts the transcript; a local file alone is not enough.
+            tickets.update(guildId,channelId,{closingAt:null,transcriptError:'Private transcript delivery failed'});
+            console.error('[tickets] Preserved '+ticket.type+' ticket '+channelId+' because its private transcript was not delivered.');
+            return false;
         }
     }
 
