@@ -4,7 +4,7 @@ const { withFooter } = require('../utils/footerBranding');
 const axios = require('axios');
 const config = require('../utils/config');
 const { baseEmbed } = require('../utils/embeds');
-const { robloxToDiscord } = require('../utils/bloxlink');
+const { robloxToDiscordWithSource } = require('../utils/accountVerification');
 const credits = require('../utils/credits');
 const packages = require('../utils/packages');
 const delivery=require('../utils/packageDelivery');
@@ -179,8 +179,10 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
   const incomplete=!Number.isFinite(amount) || amount<0 || !buyerId || !itemId;
   // Log even partial records so staff know a sale appeared instead of
   // silently dismissing it. Partial data must never trigger auto-fulfilment.
-  const buyerDiscordId=!incomplete && cfg.discordServerIdForBloxlink && buyerId
-    ? await robloxToDiscord(cfg.discordServerIdForBloxlink,buyerId).catch(()=>null) : null;
+  const buyerVerification=!incomplete && buyerId
+    ? await robloxToDiscordWithSource(cfg.discordServerIdForBloxlink||guildId,buyerId)
+    : {userId:null,source:null};
+  const buyerDiscordId=buyerVerification.userId;
   const reservation=paymentPool.findReservation(guildId,itemId);
   const linkedCustomer=reservation?.customerDiscordId||null;
   // Do not associate a payment with a customer if the Roblox buyer cannot be verified.
@@ -189,6 +191,7 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
   const reviewRequired=!!receipt?.reviewRequired || incomplete || (!!reservation && (!verifiedBuyer || mismatch));
   receipt=receipts.update(guildId,key,{
     groupId:String(groupId),transactionId:txId,itemId,itemName,buyerId,buyerName,buyerDiscordId,
+    verificationSource:buyerVerification.source,
     amount,customerDiscordId:linkedCustomer,orderId:reservation?.orderId||null,
     reviewRequired,verification:verifiedBuyer?'linked-account-match':mismatch?'account-mismatch':'not-verified',
     ...(incomplete?{error:'Incomplete transaction information; manual review required'}:{}),
@@ -219,6 +222,7 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
         {name:'Transaction ID',value:String(txId).slice(0,180),inline:false},
         {name:'Linked order',value:receipt.orderId?'#'+receipt.orderId:'Not linked',inline:true},
         {name:'Verification',value:receipt.verification,inline:true},
+        {name:'Verified by',value:receipt.verificationSource||'Not verified',inline:true},
       ]
     });
     let message;
