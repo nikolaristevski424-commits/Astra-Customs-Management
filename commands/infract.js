@@ -7,7 +7,7 @@ const { sendInfractionMessages } = require('../utils/infractionMessages');
 const { updateStatusPanel } = require('../utils/statusPanel');
 const staffDiscipline = require('../services/staffDiscipline');
 
-const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Under Investigation', 'Termination', 'Staff Blacklist'];
+const PUNISHMENTS = ['Notice', 'Warning', 'Strike', 'Suspension', 'Demotion', 'Under Investigation', 'Termination', 'Staff Blacklist'];
 
 module.exports = {
     data: new SlashCommandBuilder()
