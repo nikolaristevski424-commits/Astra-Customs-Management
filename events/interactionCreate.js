@@ -783,19 +783,31 @@ async function handleModal(interaction) {
             permissionOverwrites: overwrites,
         });
 
-        const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details, style, references });
+        // Legacy order form receives a real sales/order ID too, so it can
+        // be linked by /payment request order_id just like the new shop flow.
+        const record=orders.createOrder(guildId,{
+            customerId:interaction.user.id,designerId:null,source:'legacyOrderRequest',
+            product,quantity:1,price:null,quoteRequired:true,designerEarning:0,
+            ticketChannelId:channel.id,deadline,status:'Not Paid',statusHistory:[]
+        });
+        const ticket = tickets.create(guildId, channel.id, {
+            userId: interaction.user.id, reason: product, type: 'order', product,
+            deadline, budget, details, style, references, orderId:record.id,
+            staffRoleIds:ticketStaffRoleIds
+        });
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
         );
-        await channel.send(withFooter({
+        const sent=await channel.send(withFooter({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
             embeds: [{
-                title: 'New Order Request',
+                title: 'New Order Request #'+record.id,
                 description: 'A designer will review this request and respond in this channel as soon as possible.',
                 color: 0x1e90ff,
                 fields: [
+                    { name: 'Order ID', value: '`#'+record.id+'` — link payment with `/payment request order_id:'+record.id+'`', inline: false },
                     { name: 'Product', value: product || 'Not specified', inline: false },
                     { name: 'Style / Vibe', value: style || 'Not specified', inline: true },
                     { name: 'Deadline', value: deadline || 'Not specified', inline: true },
@@ -810,7 +822,9 @@ async function handleModal(interaction) {
             components: [row],
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
         }));
-        return interaction.editReply(`Your order request is ready: <#${channel.id}>`);
+        orders.updateOrder(guildId,record.id,{requestMessageId:sent.id});
+        tickets.update(guildId,channel.id,{orderMessageId:sent.id});
+        return interaction.editReply(`Order **#${record.id}** is ready: <#${channel.id}>. Link its payment with \`/payment request order_id:${record.id}\`.`);
     }
 
     if (customId === 'special_ticket_management') return specialTickets.open(interaction,'management');
