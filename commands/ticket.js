@@ -69,7 +69,7 @@ module.exports={
       const all=tickets.list(interaction.guildId),open=all.filter(t=>!t.closedAt);
       const unclaimed=open.filter(t=>!t.claimedBy);
       const byPriority=Object.keys(priorities).map(k=>k+': '+open.filter(t=>(t.priority||'normal')===k).length).join(' | ');
-      const byType=['order','support'].map(k=>k+': '+open.filter(t=>t.type===k).length).join(' | ');
+      const byType=['order','support','management','report'].map(k=>k+': '+open.filter(t=>t.type===k).length).join(' | ');
       return reply(interaction,'**Astra Customs | Ticket Overview**\nOpen: **'+open.length+'** · Unclaimed: **'+unclaimed.length+'** · Closed: **'+(all.length-open.length)+'**\n'+byPriority+'\n'+byType);
     }
     if(sub==='list'){
