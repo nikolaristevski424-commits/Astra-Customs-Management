@@ -4,6 +4,7 @@ const perms=require('../utils/permissions');
 const {isExecutive}=require('../utils/env');
 const partner=require('../utils/partnerPosts');
 const {isOwner}=require('../utils/ownership');
+const partnerLedger=require('../utils/partnerLedger');
 const data=new SlashCommandBuilder().setName('partnership')
   .setDescription('Announce a partner server and notify its representatives')
   .addStringOption(o=>o.setName('server').setDescription('Name of the partner server').setRequired(true).setMaxLength(100))
@@ -19,8 +20,11 @@ module.exports={
  data,
  async execute(interaction){
    const cfg=config.getConfig(interaction.guildId);
-   if(!perms.isManager(interaction.member,cfg) && !isExecutive(interaction.member) && !isOwner(interaction))
-     return interaction.reply({content:'Partnership announcements require management.',flags:MessageFlags.Ephemeral});
+   const teamRoles=Array.isArray(cfg.partnershipApplicationAcceptRoleId)?cfg.partnershipApplicationAcceptRoleId:
+     cfg.partnershipApplicationAcceptRoleId?[cfg.partnershipApplicationAcceptRoleId]:[];
+   const onTeam=teamRoles.some(roleId=>interaction.member?.roles?.cache?.has(roleId));
+   if(!perms.isManager(interaction.member,cfg) && !isExecutive(interaction.member) && !isOwner(interaction) && !onTeam)
+     return interaction.reply({content:'Partnership announcements require the Partnership Team or management.',flags:MessageFlags.Ephemeral});
    const invite=interaction.options.getString('invite',true);
    const inviteUrl=partner.normalizeInvite(invite);
    if(!inviteUrl)return interaction.reply({content:'Invalid invite. Use \`discord.gg/yourserver\` or \`https://discord.gg/yourserver\`.',flags:MessageFlags.Ephemeral});
@@ -42,7 +46,24 @@ module.exports={
      invite:inviteUrl,mentionUsers:[interaction.user.id,...representativeIds],
      ping:{content:'',parse:[],roles:[]},footer:'partnership'
    });
-   return interaction.editReply(result.error||'✅ Partnership published to <#'+result.message.channelId+'>: '+result.message.url+
-     '\nRepresentatives notified: '+representativeIds.length+'.');
+   if(result.error)return interaction.editReply(result.error);
+   let tracking;
+   try{
+     tracking=partnerLedger.record(interaction.guildId,{
+       userId:interaction.user.id,server,invite:inviteUrl,
+       messageId:result.message.id||null,messageUrl:result.message.url,
+       representativeIds
+     });
+   }catch(error){
+     console.error('[partnership] Announcement published but tracking failed:',error);
+     return interaction.editReply('✅ Partnership published: '+result.message.url+
+       '\n⚠️ Tracking could not be saved; notify management so it can be reviewed.');
+   }
+   const totals=partnerLedger.stats(interaction.guildId,interaction.user.id);
+   return interaction.editReply('✅ Partnership published to <#'+result.message.channelId+'>: '+result.message.url+
+      '\nRepresentatives notified: '+representativeIds.length+'.\n'+
+      (tracking.created?'**Recorded partnerships:** '+totals.count+' · **Accumulated commission:** R$'+totals.robuxEarned:
+        'This invite was already recorded as a partnership; no additional R$20 was counted.')+
+      '\nCommissions are tracked for management verification; Roblox payouts are not sent automatically.');
  }
 };
