@@ -8,7 +8,7 @@ const {closeTicket}=require('../utils/ticketClosing');
 const openedForTest=[];
 test.afterEach(()=>{for(const id of openedForTest.splice(0))tickets.remove(GUILD_ID,id);});
 
-const GUILD_ID='1488378242846036070',USER_ID='123456789012345678';
+const GUILD_ID='1999999999999999998',USER_ID='123456789012345678';
 const roleIds=special.TYPES.report.roleIds;
 let seq=1000000000000000000n;
 function env(type){
