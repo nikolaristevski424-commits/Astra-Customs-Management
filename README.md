@@ -38,36 +38,40 @@ commented — work through it section by section:
 
 ## Roblox verification providers (Bloxlink first, RoGoid second)
 
-Purchase monitoring now resolves a Roblox buyer to Discord in this order:
-1. Bloxlink (existing `BLOXLINK_API_KEY`)
-2. RoGoid (new `ROGOID_API_KEY`), **only** if Bloxlink has no linked identity
-
-To use the RoGoid read-only verification API, set these Wispbyte variables:
+Set the **two** API keys in Wispbyte's private `.env` and restart:
 
 ```env
 BLOXLINK_API_KEY=YOUR_EXISTING_BLOXLINK_KEY
-ROGOID_API_KEY=YOUR_ROGOID_API_KEY
-ROGOID_ROBLOX_TO_DISCORD_URL=
-ROGOID_DISCORD_TO_ROBLOX_URL=
-ROGOID_AUTH_HEADER=Authorization
-ROGOID_AUTH_SCHEME=Bearer
+ROGOID_API_KEY=YOUR_EXISTING_ROGOID_KEY
 ```
 
-**Important:** The API's exact endpoint names and authentication format were
-not accessible from RoGoid's public documentation during implementation.
-Fill in the two URL templates from the provider's [API docs](https://docs.rogoid.xyz/api)
-rather than guessing them. URL templates support `{guildId}`, `{robloxId}`,
-and `{discordId}` substitutions. URL must be HTTPS on `rogoid.xyz` or a
-subdomain. Do not insert the API key in URLs. If RoGoid's API uses `x-api-key`
-instead of `Authorization: Bearer`, set `ROGOID_AUTH_HEADER=x-api-key`.
-If it requires an unprefixed Authorization header, use `ROGOID_AUTH_SCHEME=none`.
+No extra RoGoid URL or header settings are required. The bot uses the
+documented `GET https://api.rogoid.xyz/v1/verifications/:discordId`
+with `Authorization: Bearer <ROGOID_API_KEY>`, as described in
+[RoGoid API docs](https://docs.rogoid.xyz/api/verifications/).
+The API key is server-specific, read-only for this endpoint and subject to
+RoGoid's published rate limit of 60 requests/minute per server.
+Keep secrets in Wispbyte, never in GitHub.
 
-Without `ROGOID_ROBLOX_TO_DISCORD_URL`, the RoGoid key is stored but
-**RoGoid buyer lookup is not active**. With an invalid result or API error,
-the bot fails closed to unverified/manual review instead of crediting
-a customer or marking their order as paid. A Bloxlink identity is not
-overridden by a conflicting RoGoid identity. `/health` reports the
-configuration status, not a live API response.
+**Important limitation:** RoGoid only documents a **Discord ID -> Roblox ID**
+verification lookup. There is no documented Roblox ID -> Discord ID route.
+The bot therefore checks buyers as follows:
+
+1. Check Bloxlink's Roblox -> Discord lookup first.
+2. If it finds nobody **and** the payment has a known reserved Discord customer,
+   get that member's RoGoid verification by Discord ID.
+3. Accept the RoGoid fallback only if its verified Roblox ID equals the
+   actual Roblox buyer ID on the sale. A mismatch/404/network error or an
+   unknown Discord customer requires manual review; never auto-deliver an order
+   or credit an unknown buyer.
+4. If Bloxlink returns an identity that conflicts with the reserved customer,
+   do not silently replace it with RoGoid; require review.
+
+`/health` shows whether the RoGoid key is set, but does not test it live.
+Previously documented `ROGOID_ROBLOX_TO_DISCORD_URL`,
+`ROGOID_DISCORD_TO_ROBLOX_URL`, `ROGOID_AUTH_HEADER`, and
+`ROGOID_AUTH_SCHEME` settings are **no longer used** and may be removed
+from your `.env`.
 
 ## Independent orders, help tickets, and LOA access
 
