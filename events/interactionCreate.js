@@ -96,7 +96,23 @@ async function handleAutocomplete(interaction) {
     await command.autocomplete(interaction);
 }
 
+function supportTicketModal(){
+    const modal=new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Support Ticket');
+    const reason=new TextInputBuilder().setCustomId('reason')
+        .setLabel('What do you need help with?')
+        .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
+    modal.addComponents(new ActionRowBuilder().addComponents(reason));
+    return modal;
+}
+
 async function handleSelect(interaction) {
+    if(interaction.customId==='astra_ticket_type'){
+        const selected=interaction.values?.[0];
+        if(selected==='support')return interaction.showModal(supportTicketModal());
+        if(selected==='management')return interaction.showModal(specialTickets.form('management'));
+        if(selected==='report')return interaction.showModal(specialTickets.form('report'));
+        return interaction.reply({content:'Unknown ticket type. Please choose a listed option.',flags:MessageFlags.Ephemeral});
+    }
     if(interaction.customId==='astra_order_type')return orderFlow.category(interaction);
     if(interaction.customId.startsWith('astra_order_item_'))return orderFlow.item(interaction);
     const { customId } = interaction;
@@ -487,12 +503,8 @@ async function handleButton(interaction) {
     if (customId === 'management_ticket_open') return interaction.showModal(specialTickets.form('management'));
     if (customId === 'report_ticket_open') return interaction.showModal(specialTickets.form('report'));
 
-    if (customId === 'help_ticket_open') {
-        const modal = new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Open a Ticket');
-        const reasonInput = new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
-        modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
-        return interaction.showModal(modal);
-    }
+    // Existing historical buttons remain supported for older published panels.
+    if (customId === 'help_ticket_open') return interaction.showModal(supportTicketModal());
 
     // ---- Dashboard: staff/designer applications ----
     if (/^application_(staff|designer|moderator|partnership)_open$/.test(customId)) {
