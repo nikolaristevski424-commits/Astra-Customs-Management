@@ -18,9 +18,9 @@ test('new order opening embeds display the real short order ID used by payment l
  const f=embed.fields.find(x=>x.name==='Order ID');
  assert.ok(f);
  assert.match(f.value,new RegExp('#'+o.id+'\\b'));
- assert.match(f.value,/\/payment request order_id:/);
+ assert.match(f.value,/\/payment create order_id:/);
  assert.equal(orders.findOrder(id,o.id).id,o.id);
- const request=payment.data.toJSON().options.find(x=>x.name==='request');
+ const request=payment.data.toJSON().options.find(x=>x.name==='create');
  assert.ok(request.options.find(x=>x.name==='order_id'));
 });
 test('legacy order path stores the same real ledger ID on ticket and initial embed',async()=>{
