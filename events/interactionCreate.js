@@ -548,6 +548,15 @@ async function handleButton(interaction) {
         if(ticket.claimedBy)return interaction.reply({content:'This ticket is already claimed by <@'+ticket.claimedBy+'>.',flags:MessageFlags.Ephemeral});
         await interaction.deferReply({flags:MessageFlags.Ephemeral});
         const updated = tickets.update(guildId, channelId, { claimedBy: interaction.user.id, claimedAt: Date.now() });
+        if(updated.type==='management'||updated.type==='report'){
+            // Keep confidential report evidence and management details in the
+            // original opening embed instead of replacing it with generic support text.
+            await interaction.channel.send({
+                content:'Ticket claimed by <@'+interaction.user.id+'>.',
+                allowedMentions:{parse:[]}
+            }).catch(error=>console.warn('[tickets] Claim note could not be posted:',error.message));
+            return interaction.editReply('Ticket successfully claimed. Original details were preserved.');
+        }
         if(updated.type==='order' && updated.orderId){ const record=orders.updateOrder(guildId,updated.orderId,{designerId:interaction.user.id}); await orderProgress.refresh(interaction.client,guildId,cfg,record); }
         const embed = ticket.type === 'order'
             ? {
