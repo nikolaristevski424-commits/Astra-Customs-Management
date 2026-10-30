@@ -80,6 +80,11 @@ select menu with **Support Ticket**, **Management Ticket**, and **Report a User*
 each with the Astra Customs custom emoji
 `<:ticketsupportroleicon:1559204224556863521>`.
 The same ticket menu appears in the order, order-status and portfolio panels.
+The opening order embed also displays a prominent short **Order ID** (`#1`,
+`#2`, etc.) that matches the sales ledger. Staff can link a Roblox purchase
+with `/payment request price:<Robux> order_id:<order number>`; when linked,
+the purchase log shows that ID. Both the storefront order form and the
+older `order_open_modal` form now create these real numbered ledger records.
 Existing older ticket buttons continue working for compatibility.
 A newly posted panel does not automatically delete previous messages; remove
 old posts manually if you do not want duplicate panels.
