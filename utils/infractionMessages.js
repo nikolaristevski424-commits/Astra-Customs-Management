@@ -12,7 +12,7 @@ async function sendInfractionMessages(channel, cfg, {
     issuer,
     roleId,
 }) {
-    const colors={Notice:0x4a78db,Warning:0xf1ba34,Strike:0xe57e22,Suspension:0xdf5e43,Termination:0xbc354a,'Staff Blacklist':0x8b1e45};
+    const colors={Notice:0x4a78db,Warning:0xf1ba34,Strike:0xe57e22,Suspension:0xdf5e43,Demotion:0xa855b5,Termination:0xbc354a,'Staff Blacklist':0x8b1e45};
     const details = [
         `**Punishment** \`-\` ${punishment}`,
         `**Reason** \`-\` ${reason}`,
