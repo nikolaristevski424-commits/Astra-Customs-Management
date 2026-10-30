@@ -116,8 +116,17 @@ async function open(interaction,type){
         ...(evidence?[{name:'Evidence / message links',value:evidence.slice(0,1024)}]:[]),
         {name:'Status',value:'Open',inline:true}
     ];
-    const pingIds=type==='report'?roles:[];
-    const text='<@'+interaction.user.id+'> '+(type==='report' ? pingIds.map(id=>'<@&'+id+'>').join(' ') : '');
+    // Mention precisely the roles given access to this private ticket.
+    // Management: configured manager/executive/ownership roles.
+    // Report: only the three dedicated report reviewers.
+    // Never ping generic ticket staff or unrelated server roles.
+    const pingIds=roles;
+    const roleMentions=pingIds.map(id=>'<@&'+id+'>').join(' ');
+    const text='<@'+interaction.user.id+'> **'+(type==='report'?'Report review requested':'Management assistance requested')+'**'+
+        (roleMentions?'\n'+roleMentions:'');
+    if(!pingIds.length){
+        console.warn('[specialTickets] No valid '+type+' reviewer role IDs found in the guild. Ticket will be private to the opener and founder.');
+    }
     try{
         await channel.send(withFooter({
             content:text.trim(),embeds:[{title:'Astra Customs | '+definition.label,
