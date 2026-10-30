@@ -754,8 +754,8 @@ async function handleModal(interaction) {
             return interaction.reply({ content: 'Ordering is not configured yet. Ask an administrator to set `ORDER_CATEGORY_ID` in `.env`.', ephemeral: true });
         }
 
-        const existing = tickets.findOpenForUser(guildId, interaction.user.id);
-        if (existing) return interaction.reply({ content: `You already have an open ticket: <#${existing.channelId}>`, ephemeral: true });
+        const existing = tickets.findOpenForUser(guildId, interaction.user.id, 'order');
+        if (existing) return interaction.reply({ content: `You already have an open order: <#${existing.channelId}>`, ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
         const ticketStaffRoleIds = ticketStaffRoles(interaction.guild, cfg);
@@ -811,9 +811,9 @@ async function handleModal(interaction) {
             return interaction.reply({ content: 'No ticket category is configured. Set `TICKET_CATEGORY_ID` in `.env`.', ephemeral: true });
         }
 
-        const existing = tickets.findOpenForUser(guildId, interaction.user.id);
-        if (existing) {
-            return interaction.reply({ content: `You already have an open ticket: <#${existing.channelId}>`, ephemeral: true });
+        const allowance = tickets.ticketLimit(guildId, interaction.user.id);
+        if (!allowance.allowed) {
+            return interaction.reply({content:'You already have '+allowance.count+' open tickets (maximum '+allowance.max+'). Please close one before opening another. Orders do not count toward this limit.', flags:MessageFlags.Ephemeral});
         }
 
         await interaction.deferReply({ ephemeral: true });
