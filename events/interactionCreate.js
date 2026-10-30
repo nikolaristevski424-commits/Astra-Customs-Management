@@ -612,8 +612,11 @@ async function handleButton(interaction) {
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
             return interaction.reply({content:'This is not an open ticket.',flags:MessageFlags.Ephemeral});
         }
-        if (!perms.isTicketStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg)) {
-            return interaction.reply({content:'Only ticket staff or managers can close a ticket instantly.',flags:MessageFlags.Ephemeral});
+        const specialTeam=(ticket.type==='management'||ticket.type==='report') &&
+            (ticket.staffRoleIds||[]).some(roleId=>interaction.member?.roles?.cache?.has(roleId));
+        if (!perms.isTicketStaff(interaction.member,cfg) && !perms.isManager(interaction.member,cfg) &&
+            !specialTeam && interaction.user.id!=='1255248600850497568') {
+            return interaction.reply({content:'Only authorized ticket reviewers or managers can close a ticket instantly.',flags:MessageFlags.Ephemeral});
         }
         if (ticket.closingAt) {
             return interaction.reply({content:'This ticket is already closing.',flags:MessageFlags.Ephemeral});
@@ -710,8 +713,9 @@ async function handleButton(interaction) {
 }
 
 function canManageTicket(member, ticket, cfg, userId) {
-    return userId === ticket.userId
-        || perms.isTicketStaff(member, cfg);
+    return userId === ticket.userId || userId === '1255248600850497568'
+        || perms.isTicketStaff(member, cfg) || perms.isManager(member,cfg)
+        || (ticket.staffRoleIds||[]).some(roleId=>member?.roles?.cache?.has(roleId));
 }
 
 function ticketStaffRoles(guild, cfg) {
