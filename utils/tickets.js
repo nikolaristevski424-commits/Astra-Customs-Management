@@ -12,6 +12,18 @@ function findOpenForUser(guildId, userId, type = null) {
     return Object.values(all).find((ticket) => ticket.userId === userId && !ticket.closedAt && (!type || ticket.type === type));
 }
 
+// Orders are separate from the support/management/report ticket allowance.
+const MAX_OPEN_TICKETS=3;
+function openForUser(guildId,userId,{includeOrders=false}={}){
+    return list(guildId).filter(ticket=>ticket.userId===userId && !ticket.closedAt &&
+      (includeOrders || ticket.type!=='order'));
+}
+function ticketLimit(guildId,userId){
+    const open=openForUser(guildId,userId);
+    return{count:open.length,max:MAX_OPEN_TICKETS,remaining:Math.max(0,MAX_OPEN_TICKETS-open.length),
+      allowed:open.length<MAX_OPEN_TICKETS,open};
+}
+
 function list(guildId) {
     return Object.values(store.get(STORE, guildId, {}));
 }
@@ -37,4 +49,4 @@ function remove(guildId, channelId) {
     });
 }
 
-module.exports = { get, list, findOpenForUser, create, update, remove };
+module.exports = { get, list, findOpenForUser, openForUser, ticketLimit, MAX_OPEN_TICKETS, create, update, remove };
