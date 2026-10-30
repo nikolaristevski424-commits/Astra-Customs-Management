@@ -36,6 +36,53 @@ commented — work through it section by section:
 - **Channels** — every channel the bot posts to (order log, tickets, applications, LOA, honeypot, giveaways, etc.) — right-click a channel → Copy Channel ID (needs Developer Mode on in Discord settings)
 - **Roblox** — group ID, universe ID, game pass pool, API key/cookie — see [Payments](#payments) below
 
+## Roblox verification providers (Bloxlink first, RoGoid second)
+
+Purchase monitoring now resolves a Roblox buyer to Discord in this order:
+1. Bloxlink (existing `BLOXLINK_API_KEY`)
+2. RoGoid (new `ROGOID_API_KEY`), **only** if Bloxlink has no linked identity
+
+To use the RoGoid read-only verification API, set these Wispbyte variables:
+
+```env
+BLOXLINK_API_KEY=YOUR_EXISTING_BLOXLINK_KEY
+ROGOID_API_KEY=YOUR_ROGOID_API_KEY
+ROGOID_ROBLOX_TO_DISCORD_URL=
+ROGOID_DISCORD_TO_ROBLOX_URL=
+ROGOID_AUTH_HEADER=Authorization
+ROGOID_AUTH_SCHEME=Bearer
+```
+
+**Important:** The API's exact endpoint names and authentication format were
+not accessible from RoGoid's public documentation during implementation.
+Fill in the two URL templates from the provider's [API docs](https://docs.rogoid.xyz/api)
+rather than guessing them. URL templates support `{guildId}`, `{robloxId}`,
+and `{discordId}` substitutions. URL must be HTTPS on `rogoid.xyz` or a
+subdomain. Do not insert the API key in URLs. If RoGoid's API uses `x-api-key`
+instead of `Authorization: Bearer`, set `ROGOID_AUTH_HEADER=x-api-key`.
+If it requires an unprefixed Authorization header, use `ROGOID_AUTH_SCHEME=none`.
+
+Without `ROGOID_ROBLOX_TO_DISCORD_URL`, the RoGoid key is stored but
+**RoGoid buyer lookup is not active**. With an invalid result or API error,
+the bot fails closed to unverified/manual review instead of crediting
+a customer or marking their order as paid. A Bloxlink identity is not
+overridden by a conflicting RoGoid identity. `/health` reports the
+configuration status, not a live API response.
+
+## Independent orders, help tickets, and LOA access
+
+Each member may have up to **3 simultaneously open help tickets** across
+Support, Management, and Report a User, combined. Orders are tracked
+separately and **do not count** toward the three-ticket allowance.
+The order flow continues to allow one active order per member.
+The cap is hardcoded (`MAX_OPEN_TICKETS=3`) and double-checked when
+the record is created to prevent concurrent submissions bypassing it.
+
+Users with any of these role IDs can run `/loa request` even if they are
+not included in `STAFF_ROLE_IDS`: `1497420088456777859`,
+`1565198911662985336`, `1565689738906574940`,
+`1497415634915561603`. Existing staff/admin access remains.
+
 ## Private management and report tickets
 
 Use `/panel tickets` to post a ticket panel with three buttons:
