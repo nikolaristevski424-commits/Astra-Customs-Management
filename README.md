@@ -36,6 +36,49 @@ commented — work through it section by section:
 - **Channels** — every channel the bot posts to (order log, tickets, applications, LOA, honeypot, giveaways, etc.) — right-click a channel → Copy Channel ID (needs Developer Mode on in Discord settings)
 - **Roblox** — group ID, universe ID, game pass pool, API key/cookie — see [Payments](#payments) below
 
+## Private management and report tickets
+
+Use `/panel tickets` to post a ticket panel with three buttons:
+Support Ticket, Management Ticket, and Report a User.
+
+Management and Report tickets open under Discord category `1565467577415639182`.
+They use private permission overwrites; normal support tickets are unchanged.
+Management reviewers use the configured manager/executive/ownership roles.
+Reports can be seen and pinged by these role IDs only:
+`1538963485667500144`, `1565167658377158777`,
+and `1565198911662985336` (plus the opener and founder).
+
+Closing a management ticket uploads its transcript to `1531632265812119552`.
+Closing a report ticket uploads its transcript to `1531632326834913322`.
+These confidential transcripts are **never sent to the generic support transcript channel**.
+If the bot cannot post a confidential transcript, the ticket is kept open
+so it can be retried after permissions are fixed. The bot needs View Channel,
+Manage Channels, Send Messages, Embed Links and Read Message History as appropriate.
+The report ping roles must be mentionable or the bot must have permission to mention them.
+
+## Partnership Team tracking
+
+The `/partnership` command now also accepts the configured Partnership Team
+role(s), set using `PARTNERSHIP_TEAM_ROLE_ID` in Wispbyte.
+Each successfully posted unique invite counts once toward the posting user's ledger
+at **20 Robux per partnership**. Reposting the same invite does not add commission.
+Counts and totals are stored in the bot's persistent `data` directory:
+
+- `/partnership-stats mine` — personal counts and accrued amount
+- `/partnership-stats user` — manager view of one team member
+- `/partnership-stats leaderboard` — manager team totals
+
+No automatic Robux is sent. Review completed partnerships before paying the
+accumulated amounts; these totals are not proof that Robux has already been paid.
+Historical partnerships from before this feature are not automatically backfilled.
+
+## Demotion infraction
+
+`/infract issue` includes **Demotion** as a punishment type in the normal HR log.
+It posts and retains the infraction like other punishment types.
+It **does not automatically remove or change Discord rank roles**; leadership must
+make any role changes separately.
+
 ## Astra Customs-only server access
 
 This is a private bot restricted to the official Astra Customs Discord guild `1488378242846036070`.
