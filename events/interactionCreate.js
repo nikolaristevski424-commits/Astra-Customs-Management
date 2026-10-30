@@ -807,7 +807,7 @@ async function handleModal(interaction) {
                 description: 'A designer will review this request and respond in this channel as soon as possible.',
                 color: 0x1e90ff,
                 fields: [
-                    { name: 'Order ID', value: '`#'+record.id+'` — link payment with `/payment request order_id:'+record.id+'`', inline: false },
+                    { name: 'Order ID', value: '`#'+record.id+'` — link payment with `/payment create order_id:'+record.id+'`', inline: false },
                     { name: 'Product', value: product || 'Not specified', inline: false },
                     { name: 'Style / Vibe', value: style || 'Not specified', inline: true },
                     { name: 'Deadline', value: deadline || 'Not specified', inline: true },
@@ -824,7 +824,7 @@ async function handleModal(interaction) {
         }));
         orders.updateOrder(guildId,record.id,{requestMessageId:sent.id});
         tickets.update(guildId,channel.id,{orderMessageId:sent.id});
-        return interaction.editReply(`Order **#${record.id}** is ready: <#${channel.id}>. Link its payment with \`/payment request order_id:${record.id}\`.`);
+        return interaction.editReply(`Order **#${record.id}** is ready: <#${channel.id}>. Link its payment with \`/payment create order_id:${record.id}\`.`);
     }
 
     if (customId === 'special_ticket_management') return specialTickets.open(interaction,'management');
