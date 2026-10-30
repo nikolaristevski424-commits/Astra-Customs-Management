@@ -44,8 +44,8 @@ async function modal(interaction){
  if(!open(cfg,p.type))return interaction.reply({flags:ephemeral,content:'This service is no longer accepting orders.'});
  const qty=Number(interaction.fields.getTextInputValue('qty'));
  if(!Number.isInteger(qty)||qty<1||qty>100)return interaction.reply({flags:ephemeral,content:'Please provide a quantity between 1 and 100.'});
- const existing=tickets.findOpenForUser(interaction.guildId,interaction.user.id);
- if(existing)return interaction.reply({flags:ephemeral,content:'You already have an open ticket: <#'+existing.channelId+'>'});
+ const existing=tickets.findOpenForUser(interaction.guildId,interaction.user.id,'order');
+ if(existing)return interaction.reply({flags:ephemeral,content:'You already have an open order: <#'+existing.channelId+'>'});
  await interaction.deferReply({flags:ephemeral});
  const parentId=cfg.orderCategoryId||cfg.ticketCategoryId;
  const parent=parentId?await guild.channels.fetch(parentId).catch(()=>null):null;
