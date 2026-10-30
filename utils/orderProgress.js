@@ -34,6 +34,7 @@ function embed(cfg,order,ticket){
   .setTitle('Astra Customs | Order #'+order.id)
   .setDescription('**'+String(order.product||'Commission').slice(0,100)+'**\n'+progress+'\n**Current status: '+order.status+'**')
   .addFields(
+   {name:'Order ID',value:'`#'+order.id+'` — use this with `/payment request order_id:'+order.id+'`',inline:false},
    {name:'Customer',value:order.customerId?'<@'+order.customerId+'>':'Unknown',inline:true},
    {name:'Designer',value:order.designerId?'<@'+order.designerId+'>':'Unassigned',inline:true},
    {name:'Quantity',value:String(order.quantity||1),inline:true},
