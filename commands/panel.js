@@ -40,6 +40,24 @@ function baseContainer(cfg, bannerKey = null) {
     return container;
 }
 
+// All ticket entry points use the same three-type menu and server emoji.
+// Discord's select option emoji displays before the option label.
+const TICKET_EMOJI=Object.freeze({id:'1559204224556863521',name:'ticketsupportroleicon'});
+const TICKET_CHOICES=Object.freeze([
+    {label:'Support Ticket',value:'support',description:'Orders, payments, delivery or general help'},
+    {label:'Management Ticket',value:'management',description:'Contact the Astra Customs management team'},
+    {label:'Report a User',value:'report',description:'Privately report a member or incident'}
+]);
+function ticketSelectRow(){
+    return new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId('astra_ticket_type')
+            .setPlaceholder('Choose a ticket type...')
+            .setMinValues(1).setMaxValues(1)
+            .addOptions(TICKET_CHOICES.map(choice=>({...choice,emoji:{...TICKET_EMOJI}})))
+    );
+}
+
 function orderStatusPanel(cfg) {
     const container=baseContainer(cfg,'status');
     const values=Object.keys(catalog.TYPES).map(id=>availability.status(cfg,id));
@@ -55,9 +73,9 @@ function orderStatusPanel(cfg) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       '*Changes are reflected here automatically when management uses \`/status\`.*'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-       new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success),
-       new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Support').setStyle(ButtonStyle.Secondary)
+       new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success)
     ));
+    container.addActionRowComponents(ticketSelectRow());
     return {components:[container]};
 }
 
@@ -66,11 +84,10 @@ function ticketsPanel(cfg) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Assistance\n\nNeed help with an order, payment, delivery, management issue, or member concern? Open a private ticket and explain what you need.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Before opening a ticket**\n- Explain the issue clearly.\n- Include relevant order or payment information.\n- Never share passwords, Roblox cookies, or private credentials.\n- Keep communication respectful while staff review your request.'));
-    container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Support Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),
-        new ButtonBuilder().setCustomId('management_ticket_open').setLabel('Management Ticket').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('report_ticket_open').setLabel('Report a User').setStyle(ButtonStyle.Danger)
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '**Select a ticket type below.** You may have up to **3 open tickets** across these options; orders are counted separately.\n**Terms:** https://astra-customs-terms.vercel.app/'
     ));
+    container.addActionRowComponents(ticketSelectRow());
     return { components: [container] };
 }
 
@@ -88,9 +105,8 @@ function orderPanel(cfg){
         .setCustomId('astra_order_type').setPlaceholder('Select an order type...').addOptions(
             Object.entries(catalog.TYPES).map(([id,group])=>({label:group.label,value:id,description:availability.labels[availability.status(cfg,id)]||'View designs'}))
         )));
-    container.addActionRowComponents(new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Contact Support').setStyle(ButtonStyle.Secondary)
-    ));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Need assistance?** Choose a ticket type below.'));
+    container.addActionRowComponents(ticketSelectRow());
     return {components:[container]};
 }
 
@@ -134,8 +150,8 @@ function portfolioPanel(cfg, guildId) {
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('order_open').setLabel('Start an Order').setStyle(ButtonStyle.Success).setEmoji('🛒'),
-        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Ask About Work').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
     ));
+    container.addActionRowComponents(ticketSelectRow());
     return { components: [container] };
 }
 
@@ -269,6 +285,9 @@ const BUILDERS = {
 module.exports = {
     BUILDERS,
     PANEL_CHANNELS,
+    ticketSelectRow,
+    TICKET_CHOICES,
+    TICKET_EMOJI,
     async refreshPanels(client,guildId,{discover=false}={}){
         const cfg=config.getConfig(guildId);
         const results=[];

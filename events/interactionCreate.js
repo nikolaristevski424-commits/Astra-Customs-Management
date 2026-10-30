@@ -96,7 +96,23 @@ async function handleAutocomplete(interaction) {
     await command.autocomplete(interaction);
 }
 
+function supportTicketModal(){
+    const modal=new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Support Ticket');
+    const reason=new TextInputBuilder().setCustomId('reason')
+        .setLabel('What do you need help with?')
+        .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
+    modal.addComponents(new ActionRowBuilder().addComponents(reason));
+    return modal;
+}
+
 async function handleSelect(interaction) {
+    if(interaction.customId==='astra_ticket_type'){
+        const selected=interaction.values?.[0];
+        if(selected==='support')return interaction.showModal(supportTicketModal());
+        if(selected==='management')return interaction.showModal(specialTickets.form('management'));
+        if(selected==='report')return interaction.showModal(specialTickets.form('report'));
+        return interaction.reply({content:'Unknown ticket type. Please choose a listed option.',flags:MessageFlags.Ephemeral});
+    }
     if(interaction.customId==='astra_order_type')return orderFlow.category(interaction);
     if(interaction.customId.startsWith('astra_order_item_'))return orderFlow.item(interaction);
     const { customId } = interaction;
@@ -487,12 +503,8 @@ async function handleButton(interaction) {
     if (customId === 'management_ticket_open') return interaction.showModal(specialTickets.form('management'));
     if (customId === 'report_ticket_open') return interaction.showModal(specialTickets.form('report'));
 
-    if (customId === 'help_ticket_open') {
-        const modal = new ModalBuilder().setCustomId('ticket_open_modal').setTitle('Open a Ticket');
-        const reasonInput = new TextInputBuilder().setCustomId('reason').setLabel('What do you need help with?').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
-        modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
-        return interaction.showModal(modal);
-    }
+    // Existing historical buttons remain supported for older published panels.
+    if (customId === 'help_ticket_open') return interaction.showModal(supportTicketModal());
 
     // ---- Dashboard: staff/designer applications ----
     if (/^application_(staff|designer|moderator|partnership)_open$/.test(customId)) {
@@ -771,19 +783,31 @@ async function handleModal(interaction) {
             permissionOverwrites: overwrites,
         });
 
-        const ticket = tickets.create(guildId, channel.id, { userId: interaction.user.id, reason: product, type: 'order', product, deadline, budget, details, style, references });
+        // Legacy order form receives a real sales/order ID too, so it can
+        // be linked by /payment request order_id just like the new shop flow.
+        const record=orders.createOrder(guildId,{
+            customerId:interaction.user.id,designerId:null,source:'legacyOrderRequest',
+            product,quantity:1,price:null,quoteRequired:true,designerEarning:0,
+            ticketChannelId:channel.id,deadline,status:'Not Paid',statusHistory:[]
+        });
+        const ticket = tickets.create(guildId, channel.id, {
+            userId: interaction.user.id, reason: product, type: 'order', product,
+            deadline, budget, details, style, references, orderId:record.id,
+            staffRoleIds:ticketStaffRoleIds
+        });
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
         );
-        await channel.send(withFooter({
+        const sent=await channel.send(withFooter({
             content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
             embeds: [{
-                title: 'New Order Request',
+                title: 'New Order Request #'+record.id,
                 description: 'A designer will review this request and respond in this channel as soon as possible.',
                 color: 0x1e90ff,
                 fields: [
+                    { name: 'Order ID', value: '`#'+record.id+'` — link payment with `/payment create order_id:'+record.id+'`', inline: false },
                     { name: 'Product', value: product || 'Not specified', inline: false },
                     { name: 'Style / Vibe', value: style || 'Not specified', inline: true },
                     { name: 'Deadline', value: deadline || 'Not specified', inline: true },
@@ -798,7 +822,9 @@ async function handleModal(interaction) {
             components: [row],
             allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
         }));
-        return interaction.editReply(`Your order request is ready: <#${channel.id}>`);
+        orders.updateOrder(guildId,record.id,{requestMessageId:sent.id});
+        tickets.update(guildId,channel.id,{orderMessageId:sent.id});
+        return interaction.editReply(`Order **#${record.id}** is ready: <#${channel.id}>. Link its payment with \`/payment create order_id:${record.id}\`.`);
     }
 
     if (customId === 'special_ticket_management') return specialTickets.open(interaction,'management');
