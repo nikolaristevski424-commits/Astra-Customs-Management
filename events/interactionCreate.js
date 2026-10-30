@@ -834,7 +834,11 @@ async function handleModal(interaction) {
             permissionOverwrites: overwrites,
         });
 
-        tickets.create(guildId, channel.id, { userId: interaction.user.id, reason, type: 'support', staffRoleIds: ticketStaffRoleIds });
+        const supportRecord = tickets.createLimited(guildId, channel.id, { userId: interaction.user.id, reason, type: 'support', staffRoleIds: ticketStaffRoleIds });
+        if(!supportRecord){
+            await channel.delete('User reached the three-ticket limit while ticket was being created').catch(error=>console.warn('[tickets] Could not remove untracked ticket:',error.message));
+            return interaction.editReply('You reached the maximum of '+tickets.MAX_OPEN_TICKETS+' open tickets. Orders do not count toward this limit.');
+        }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Primary),
