@@ -122,13 +122,17 @@ not included in `STAFF_ROLE_IDS`: `1497420088456777859`,
 
 ## Private management and report tickets
 
-Use `/panel tickets` to post a ticket panel with three buttons:
-Support Ticket, Management Ticket, and Report a User.
+Use `/panel tickets` to post one dropdown with Support Ticket,
+Management Ticket, and Report a User. Every option shows Astra Customs'
+custom ticket emoji. The existing older ticket buttons still work.
 
 Management and Report tickets open under Discord category `1565467577415639182`.
 They use private permission overwrites; normal support tickets are unchanged.
 Management reviewers use the configured manager/executive/ownership roles.
-Reports can be seen and pinged by these role IDs only:
+When a management ticket opens, the bot **mentions those authorized roles**
+inside the private ticket. Report tickets notify only their dedicated
+reviewers; they do not ping unrelated staff roles. Only roles present in the
+server are included. Reports can be seen and pinged by these role IDs only:
 `1538963485667500144`, `1565167658377158777`,
 and `1565198911662985336` (plus the opener and founder).
 
@@ -138,7 +142,7 @@ These confidential transcripts are **never sent to the generic support transcrip
 If the bot cannot post a confidential transcript, the ticket is kept open
 so it can be retried after permissions are fixed. The bot needs View Channel,
 Manage Channels, Send Messages, Embed Links and Read Message History as appropriate.
-The report ping roles must be mentionable or the bot must have permission to mention them.
+Management and report ping roles must be mentionable, or the bot must have **Mention @everyone, @here, and All Roles** permission in those private channels. The bot cannot force a ping of an unmentionable role without that permission.
 
 ## Partnership Team tracking
 
