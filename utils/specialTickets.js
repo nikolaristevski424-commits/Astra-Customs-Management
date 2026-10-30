@@ -95,10 +95,15 @@ async function open(interaction,type){
         console.error('[specialTickets] Could not create private '+type+' ticket:',error);
         return interaction.editReply('Could not create the private ticket. Check the bot’s Manage Channels and category permissions.');
     }
-    tickets.create(guildId,channel.id,{
+    const saved=tickets.createLimited(guildId,channel.id,{
         type,userId:interaction.user.id,reason,reportedUser,evidence,
         staffRoleIds:roles,transcriptChannelId:definition.transcriptChannelId,
     });
+    if(!saved){
+        await channel.delete('User reached the three-ticket limit while ticket was being created')
+            .catch(error=>console.warn('[specialTickets] Could not remove untracked ticket:',error.message));
+        return interaction.editReply('You reached the maximum of '+tickets.MAX_OPEN_TICKETS+' open tickets. Orders do not count toward this limit.');
+    }
     const row=new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('ticket_claim_'+channel.id).setLabel('Claim').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
