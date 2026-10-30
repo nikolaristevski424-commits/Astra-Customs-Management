@@ -7,6 +7,6 @@ function isOwner(interaction) {
   const roles=interaction.member.roles?.cache;
   // Verified Astra Customs ownership role; overrideable through the host env.
   const ownerRoleIds=ids(process.env.OWNERSHIP_ROLE_IDS || '1538963559986372719');
-  return !!roles?.some(role => ownerRoleIds.includes(role.id));
+  return ownerRoleIds.some(roleId => roles?.has?.(roleId) === true);
 }
 module.exports={isOwner,ids};
