@@ -40,9 +40,9 @@ module.exports={
      '**Roblox group:** '+(cfg.robloxGroupId||'❌ Not configured'),
      '**Roblox credentials:** '+(process.env.ROBLOX_COOKIE?.trim()?'Set (not verified)':'❌ ROBLOX_COOKIE missing'),
      '**Bloxlink verification:** '+(process.env.BLOXLINK_API_KEY?.trim()?'API key configured':'No API key'),
-     '**RoGoid verification:** '+(!process.env.ROGOID_API_KEY?.trim()?'No API key':
-        !process.env.ROGOID_ROBLOX_TO_DISCORD_URL?.trim()?'API key configured; lookup URL missing':
-        'API key and lookup URL configured (not live-tested)'),
+     '**RoGoid verification:** '+(process.env.ROGOID_API_KEY?.trim()?
+        'API key configured; official Discord-to-Roblox endpoint enabled (not live-tested)':
+        'No API key configured'),
      '**Purchase notifications:** '+(purchaseChannel?'<#'+purchaseChannel+'>':'❌ Channel missing'),
    ];
    if(st){
