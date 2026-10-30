@@ -5,6 +5,20 @@ const loa = require('../utils/loa');
 const perms = require('../utils/permissions');
 const { baseEmbed } = require('../utils/embeds');
 
+// Members with any of these roles may submit LOA requests, even when
+// their role isn't part of STAFF_ROLE_IDS.
+const LOA_REQUEST_ROLE_IDS=Object.freeze([
+    '1497420088456777859', // Design team
+    '1565198911662985336', // Moderator
+    '1565689738906574940', // Partnership team
+    '1497415634915561603', // Staff
+]);
+function canRequestLOA(member,cfg){
+    if(!member)return false;
+    return perms.isStaff(member,cfg) ||
+        LOA_REQUEST_ROLE_IDS.some(id=>member.roles?.cache?.has(id));
+}
+
 function parseDate(str) {
     const ms = Date.parse(str.includes('T') ? str : `${str}T00:00:00Z`);
     return Number.isNaN(ms) ? null : ms;
@@ -18,8 +32,8 @@ async function submitRequest(interaction, { startInput, endInput, reason }) {
     const guildId = interaction.guildId;
     const cfg = config.getConfig(guildId);
 
-    if (!perms.isStaff(interaction.member, cfg)) {
-        return { ok: false, message: 'Leave of Absence requests are for staff members.' };
+    if (!canRequestLOA(interaction.member, cfg)) {
+        return { ok: false, message: 'LOA requests are available to staff, designers, moderators, and partnership team members.' };
     }
 
     const startDate = parseDate(startInput);
@@ -58,6 +72,8 @@ async function submitRequest(interaction, { startInput, endInput, reason }) {
 
 module.exports = {
     submitRequest,
+    canRequestLOA,
+    LOA_REQUEST_ROLE_IDS,
 
     data: new SlashCommandBuilder()
         .setName('loa')
