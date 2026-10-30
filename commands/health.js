@@ -76,7 +76,7 @@ module.exports={
      lines.push('**Want to check keys?** Management can run \u0060/health test_credentials:true\u0060.');
    }
    lines.push('Use \u0060/purchases diagnose\u0060 for detailed purchase monitoring.');
-   const payload={content:lines.join('\\n'),allowedMentions:{parse:[]}};
+   const payload={content:lines.join('\n'),allowedMentions:{parse:[]}};
    if(live)return interaction.editReply(payload);
    return interaction.reply({...payload,flags:MessageFlags.Ephemeral});
  }
