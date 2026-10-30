@@ -82,7 +82,7 @@ each with the Astra Customs custom emoji
 The same ticket menu appears in the order, order-status and portfolio panels.
 The opening order embed also displays a prominent short **Order ID** (`#1`,
 `#2`, etc.) that matches the sales ledger. Staff can link a Roblox purchase
-with `/payment request price:<Robux> order_id:<order number>`; when linked,
+with `/payment create price:<Robux> order_id:<order number>`; when linked,
 the purchase log shows that ID. Both the storefront order form and the
 older `order_open_modal` form now create these real numbered ledger records.
 Existing older ticket buttons continue working for compatibility.
@@ -258,7 +258,7 @@ staff and refreshes the original order-log message. `/order view`, `/order histo
 
 ## Payments
 
-`/payment request price:<amount>` auto-picks whichever game pass from
+`/payment create price:<amount>` auto-picks whichever game pass from
 your `PAYMENT_GAMEPASS_IDS` pool isn't currently reserved, sets its
 price via Roblox's official Open Cloud API, reserves it, and hands back
 both the payment link **and** the game's join link (if `GAME_PLACE_ID`
