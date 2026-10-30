@@ -4,7 +4,7 @@ const { withFooter } = require('../utils/footerBranding');
 const axios = require('axios');
 const config = require('../utils/config');
 const { baseEmbed } = require('../utils/embeds');
-const { robloxToDiscordWithSource } = require('../utils/accountVerification');
+const { verifyPurchaseBuyer } = require('../utils/accountVerification');
 const credits = require('../utils/credits');
 const packages = require('../utils/packages');
 const delivery=require('../utils/packageDelivery');
@@ -179,12 +179,15 @@ async function recordPurchase(client,guildId,cfg,groupId,tx) {
   const incomplete=!Number.isFinite(amount) || amount<0 || !buyerId || !itemId;
   // Log even partial records so staff know a sale appeared instead of
   // silently dismissing it. Partial data must never trigger auto-fulfilment.
-  const buyerVerification=!incomplete && buyerId
-    ? await robloxToDiscordWithSource(cfg.discordServerIdForBloxlink||guildId,buyerId)
-    : {userId:null,source:null};
-  const buyerDiscordId=buyerVerification.userId;
   const reservation=paymentPool.findReservation(guildId,itemId);
   const linkedCustomer=reservation?.customerDiscordId||null;
+  // Bloxlink: Roblox buyer -> Discord member. RoGoid: reserved member ->
+  // Roblox account, used only when Bloxlink has no match. RoGoid has no
+  // documented reverse endpoint and can never identify an unknown buyer.
+  const buyerVerification=!incomplete && buyerId
+    ? await verifyPurchaseBuyer(cfg.discordServerIdForBloxlink||guildId,buyerId,linkedCustomer)
+    : {userId:null,source:null};
+  const buyerDiscordId=buyerVerification.userId;
   // Do not associate a payment with a customer if the Roblox buyer cannot be verified.
   const verifiedBuyer=!!(linkedCustomer && buyerDiscordId && linkedCustomer===buyerDiscordId);
   const mismatch=!!(linkedCustomer && buyerDiscordId && linkedCustomer!==buyerDiscordId);
