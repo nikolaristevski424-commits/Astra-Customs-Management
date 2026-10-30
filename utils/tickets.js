@@ -35,6 +35,21 @@ function create(guildId, channelId, data) {
     })[channelId];
 }
 
+// Atomic, synchronous final check after channel creation. Prevents two
+// simultaneous ticket forms bypassing the three-ticket cap.
+function createLimited(guildId,channelId,data){
+    if(data.type==='order')return create(guildId,channelId,data);
+    let created=null;
+    store.update(STORE,guildId,{},all=>{
+        const count=Object.values(all).filter(t=>t.userId===data.userId && !t.closedAt && t.type!=='order').length;
+        if(count>=MAX_OPEN_TICKETS)return all;
+        all[channelId]={channelId,createdAt:Date.now(),...data};
+        created=all[channelId];
+        return all;
+    });
+    return created;
+}
+
 function update(guildId, channelId, patch) {
     return store.update(STORE, guildId, {}, (all) => {
         if (all[channelId]) Object.assign(all[channelId], patch);
@@ -49,4 +64,4 @@ function remove(guildId, channelId) {
     });
 }
 
-module.exports = { get, list, findOpenForUser, openForUser, ticketLimit, MAX_OPEN_TICKETS, create, update, remove };
+module.exports = { get, list, findOpenForUser, openForUser, ticketLimit, MAX_OPEN_TICKETS, create, createLimited, update, remove };
