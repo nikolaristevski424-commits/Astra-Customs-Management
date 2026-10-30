@@ -7,9 +7,9 @@ function get(guildId, channelId) {
     return all[channelId];
 }
 
-function findOpenForUser(guildId, userId) {
+function findOpenForUser(guildId, userId, type = null) {
     const all = store.get(STORE, guildId, {});
-    return Object.values(all).find((ticket) => ticket.userId === userId && !ticket.closedAt);
+    return Object.values(all).find((ticket) => ticket.userId === userId && !ticket.closedAt && (!type || ticket.type === type));
 }
 
 function list(guildId) {
