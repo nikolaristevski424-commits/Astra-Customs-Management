@@ -41,7 +41,7 @@ function isExecutive(member) {
     const userIds = getExecutiveUserIds();
     if (userIds.includes(member.id)) return true;
     if (member.permissions?.has?.('Administrator')) return true;
-    return member.roles.cache.some((role) => roleIds.includes(role.id));
+    return roleIds.some(roleId => member?.roles?.cache?.has?.(roleId) === true);
 }
 
 // [envVarName, configKey, type] — type is 'string' | 'int' | 'idlist' | 'commission'

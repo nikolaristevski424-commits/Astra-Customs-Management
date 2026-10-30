@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Runtime versions
+        run: node --version && npm --version
       - name: Clean install
         run: npm ci
       - name: Run tests

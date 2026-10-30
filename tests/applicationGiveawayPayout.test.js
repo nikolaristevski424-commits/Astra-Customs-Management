@@ -7,6 +7,7 @@ const panel=require('../commands/panel');
 const giveaway=require('../commands/giveaway');
 const payout=require('../commands/payout');
 const events=require('../events/interactionCreate');
+const ASTRA_GUILD_ID='1488378242846036070';
 
 test('four application types and all required questions fit Discord modal limits',()=>{
   const keys=['designer','staff','moderator','partnership'];
@@ -54,7 +55,9 @@ test('status update edits existing application panel in place and disables close
 });
 
 test('closed applications reject old panel buttons and already opened modals',async()=>{
-  const gid='app-closed-'+Date.now();
+  // User interactions are intentionally blocked outside Astra Customs.
+  // Test application behavior in the one supported guild instead.
+  const gid=ASTRA_GUILD_ID;
   config.setNested(gid,'applicationStatus',{partnership:'closed',moderator:'closed'});
   for(const kind of ['button','modal']){
     let reply;
@@ -72,7 +75,8 @@ test('closed applications reject old panel buttons and already opened modals',as
   }
 });
 test('Moderator application launches exactly five response inputs',async()=>{
-  const gid='app-open-'+Date.now();
+  const gid=ASTRA_GUILD_ID;
+  config.setNested(gid,'applicationStatus',{partnership:'open',moderator:'open'});
   let shown;
   const interaction={
     customId:'application_moderator_open',guildId:gid,

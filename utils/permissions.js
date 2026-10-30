@@ -6,7 +6,9 @@ function isAdmin(member) {
 
 function hasAnyRole(member, roleIds = []) {
     if (!roleIds || roleIds.length === 0) return false;
-    return member.roles.cache.some((role) => roleIds.includes(role.id));
+    // Works with Discord.js Collection and ordinary Map-based members.
+    // Check exact role IDs rather than relying on Collection-only .some().
+    return roleIds.some((roleId) => member?.roles?.cache?.has?.(roleId) === true);
 }
 
 function isStaff(member, config) {
@@ -52,7 +54,7 @@ function commissionRate(member, config) {
     const rates = config.commissionRates || {};
     let best = null;
     for (const [roleId, pct] of Object.entries(rates)) {
-        if (member.roles.cache.some((role) => role.id === roleId)) {
+        if (member?.roles?.cache?.has?.(roleId)) {
             if (best === null || pct > best) best = pct;
         }
     }
