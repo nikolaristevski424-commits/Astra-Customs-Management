@@ -66,7 +66,7 @@ function ticketsPanel(cfg) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Assistance\n\nNeed help with an order, payment, delivery, management issue, or member concern? Open a private ticket and explain what you need.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Before opening a ticket**\n- Explain the issue clearly.\n- Include relevant order or payment information.\n- Never share passwords, Roblox cookies, or private credentials.\n- Keep communication respectful while staff review your request.'));
-    container.addActionRowComponents(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Open Private Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')));
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(\n        new ButtonBuilder().setCustomId('help_ticket_open').setLabel('Support Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫'),\n        new ButtonBuilder().setCustomId('management_ticket_open').setLabel('Management Ticket').setStyle(ButtonStyle.Secondary),\n        new ButtonBuilder().setCustomId('report_ticket_open').setLabel('Report a User').setStyle(ButtonStyle.Danger)\n    ));
     return { components: [container] };
 }
 
