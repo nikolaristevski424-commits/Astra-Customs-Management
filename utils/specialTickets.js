@@ -55,9 +55,9 @@ async function open(interaction,type){
     const definition=routing(type);
     if(!definition)return interaction.reply({content:'Unknown ticket type.',flags:MessageFlags.Ephemeral});
     const guild=interaction.guild,guildId=interaction.guildId;
-    const existing=tickets.findOpenForUser(guildId,interaction.user.id,type);
-    if(existing)return interaction.reply({
-        content:'You already have an open '+definition.label.toLowerCase()+': <#'+existing.channelId+'>',
+    const allowance=tickets.ticketLimit(guildId,interaction.user.id);
+    if(!allowance.allowed)return interaction.reply({
+        content:'You already have '+allowance.count+' open tickets (maximum '+allowance.max+'). Close one before opening another. Orders do not count.',
         flags:MessageFlags.Ephemeral
     });
     const parent=await guild.channels.fetch(CATEGORY_ID).catch(()=>null);
