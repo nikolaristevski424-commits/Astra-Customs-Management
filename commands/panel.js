@@ -100,13 +100,26 @@ function orderPanel(cfg){
       const current=availability.status(cfg,id);
       return '**'+group.label+'** '+(availability.icons[current]||'')+' '+(availability.labels[current]||'Open');
     });
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')+'\n\n**Before you purchase:** https://astra-customs-terms.vercel.app/'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    // Use the original custom status emoji sets, not generic Unicode circles.
+    // This legend also refreshes with the Order Here panel when /status changes.
+    const legend=[
+        '**Status Legend**',
+        availability.icons.open+' **Open** — Accepting new orders',
+        availability.icons.delayed+' **Delayed** — Orders may take longer',
+        availability.icons.closed+' **Closed** — Not accepting new orders',
+        availability.icons.premium+' **Premium / Boosters Only** — Restricted availability; ask management'
+    ].join('\n');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(legend));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      '**Start your order** — Choose a service from the menu below.\n**Before purchasing:** https://astra-customs-terms.vercel.app/'
+    ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
         .setCustomId('astra_order_type').setPlaceholder('Select an order type...').addOptions(
             Object.entries(catalog.TYPES).map(([id,group])=>({label:group.label,value:id,description:availability.labels[availability.status(cfg,id)]||'View designs'}))
         )));
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Need assistance?** Choose a ticket type below.'));
-    container.addActionRowComponents(ticketSelectRow());
     return {components:[container]};
 }
 
