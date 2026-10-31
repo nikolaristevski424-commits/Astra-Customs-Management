@@ -126,29 +126,36 @@ function orderPanel(cfg){
 function applicationsPanel(cfg) {
     const container=baseContainer(cfg,'applications');
     const entries=[
-      ['designer','🎨','Portfolio and design experience'],
-      ['staff','🧑‍💼','Helpful support and customer communication'],
-      ['moderator','🛡️','Fair moderation and professional conduct'],
-      ['partnership','🤝','Community outreach and genuine partnerships']
+      ['designer','🎨','Design liveries, uniforms and graphics for customers'],
+      ['staff','💬','Help customers with orders, payments and support'],
+      ['moderator','🛡️','Moderate Discord fairly and respond to rule violations'],
+      ['partnership','🤝','Build partnerships and help Astra Customs grow']
     ];
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '## '+cfg.brandName+' | Team Applications\n\nJoin a team that helps Astra Customs grow. Review availability and choose the role that fits you.'));
+      '# '+cfg.brandName+' | Team Applications\\n'+
+      'Join the team behind Astra Customs. Check each position’s status and choose the application that fits your skills.'));
     container.addSeparatorComponents(new SeparatorBuilder());
     for(const [key,emoji,description] of entries){
       const status=getStatus(cfg,key),info=STATUSES[status];
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        emoji+' **'+APPLICATIONS[key].name+'** — '+info.emoji+' **'+info.label+'**\n'+description));
+        emoji+' **'+APPLICATIONS[key].name+'**   '+info.emoji+' **'+info.label+'**\\n'+description));
     }
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '*Closed applications cannot be submitted. Delayed applications are accepted but may take longer to review. Please answer every question honestly.*'));
+      '**Before applying**\\nAnswer honestly and include your experience. Closed positions cannot be submitted. Delayed positions may take longer to review.'));
+    // Discord only provides preset button colors. Distinct blue and green
+    // actions differentiate positions without using red for positive actions.
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('application_designer_open').setLabel('Creative Team').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'designer')==='closed'),
-      new ButtonBuilder().setCustomId('application_staff_open').setLabel('Customer Support').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'staff')==='closed')
+      new ButtonBuilder().setCustomId('application_designer_open').setLabel(APPLICATIONS.designer.name)
+        .setEmoji('🎨').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'designer')==='closed'),
+      new ButtonBuilder().setCustomId('application_staff_open').setLabel(APPLICATIONS.staff.name)
+        .setEmoji('💬').setStyle(ButtonStyle.Success).setDisabled(getStatus(cfg,'staff')==='closed')
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('application_moderator_open').setLabel('Discord Moderator').setStyle(ButtonStyle.Secondary).setDisabled(getStatus(cfg,'moderator')==='closed'),
-      new ButtonBuilder().setCustomId('application_partnership_open').setLabel('Partnership Team').setStyle(ButtonStyle.Secondary).setDisabled(getStatus(cfg,'partnership')==='closed')
+      new ButtonBuilder().setCustomId('application_moderator_open').setLabel(APPLICATIONS.moderator.name)
+        .setEmoji('🛡️').setStyle(ButtonStyle.Primary).setDisabled(getStatus(cfg,'moderator')==='closed'),
+      new ButtonBuilder().setCustomId('application_partnership_open').setLabel(APPLICATIONS.partnership.name)
+        .setEmoji('🤝').setStyle(ButtonStyle.Success).setDisabled(getStatus(cfg,'partnership')==='closed')
     ));
     return {components:[container]};
 }
