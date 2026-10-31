@@ -132,17 +132,17 @@ function applicationsPanel(cfg) {
       ['partnership','🤝','Build partnerships and help Astra Customs grow']
     ];
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '# '+cfg.brandName+' | Team Applications\\n'+
+      '# '+cfg.brandName+' | Team Applications\n'+
       'Join the team behind Astra Customs. Check each position’s status and choose the application that fits your skills.'));
     container.addSeparatorComponents(new SeparatorBuilder());
     for(const [key,emoji,description] of entries){
       const status=getStatus(cfg,key),info=STATUSES[status];
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        emoji+' **'+APPLICATIONS[key].name+'**   '+info.emoji+' **'+info.label+'**\\n'+description));
+        emoji+' **'+APPLICATIONS[key].name+'**   '+info.emoji+' **'+info.label+'**\n'+description));
     }
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '**Before applying**\\nAnswer honestly and include your experience. Closed positions cannot be submitted. Delayed positions may take longer to review.'));
+      '**Before applying**\nAnswer honestly and include your experience. Closed positions cannot be submitted. Delayed positions may take longer to review.'));
     // Discord only provides preset button colors. Distinct blue and green
     // actions differentiate positions without using red for positive actions.
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
