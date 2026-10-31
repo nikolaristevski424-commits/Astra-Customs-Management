@@ -59,11 +59,18 @@ module.exports={
      return interaction.editReply('✅ Partnership published: '+result.message.url+
        '\n⚠️ Tracking could not be saved; notify management so it can be reviewed.');
    }
+   if(!tracking.created&&!tracking.reactivated){
+     // Avoid leaving an untracked duplicate announcement in the active
+     // partnership channel. The old tracked post remains authoritative.
+     await result.message.delete?.().catch(error=>
+       console.warn('[partnership] Could not delete duplicate announcement:',error.message));
+     return interaction.editReply('This partner invite already has an active tracked partnership. No duplicate listing or extra R$20 commission was created.');
+   }
    const totals=partnerLedger.stats(interaction.guildId,interaction.user.id);
    return interaction.editReply('✅ Partnership published to <#'+result.message.channelId+'>: '+result.message.url+
       '\nRepresentatives notified: '+representativeIds.length+'.\n'+
       (tracking.created?'**Recorded partnerships:** '+totals.count+' · **Accumulated commission:** R$'+totals.robuxEarned:
-        'This invite was already recorded as a partnership; no additional R$20 was counted.')+
+        'This previously terminated partnership has been re-established. No additional R$20 was counted for an already recorded invite.')+
       '\nCommissions are tracked for management verification; Roblox payouts are not sent automatically.');
  }
 };
