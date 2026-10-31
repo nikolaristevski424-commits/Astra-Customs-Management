@@ -57,6 +57,19 @@ async function terminateRepresentative(client,guildId,memberId,options={}){
     return{terminated,deleted,failed};
 }
 
+/** Retry failed announcement removal after transient Discord permission/outage errors. */
+async function retryTerminatedAnnouncements(client,guildId){
+    let fixed=0;
+    const pending=ledger.list(guildId).filter(e=>
+        e.status===ledger.STATUS.terminated && !e.deletedAt && e.messageId);
+    for(const entry of pending){
+        const result=await deleteAnnouncement(client,guildId,entry);
+        ledger.markDeletion(guildId,entry.id,result);
+        if(result.deleted)fixed++;
+    }
+    return{pending:pending.length,fixed};
+}
+
 /** Startup reconciliation catches representative departures while the bot was offline. */
 async function reconcileOnReady(client,{fetchMember=null}={}){
     const guildId=serverScope.ASTRA_GUILD_ID;
@@ -77,6 +90,7 @@ async function reconcileOnReady(client,{fetchMember=null}={}){
             terminated+=r.terminated.length;
         }
     }
+    await retryTerminatedAnnouncements(client,guildId);
     return{checked:memberIds.length,terminated};
 }
-module.exports={recordedChannel,deleteAnnouncement,terminateRepresentative,reconcileOnReady};
+module.exports={recordedChannel,deleteAnnouncement,terminateRepresentative,reconcileOnReady,retryTerminatedAnnouncements};
