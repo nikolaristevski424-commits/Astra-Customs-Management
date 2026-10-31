@@ -93,7 +93,7 @@ function polishClassicEmbeds(embeds,cfg={}){
     const result=EmbedBuilder.from(embed);
     if(raw.color==null)result.setColor(accentFor(raw));
     if(!raw.author?.name)result.setAuthor({name:brand});
-    if(!raw.footer?.text)result.setFooter({text:brand+'  •  Official notification'});
+    if(!raw.footer?.text)result.setFooter({text:brand+'  •  Official update'});
     return result;
   });
 }
