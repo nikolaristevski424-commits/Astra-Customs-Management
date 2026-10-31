@@ -4,7 +4,7 @@ const {EmbedBuilder,MessageFlags,ContainerBuilder,TextDisplayBuilder}=require('d
 const {isOwner}=require('../utils/ownership');
 const partner=require('../utils/partnerPosts');
 const {withFooter,footerUrl}=require('../utils/footerBranding');
-const closee=require('../commands/closee');
+const close=require('../commands/close');
 const paid=require('../commands/paid');
 const partnership=require('../commands/partnership');
 
@@ -53,8 +53,8 @@ test('paid-ad ping controls require explicit mention permission',()=>{
  assert.equal(partner.pingOptions(make('role',null,true)).error!==undefined,true);
  assert.equal(partner.pingOptions(make('role',{id:'123456789012345678',mentionable:true},false)).roles[0],'123456789012345678');
 });
-test('closee is staff-only and rejects an ordinary customer',()=>{
- const {canClose}=closee;
+test('/close is staff-only and rejects an ordinary customer',()=>{
+ const {canClose}=close;
  const cfg={ticketStaffRoleIds:['123456789012345679'],managerRoleIds:['123456789012345680']};
  const regular=mockMember('123456789012345678');
  assert.equal(canClose(regular,cfg),false);
