@@ -6,6 +6,7 @@ const giveawayScheduler = require('../services/giveawayScheduler');
 const activityCheckExpiry = require('../services/activityCheckExpiry');
 const ticketCloseRequests = require('../services/ticketCloseRequests');
 const staffDiscipline = require('../services/staffDiscipline');
+const partnerships=require('../services/partnershipLifecycle');
 
 module.exports = {
     name: Events.ClientReady,
@@ -21,5 +22,8 @@ module.exports = {
         activityCheckExpiry.start(client);
         ticketCloseRequests.start(client);
         staffDiscipline.start(client);
+        // Repair active partnerships if representatives left while offline.
+        partnerships.reconcileOnReady(client).catch(error=>
+          console.warn('[ready] Partnership reconciliation failed:',error.message));
     },
 };
