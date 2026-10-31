@@ -10,7 +10,7 @@ test.afterEach(()=>{for(const id of openedForTest.splice(0))tickets.remove(GUILD
 
 const GUILD_ID='1999999999999999998',USER_ID='123456789012345678';
 const roleIds=special.TYPES.report.roleIds;
-const managementRoleIds=['1538963485667500144','1543008897537802281'];
+const managementRoleIds=['1538963485667500144','1565167658377158777'];
 let seq=1000000000000000000n;
 function env(type){
   const id=String(++seq),posts=[],transcripts=[];
@@ -77,25 +77,25 @@ test('report ticket restricts access, pings only specified report roles, and per
   for(const id of roleIds)assert.ok(e.posts[0].content.includes('<@&'+id+'>'));
   assert.ok(!e.posts[0].content.includes('<@&1543008897537802281>'));
   assert.match(e.posts[0].content,/Report review requested/);
+  assert.equal(e.posts[1].embeds,undefined);
+  assert.ok(JSON.stringify(e.posts[1].components).includes('Report a User Ticket'));
   assert.equal(tickets.get(GUILD_ID,e.id).type,'report');
   assert.equal(tickets.get(GUILD_ID,e.id).reportedUser,'ReportedMember');
 });
-test('management ticket pings each authorized management role, never unrelated report roles',async()=>{
-  config.setConfig(GUILD_ID,{managerRoleIds:managementRoleIds});
+test('management ticket pings exactly the two specified reviewer roles and uses a V2 card',async()=>{
   const e=env('management');
   await special.open(e.interaction,'management');
   assert.equal(e.posts.length,2);
   const expected=special.authorizedRoles(e.guild,config.getConfig(GUILD_ID),'management');
-  for(const roleId of managementRoleIds)assert.ok(expected.includes(roleId));
-  assert.deepEqual(e.posts[0].allowedMentions.roles,expected);
-  assert.deepEqual(e.posts[0].allowedMentions.parse,[]);
-  for(const roleId of expected)assert.ok(e.posts[0].content.includes('<@&'+roleId+'>'));
-  assert.ok(!e.posts[0].content.includes('<@&1565167658377158777>'));
+  assert.deepEqual(expected,managementRoleIds);
+  assert.deepEqual(e.posts[0].allowedMentions.roles,managementRoleIds);
+  for(const roleId of managementRoleIds)assert.ok(e.posts[0].content.includes('<@&'+roleId+'>'));
   assert.ok(!e.posts[0].content.includes('<@&1565198911662985336>'));
-  assert.match(e.posts[0].content,/Management assistance requested/);
+  assert.equal(e.posts[1].embeds,undefined);
+  assert.ok(JSON.stringify(e.posts[1].components).includes('Management Ticket'));
   assert.deepEqual(
-      e.guild.lastCreated.permissionOverwrites.filter(x=>expected.includes(x.id)).map(x=>x.id),
-      expected,'Only authorized reviewer roles are pinged and allowed into this channel'
+    e.guild.lastCreated.permissionOverwrites.filter(x=>expected.includes(x.id)).map(x=>x.id),
+    expected
   );
   assert.equal(tickets.get(GUILD_ID,e.id).type,'management');
   assert.equal(tickets.get(GUILD_ID,e.id).transcriptChannelId,'1531632265812119552');
