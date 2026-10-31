@@ -541,7 +541,7 @@ async function handleButton(interaction) {
         const [, , type, applicantId] = customId.split('_');
         const modal = new ModalBuilder()
             .setCustomId(`app_decision_modal_${accept ? 'accept' : 'deny'}_${type}_${applicantId}_${interaction.channelId}_${interaction.message.id}`)
-            .setTitle(`${accept ? 'Accept' : 'Deny'} Application`);
+            .setTitle(`${accept ? 'Accept' : 'Deny'} ${applicationStatus.APPLICATIONS[type]?.name || 'Application'}`.slice(0,45));
         const reason = new TextInputBuilder()
             .setCustomId('reason')
             .setLabel(accept ? 'Reason for acceptance' : 'Reason for denial')
@@ -969,10 +969,12 @@ async function handleModal(interaction) {
         const accepted = decision === 'accept';
         const status = accepted ? 'Accepted' : 'Denied';
         const color = accepted ? 0x2ecc71 : 0xe74c3c;
-        const appName = type === 'staff' ? 'Customer Support' : 'Creative Team';
+        const appDefinition=applicationStatus.APPLICATIONS[type];
+        if(!appDefinition)return interaction.reply({content:'Unknown application type. Decision not applied.',flags:MessageFlags.Ephemeral});
+        const appName=appDefinition.name;
         const reviewerMention = `<@${interaction.user.id}>`;
         const updatedEmbed = (originalEmbed ? EmbedBuilder.from(originalEmbed) : new EmbedBuilder())
-            .setTitle(`${appName} Application — ${status}`)
+            .setTitle(`${cfg.brandName || 'Astra Customs'} | ${appName} Application — ${status}`)
             .setColor(color)
             .addFields(
                 { name: 'Decision', value: status, inline: true },
@@ -1013,7 +1015,7 @@ async function handleModal(interaction) {
 
         const resultEmbed = new EmbedBuilder()
             .setColor(color)
-            .setTitle(`${appName} Application ${status}`)
+            .setTitle(`${cfg.brandName || 'Astra Customs'} | ${appName} Application ${status}`)
             .setDescription(`The application from <@${applicantId}> was ${status.toLowerCase()}.`)
             .addFields(
                 { name: 'Reviewed by', value: reviewerMention, inline: true },
@@ -1035,8 +1037,8 @@ async function handleModal(interaction) {
             await applicant.send(withFooter({
                 embeds: [new EmbedBuilder()
                     .setColor(color)
-                    .setTitle(`Application ${status}`)
-                    .setDescription(`Your **${appName}** application to **${cfg.brandName}** was ${status.toLowerCase()}.`)
+                    .setTitle(`${appName} Application — ${status}`)
+                    .setDescription(`Your **${appName}** application to **${cfg.brandName || 'Astra Customs'}** was **${status.toLowerCase()}**.`)
                     .addFields(
                         { name: 'Decision reason', value: reason },
                         { name: 'Reviewed by', value: reviewerMention, inline: true },
