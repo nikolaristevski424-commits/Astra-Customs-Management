@@ -26,8 +26,22 @@ test('all three ticket categories appear in one emoji-labelled dropdown, not sep
   const encoded=JSON.stringify(payload);
   assert.doesNotMatch(encoded,/help_ticket_open|management_ticket_open|report_ticket_open/);
 });
-test('ticket dropdown is present on order/status and portfolio as well',()=>{
-  for(const type of ['order','order-status','portfolio']){
+test('Order Here is solely for orders and shows original custom status emoji legend',()=>{
+  const payload=panel.BUILDERS.order(baseConfig,GUILD);
+  const encoded=JSON.stringify(payload);
+  const availability=require('../utils/serviceAvailability');
+  assert.equal(dropdowns(payload).length,0,'Order Here must not offer ticket creation');
+  assert.doesNotMatch(encoded,/help_ticket_open|management_ticket_open|report_ticket_open/);
+  assert.match(encoded,/astra_order_type/);
+  assert.match(encoded,/Status Legend/);
+  for(const status of ['open','delayed','closed','premium']){
+    assert.ok(encoded.includes(availability.icons[status]),'Missing original '+status+' custom emoji');
+    assert.ok(encoded.includes(availability.labels[status]),'Missing '+status+' legend label');
+  }
+  assert.ok(encoded.includes('astra-customs-terms.vercel.app'));
+});
+test('other help entry points retain ticket dropdown while Order Here does not',()=>{
+  for(const type of ['order-status','portfolio','tickets']){
     const rendered=panel.BUILDERS[type](baseConfig,GUILD);
     assert.equal(dropdowns(rendered).length,1,type);
     assert.doesNotMatch(JSON.stringify(rendered),/help_ticket_open/);

@@ -62,6 +62,24 @@ function addFooterToV2(payload,url) {
   return {...payload,components};
 }
 
+/** Consistent Astra metadata for existing classic embeds.
+ * Retain every original title, field, color, footer, and description.
+ * Do not overwrite Decision: footers used by application review logic.
+ * Do not alter image-only footer/banner embeds.
+ */
+function polishClassicEmbeds(embeds,cfg={}){
+  const brand=String(cfg.brandName||process.env.BRAND_NAME||'Astra Customs').slice(0,256);
+  return embeds.map(embed=>{
+    const raw=json(embed);
+    if(!raw || typeof raw!=='object' || !(raw.title||raw.description||raw.fields?.length))return embed;
+    const result=EmbedBuilder.from(embed);
+    if(raw.color==null)result.setColor(0x4f6dd2);
+    if(!raw.author?.name)result.setAuthor({name:brand});
+    if(!raw.footer?.text)result.setFooter({text:brand+' • Official update'});
+    return result;
+  });
+}
+
 /**
  * Brand normal embeds and Components V2 messages with the Astra footer.
  * A classic embed may only have one big image; a separate image-only embed
@@ -73,9 +91,10 @@ function withFooter(payload,cfg={}) {
   if(!/^https:\/\//i.test(url))return payload;
 
   if(Array.isArray(payload.embeds) && payload.embeds.length) {
-    if(payload.embeds.some(e=>isFooterImage(e,url)))return payload;
-    const oldRemoved=payload.embeds.filter(e=>!String(json(e)?.image?.url||'').includes('footer-banner.png'));
-    if(oldRemoved.length>=10)return payload;
+    const polished=polishClassicEmbeds(payload.embeds,cfg);
+    if(polished.some(e=>isFooterImage(e,url)))return {...payload,embeds:polished};
+    const oldRemoved=polished.filter(e=>!String(json(e)?.image?.url||'').includes('footer-banner.png'));
+    if(oldRemoved.length>=10)return {...payload,embeds:oldRemoved};
     return {...payload,embeds:[...oldRemoved,new EmbedBuilder().setImage(url)]};
   }
   if(Array.isArray(payload.components) && payload.components.length && isComponentsV2(payload)) {
@@ -83,4 +102,4 @@ function withFooter(payload,cfg={}) {
   }
   return payload;
 }
-module.exports={withFooter,footerUrl,DEFAULT_FOOTER_URL};
+module.exports={withFooter,footerUrl,polishClassicEmbeds,DEFAULT_FOOTER_URL};
