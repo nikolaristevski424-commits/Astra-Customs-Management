@@ -1,3 +1,27 @@
+## Order Here status legend and application identity fixes
+
+The **Order Here** panel now offers only the service ordering dropdown; it
+does not include a ticket-opening menu. The panel has a legend made from
+Astra Customs' original custom status emoji groups for **Open**, **Delayed**,
+**Closed**, and **Premium / Boosters Only**. Existing classic Order Here panels
+have their ticket controls removed during `/panel refresh`, while the
+original order controls remain available. Run `/panel order` to post a fresh
+Components V2 version.
+
+Application decisions use the exact definition for each application type:
+**Creative Team**, **Customer Support**, **Discord Moderator**, or
+**Partnership Team**. Moderator and Partnership approvals no longer appear
+as Creative Team in the original review, results channel, applicant DM, or
+staff confirmation. The application panel now uses role-specific emoji and
+blue/green Discord buttons.
+
+The shared embed formatter also gives classic bot notification embeds a
+consistent Astra brand name, fallback blue accent color, and a clear footer
+where no footer was supplied. It preserves existing titles, fields, color
+statuses, and decision markers. Discord does not allow arbitrary button
+colors or changing a classic embed into a Components V2 message in place;
+existing workflow messages remain compatible.
+
 # Design Shop Bot
 
 An all-in-one Discord bot for running a Roblox design/commission shop:
