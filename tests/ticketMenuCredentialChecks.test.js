@@ -40,12 +40,24 @@ test('Order Here is solely for orders and shows original custom status emoji leg
   }
   assert.ok(encoded.includes('astra-customs-terms.vercel.app'));
 });
-test('other help entry points retain ticket dropdown while Order Here does not',()=>{
-  for(const type of ['order-status','portfolio','tickets']){
+test('Tickets is the only panel offering ticket creation; Order Status has all custom emoji legend states',()=>{
+  for(const type of Object.keys(panel.BUILDERS)){
     const rendered=panel.BUILDERS[type](baseConfig,GUILD);
-    assert.equal(dropdowns(rendered).length,1,type);
-    assert.doesNotMatch(JSON.stringify(rendered),/help_ticket_open/);
+    const count=dropdowns(rendered).length;
+    assert.equal(count,type==='tickets'?1:0,type+' must not open tickets outside Tickets');
+    if(type!=='tickets'){
+      const json=JSON.stringify(rendered);
+      assert.doesNotMatch(json,/help_ticket_open|management_ticket_open|report_ticket_open/,type);
+    }
   }
+  const status=JSON.stringify(panel.BUILDERS['order-status'](baseConfig));
+  const availability=require('../utils/serviceAvailability');
+  assert.match(status,/Status Legend/);
+  for(const name of ['open','delayed','closed','premium']){
+    assert.ok(status.includes(availability.icons[name]),'Missing '+name+' custom emoji');
+    assert.ok(status.includes(availability.labels[name]),'Missing '+name+' text');
+  }
+  assert.ok(status.includes('order_open'),'Order Status should retain its Order Now button');
 });
 test('all ticket menu selections open the correct modal and preserve privacy',async()=>{
   for(const [selection,expectedModal] of [
@@ -56,10 +68,12 @@ test('all ticket menu selections open the correct modal and preserve privacy',as
     let shown=null;
     const interaction={
       guildId:GUILD,customId:'astra_ticket_type',values:[selection],
+      message:{author:{id:'bot'},components:panel.BUILDERS.tickets(baseConfig).components},
+
       isChatInputCommand:()=>false,isAutocomplete:()=>false,isButton:()=>false,
       isStringSelectMenu:()=>true,isModalSubmit:()=>false,
       showModal:async modal=>{shown=modal.toJSON();},
-      client:{commands:new Map()}
+      client:{user:{id:'bot'},commands:new Map()}
     };
     await interactionHandler.execute(interaction);
     assert.ok(shown,'Expected a modal for '+selection);
@@ -71,13 +85,42 @@ test('old support ticket buttons still work on previously published panels',asyn
   let modal;
   const interaction={
     guildId:GUILD,customId:'help_ticket_open',
+    message:{author:{id:'bot'},embeds:[{title:'Astra Customs Assistance'}],
+      components:[{type:1,components:[{type:2,custom_id:'help_ticket_open'}]}]},
     isChatInputCommand:()=>false,isAutocomplete:()=>false,isButton:()=>true,
     isStringSelectMenu:()=>false,isModalSubmit:()=>false,
     showModal:async value=>{modal=value.toJSON()},
-    client:{commands:new Map()}
+    client:{user:{id:'bot'},commands:new Map()}
   };
   await interactionHandler.execute(interaction);
   assert.equal(modal.custom_id,'ticket_open_modal');
+});
+test('stale Order Status and Portfolio menus and buttons cannot open tickets',async()=>{
+  for(const type of ['order-status','portfolio','order']){
+    const source=panel.BUILDERS[type](baseConfig,GUILD);
+    // Older messages still have the historical menu component.
+    const message={author:{id:'bot'},components:[
+       ...source.components,
+       panel.ticketSelectRow()
+    ]};
+    for(const customId of ['astra_ticket_type','help_ticket_open','management_ticket_open','report_ticket_open']){
+      let rejected,opened=false;
+      const interaction={
+        guildId:GUILD,customId,values:['support'],message,
+        isChatInputCommand:()=>false,isAutocomplete:()=>false,
+        isButton:()=>customId!=='astra_ticket_type',
+        isStringSelectMenu:()=>customId==='astra_ticket_type',
+        isModalSubmit:()=>false,
+        showModal:async()=>{opened=true;},
+        reply:async payload=>{rejected=payload;},
+        client:{user:{id:'bot'},commands:new Map()}
+      };
+      await interactionHandler.execute(interaction);
+      assert.equal(opened,false,customId+' opened a ticket on '+type);
+      assert.match(rejected.content,/Tickets/);
+      assert.ok(rejected.flags&MessageFlags.Ephemeral);
+    }
+  }
 });
 test('Roblox cookie live check authenticates with safe read-only GET, without modifying Roblox',async()=>{
   const requests=[];
