@@ -25,6 +25,7 @@ const loaUtil = require('../utils/loa');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
 const specialTickets = require('../utils/specialTickets');
+const {isTicketPanel}=require('../utils/ticketEntryGuard');
 const ticketCards = require('../utils/ticketCards');
 const orderCategories = require('../utils/orderCategories');
 const SUPPORT_REVIEW_ROLE_ID='1497415634915561603';
@@ -110,6 +111,11 @@ function supportTicketModal(){
 
 async function handleSelect(interaction) {
     if(interaction.customId==='astra_ticket_type'){
+        if(!isTicketPanel(interaction.message,interaction.client?.user?.id))
+            return interaction.reply({
+                content:'Please open tickets using the dedicated **Tickets** panel in <#1497580809752805456>. Ticket options on older order or status posts are no longer available.',
+                flags:MessageFlags.Ephemeral
+            });
         const selected=interaction.values?.[0];
         if(selected==='support')return interaction.showModal(supportTicketModal());
         if(selected==='management')return interaction.showModal(specialTickets.form('management'));
@@ -503,11 +509,18 @@ async function handleButton(interaction) {
     // ---- Dashboard: Help (open ticket) ----
     if(customId==='order_open') return orderFlow.start(interaction);
 
-    if (customId === 'management_ticket_open') return interaction.showModal(specialTickets.form('management'));
-    if (customId === 'report_ticket_open') return interaction.showModal(specialTickets.form('report'));
-
-    // Existing historical buttons remain supported for older published panels.
-    if (customId === 'help_ticket_open') return interaction.showModal(supportTicketModal());
+    // Older published panels may still show ticket buttons until refreshed.
+    // Never let those older buttons open tickets outside the Tickets panel.
+    if (['management_ticket_open','report_ticket_open','help_ticket_open'].includes(customId)){
+        if(!isTicketPanel(interaction.message,interaction.client?.user?.id))
+            return interaction.reply({
+                content:'Tickets must be opened from the **Tickets** panel in <#1497580809752805456>.',
+                flags:MessageFlags.Ephemeral
+            });
+        if(customId==='management_ticket_open')return interaction.showModal(specialTickets.form('management'));
+        if(customId==='report_ticket_open')return interaction.showModal(specialTickets.form('report'));
+        return interaction.showModal(supportTicketModal());
+    }
 
     // ---- Dashboard: staff/designer applications ----
     if (/^application_(staff|designer|moderator|partnership)_open$/.test(customId)) {

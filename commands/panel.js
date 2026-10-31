@@ -58,6 +58,15 @@ function ticketSelectRow(){
     );
 }
 
+function statusLegend(){
+    return [
+        '**Status Legend**',
+        availability.icons.open+' **Open** — Accepting new orders',
+        availability.icons.delayed+' **Delayed** — Orders may take longer',
+        availability.icons.closed+' **Closed** — Not accepting new orders',
+        availability.icons.premium+' **Premium / Boosters Only** — Restricted availability; ask management'
+    ].join('\n');
+}
 function orderStatusPanel(cfg) {
     const container=baseContainer(cfg,'status');
     const values=Object.keys(catalog.TYPES).map(id=>availability.status(cfg,id));
@@ -70,12 +79,14 @@ function orderStatusPanel(cfg) {
     }
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
     container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(statusLegend()));
+    container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       '*Changes are reflected here automatically when management uses \`/status\`.*'));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
        new ButtonBuilder().setCustomId('order_open').setLabel('Order Now').setStyle(ButtonStyle.Success)
     ));
-    container.addActionRowComponents(ticketSelectRow());
+
     return {components:[container]};
 }
 
@@ -104,14 +115,7 @@ function orderPanel(cfg){
     container.addSeparatorComponents(new SeparatorBuilder());
     // Use the original custom status emoji sets, not generic Unicode circles.
     // This legend also refreshes with the Order Here panel when /status changes.
-    const legend=[
-        '**Status Legend**',
-        availability.icons.open+' **Open** — Accepting new orders',
-        availability.icons.delayed+' **Delayed** — Orders may take longer',
-        availability.icons.closed+' **Closed** — Not accepting new orders',
-        availability.icons.premium+' **Premium / Boosters Only** — Restricted availability; ask management'
-    ].join('\n');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(legend));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(statusLegend()));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
       '**Start your order** — Choose a service from the menu below.\n**Before purchasing:** https://astra-customs-terms.vercel.app/'
@@ -166,12 +170,12 @@ function portfolioPanel(cfg, guildId) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Portfolio\n\nA selection of recent work from our creative team.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        pieces.length ? pieces.map((piece) => `**${piece.caption || 'Featured work'}**\n${piece.url}`).join('\n\n') : 'The portfolio is currently being updated. Check back soon or open a ticket to request examples of relevant work.'
+        pieces.length ? pieces.map((piece) => `**${piece.caption || 'Featured work'}**\n${piece.url}`).join('\n\n') : 'The portfolio is currently being updated. Check back for new work or browse our design services.'
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('order_open').setLabel('Start an Order').setStyle(ButtonStyle.Success).setEmoji('🛒'),
     ));
-    container.addActionRowComponents(ticketSelectRow());
+
     return { components: [container] };
 }
 
@@ -306,10 +310,10 @@ function legacyStatusPayload(cfg,message){
     });
     const embed=new EmbedBuilder().setColor(parseColor(cfg.accentColor)).setTitle(cfg.brandName+' | Order Status')
         .setDescription('**Live availability**\n\n'+lines.join('\n')+
-          '\n\nAvailability updates when management uses \`/status\`.').setTimestamp();
+          '\n\n'+statusLegend()+'\n\nAvailability updates when management uses \`/status\`.').setTimestamp();
     const image=old?.image?.url;
     if(image)embed.setImage(image);
-    return withFooter({embeds:[embed],components:message.components||[],allowedMentions:{parse:[]}},cfg);
+    return withFooter({embeds:[embed],components:withoutTicketControls(message.components),allowedMentions:{parse:[]}},cfg);
 }
 const BUILDERS = {
     'order-status': (cfg) => orderStatusPanel(cfg),
@@ -325,6 +329,7 @@ module.exports = {
     BUILDERS,
     PANEL_CHANNELS,
     ticketSelectRow,
+    statusLegend,
     TICKET_CHOICES,
     TICKET_EMOJI,
     withoutTicketControls,

@@ -97,13 +97,29 @@ Previously documented `ROGOID_ROBLOX_TO_DISCORD_URL`,
 `ROGOID_AUTH_SCHEME` settings are **no longer used** and may be removed
 from your `.env`.
 
+## Dedicated Tickets panel and Order Status emoji legend
+
+The `/panel tickets` message is the **only** place members may open Support,
+Management or Report a User tickets. `/panel order-status` retains **Order Now**
+but has no ticket menu. `/panel portfolio` and `/panel order` likewise
+contain no ticket entry controls. The Order Status and Order Here panels both
+show Astra's original custom Open, Delayed, Closed and Premium status-emoji
+legend, with automatic availability updates.
+
+After deployment use `/panel refresh` to edit existing bot-authored
+Order Status/Order Here posts, including removing stale ticket buttons from
+classic embeds. Publish a fresh `/panel portfolio` if the older portfolio
+post still shows a ticket dropdown, and delete the old post. Outdated
+non-ticket panel menus are blocked by the interaction handler as well, so
+they cannot open tickets even before the old message is deleted.
+
 ## Custom-emoji ticket dropdowns and connection health
 
 Use `/panel tickets` after updating the bot. The panel now has a single
 select menu with **Support Ticket**, **Management Ticket**, and **Report a User**,
 each with the Astra Customs custom emoji
 `<:ticketsupportroleicon:1559204224556863521>`.
-The same ticket menu appears in the order, order-status and portfolio panels.
+**Only the dedicated Tickets/Assistance panel provides ticket-opening options.** Order Here, Order Status, Portfolio and other panels no longer contain ticket creation menus. Old public menus or ticket buttons are blocked from opening tickets even before their messages are refreshed.
 The opening order embed also displays a prominent short **Order ID** (`#1`,
 `#2`, etc.) that matches the sales ledger. Staff can link a Roblox purchase
 with `/payment create price:<Robux> order_id:<order number>`; when linked,
