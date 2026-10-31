@@ -2,6 +2,7 @@ const { withFooter } = require('./footerBranding');
 const {ActionRowBuilder,StringSelectMenuBuilder,ModalBuilder,TextInputBuilder,TextInputStyle,ChannelType,PermissionsBitField,MessageFlags,ButtonBuilder,ButtonStyle} = require('discord.js');
 const config=require('./config'), tickets=require('./tickets'), orders=require('./orders'), progress=require('./orderProgress');
 const catalog=require('./catalog'), service=require('./serviceAvailability');
+const orderCategories=require('./orderCategories');
 const TERMS='https://astra-customs-terms.vercel.app/';
 const SHOP='https://www.roblox.com/games/102262993580557/Astra-Customs-Shop';
 const ephemeral=MessageFlags.Ephemeral;
@@ -47,9 +48,9 @@ async function modal(interaction){
  const existing=tickets.findOpenForUser(interaction.guildId,interaction.user.id,'order');
  if(existing)return interaction.reply({flags:ephemeral,content:'You already have an open order: <#'+existing.channelId+'>'});
  await interaction.deferReply({flags:ephemeral});
- const parentId=cfg.orderCategoryId||cfg.ticketCategoryId;
- const parent=parentId?await guild.channels.fetch(parentId).catch(()=>null):null;
- if(!parent || parent.type!==ChannelType.GuildCategory)return interaction.editReply('Please ask management to configure a valid ORDER_CATEGORY_ID.');
+ const parentId=orderCategories.fromService(p.type);
+ const parent=await orderCategories.category(guild,parentId);
+ if(!parent)return interaction.editReply('The '+p.service+' order category is missing or inaccessible (ID '+(parentId||'unknown')+'). Please ask management to check the Discord category and bot permissions.');
  const supportRoles=(cfg.ticketStaffRoleIds?.length?cfg.ticketStaffRoleIds:cfg.staffRoleIds||[]).filter(id=>guild.roles.cache.has(id));
  const roles=[...new Set([...supportRoles,p.role])].filter(id=>guild.roles.cache.has(id));
  const allow=[PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages,PermissionsBitField.Flags.ReadMessageHistory];
@@ -79,12 +80,15 @@ async function modal(interaction){
   new ButtonBuilder().setCustomId('ticket_close_instant_'+channel.id).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger)
  );
  try{
-  const sent=await channel.send(withFooter({content:'<@'+interaction.user.id+'>'+(guild.roles.cache.has(p.role)?' <@&'+p.role+'>':''),
-    embeds:[progress.embed(cfg,record,tickets.get(interaction.guildId,channel.id))],
-    components:progress.controls(record),allowedMentions:{users:[interaction.user.id],roles:guild.roles.cache.has(p.role)?[p.role]:[]}}));
+  await channel.send({content:'<@'+interaction.user.id+'>'+
+      (guild.roles.cache.has(p.role)?' <@&'+p.role+'>':'')+
+      ' — Order #'+record.id+' opened.',
+      allowedMentions:{parse:[],users:[interaction.user.id],
+          roles:guild.roles.cache.has(p.role)?[p.role]:[]}});
+  const sent=await channel.send(progress.panel(cfg,record,tickets.get(interaction.guildId,channel.id)));
   orders.updateOrder(interaction.guildId,record.id,{requestMessageId:sent.id});
   tickets.update(interaction.guildId,channel.id,{orderMessageId:sent.id});
-  await channel.send({content:'**Before you continue:** Please read our Terms of Service: '+TERMS+'\nRoblox shop: '+SHOP+'\nA designer will confirm your final price before payment.'});
+  // Terms and payment instructions are already in the Components V2 order card.
  }catch(error){console.error('[orderFlow] Failed sending order messages:',error)}
  return interaction.editReply('Order **#'+record.id+'** opened: <#'+channel.id+'>\n**Estimated cost:** '+price+'. A designer will confirm the final quote.');
 }
