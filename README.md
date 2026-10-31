@@ -160,6 +160,23 @@ not included in `STAFF_ROLE_IDS`: `1497420088456777859`,
 `1565198911662985336`, `1565689738906574940`,
 `1497415634915561603`. Existing staff/admin access remains.
 
+## Astra Customs premium message design and correct close commands
+
+The customer storefront, assistance tickets, order-progress cards, service
+availability, and command directory now use an updated consistent Components
+V2 visual system with clearer hierarchy, section headers, stage indicators,
+service-specific accents, and action buttons. Classic staff embeds continue
+working and receive a context-aware accent color when no color is specified,
+plus brand identity and footer details. Existing interactive staff workflows
+and historical messages are not converted in place.
+
+**The typo command has been removed.** Ticket staff can use **`/close`**
+to immediately close the current ticket and archive its transcript.
+Members use **`/close-request`** to start the existing 24-hour closure
+request flow. The old **`/closee`** command no longer deploys. Restart the
+bot to redeploy slash commands; the bot must have permission to manage
+commands in its guild.
+
 ## New Components V2 ticket and order experience
 
 Ticket creation notifications have been separated from their polished
@@ -454,7 +471,7 @@ channel. Claiming and closing a ticket is restricted to
 `TICKET_STAFF_ROLE_IDS` — set this to a dedicated ticket-support role
 if you want it separate from general `STAFF_ROLE_IDS` (leave it blank
 to just use `STAFF_ROLE_IDS`). The ticket opener and invited members can
-also manage its close request. Use `/close request` to post a public
+also manage its close request. Use `/close-request` to post a public
 request with **Close Ticket Now** and **Keep Ticket Open** buttons. If no
 one responds within 24 hours, the ticket closes automatically. A closing
 ticket gets a complete text transcript (including attachments) in
