@@ -160,6 +160,30 @@ not included in `STAFF_ROLE_IDS`: `1497420088456777859`,
 `1565198911662985336`, `1565689738906574940`,
 `1497415634915561603`. Existing staff/admin access remains.
 
+## Automatic partnership lifecycle and representative departures
+
+Partnerships posted with `/partnership` already record up to five
+partner-server representative Discord IDs. If **any registered representative
+leaves Astra Customs**, the bot now:
+
+1. Marks every affected active partnership as **Terminated** in the
+   partnership ledger and removes it from active tracking.
+2. Attempts to delete the original published announcement in the official
+   partnerships channel, verifying that it belongs to this bot before
+   deleting it. It never removes unrelated user messages.
+3. Retains the historical entry and previously recorded R$20 commission for
+   auditing; it does not automatically pay or reverse Robux.
+4. Retries previously failed announcement deletion at next startup.
+5. Reconciles missing representatives when the bot restarts, catching leaves
+   while the bot was offline. Network errors never count as proof someone
+   left the server.
+
+The partnership tracker now shows **active**, **terminated**, and historic
+totals. Republishing a previously terminated invite can reactivate its
+existing record without double-awarding a commission. This applies to tracked
+partnerships posted with `/partnership`; manually posted advertisements
+without stored representative IDs cannot be monitored.
+
 ## Astra Customs premium message design and correct close commands
 
 The customer storefront, assistance tickets, order-progress cards, service
