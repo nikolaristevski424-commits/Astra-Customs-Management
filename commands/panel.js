@@ -72,7 +72,7 @@ function orderStatusPanel(cfg) {
     const container=baseContainer(cfg,'status');
     const values=Object.keys(catalog.TYPES).map(id=>availability.status(cfg,id));
     const available=values.filter(s=>s==='open').length;
-    const lines=['# '+cfg.brandName+' | Service Status',
+    const lines=['# '+cfg.brandName+' | Order Status',
       '**LIVE AVAILABILITY**   •   '+available+' / '+values.length+' services accepting new commissions',
       '', '**CURRENT SERVICE STATUS**'];
     for (const [id,group] of Object.entries(catalog.TYPES)) {
