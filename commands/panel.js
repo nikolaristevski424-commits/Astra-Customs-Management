@@ -19,6 +19,7 @@ const portfolio = require('../utils/portfolio');
 const { parseColor, addPanelBanner } = require('../utils/embeds');
 const { sendAsPanel } = require('../utils/respond');
 const {withFooter} = require('../utils/footerBranding');
+const {COLORS,accent}=require('../utils/visualSystem');
 const { isExecutive } = require('../utils/env');
 const { isOwner } = require('../utils/ownership');
 const perms=require('../utils/permissions');
@@ -35,7 +36,7 @@ const PANEL_CHANNELS = Object.freeze({
 });
 
 function baseContainer(cfg, bannerKey = null) {
-    const container = new ContainerBuilder().setAccentColor(parseColor(cfg.accentColor));
+    const container = new ContainerBuilder().setAccentColor(accent(cfg));
     if (bannerKey) addPanelBanner(container, cfg, bannerKey);
     return container;
 }
@@ -71,8 +72,9 @@ function orderStatusPanel(cfg) {
     const container=baseContainer(cfg,'status');
     const values=Object.keys(catalog.TYPES).map(id=>availability.status(cfg,id));
     const available=values.filter(s=>s==='open').length;
-    const lines=['## '+cfg.brandName+' | Order Status',
-      '', '**Live design availability** · '+available+' of '+values.length+' services open', ''];
+    const lines=['# '+cfg.brandName+' | Service Status',
+      '**LIVE AVAILABILITY**   •   '+available+' / '+values.length+' services accepting new commissions',
+      '', '**CURRENT SERVICE STATUS**'];
     for (const [id,group] of Object.entries(catalog.TYPES)) {
         const value=availability.status(cfg,id);
         lines.push('**'+group.label+'** '+(availability.icons[value]||'❔')+' '+(availability.labels[value]||value));
@@ -92,11 +94,23 @@ function orderStatusPanel(cfg) {
 
 function ticketsPanel(cfg) {
     const container = baseContainer(cfg, 'tickets');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} Assistance\n\nNeed help with an order, payment, delivery, management issue, or member concern? Open a private ticket and explain what you need.`));
-    container.addSeparatorComponents(new SeparatorBuilder());
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Before opening a ticket**\n- Explain the issue clearly.\n- Include relevant order or payment information.\n- Never share passwords, Roblox cookies, or private credentials.\n- Keep communication respectful while staff review your request.'));
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-        '**Select a ticket type below.** You may have up to **3 open tickets** across these options; orders are counted separately.\n**Terms:** https://astra-customs-terms.vercel.app/'
+       '# '+cfg.brandName+' | Support Center\n'+
+       '**PRIVATE SUPPORT**   ·   Orders  /  Management  /  Reports\n\n'+
+       'Need assistance? Choose the correct ticket type and a dedicated team will review your request.'
+    ));
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+       '**01  /  CHOOSE A DEPARTMENT**\n'+
+       '🎫 **General Support** — Purchases, orders, payments and delivery\n'+
+       '🛡️ **Management** — Escalations and private management requests\n'+
+       '⚑ **Report a User** — Confidential reports and supporting evidence'
+    ));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '**02  /  OPEN YOUR TICKET**\nChoose an option below to get started.\n'+
+        '**3 active tickets maximum**   •   Orders are tracked separately\n'+
+        '**Security**  Never share passwords or authentication codes.\n'+
+        '**Terms**  https://astra-customs-terms.vercel.app/'
     ));
     container.addActionRowComponents(ticketSelectRow());
     return { components: [container] };
@@ -105,20 +119,25 @@ function ticketsPanel(cfg) {
 function orderPanel(cfg){
     const container=baseContainer(cfg,'order');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '## '+cfg.brandName+' | Order Here\n\nChoose a service below to start your commission. Current availability is shown for every category.'));
+      '# '+cfg.brandName+' | Commission Store\n'+
+      '**ORDER HERE**  ·  Custom work, professional delivery\n\n'+
+      'Choose your service, select a product, and explain your design brief. All requests receive their own tracked order ID.'));
     container.addSeparatorComponents(new SeparatorBuilder());
     const lines=Object.entries(catalog.TYPES).map(([id,group])=>{
       const current=availability.status(cfg,id);
       return '**'+group.label+'** '+(availability.icons[current]||'')+' '+(availability.labels[current]||'Open');
     });
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+       '**01  /  LIVE SERVICE AVAILABILITY**\n'+lines.join('\n')
+    ));
     container.addSeparatorComponents(new SeparatorBuilder());
     // Use the original custom status emoji sets, not generic Unicode circles.
     // This legend also refreshes with the Order Here panel when /status changes.
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(statusLegend()));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '**Start your order** — Choose a service from the menu below.\n**Before purchasing:** https://astra-customs-terms.vercel.app/'
+      '**02  /  BEGIN YOUR COMMISSION**\nChoose a service from the dropdown. Your ticket will be organized automatically.\n'+
+      '**Before purchasing**  https://astra-customs-terms.vercel.app/'
     ));
     container.addActionRowComponents(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
         .setCustomId('astra_order_type').setPlaceholder('Select an order type...').addOptions(
@@ -167,7 +186,7 @@ function applicationsPanel(cfg) {
 function portfolioPanel(cfg, guildId) {
     const pieces = portfolio.list(guildId).slice(-10).reverse();
     const container = baseContainer(cfg, 'portfolio');
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${cfg.brandName} | Portfolio\n\nA selection of recent work from our creative team.`));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${cfg.brandName} | Featured Work\n**PORTFOLIO**  ·  Custom designs for Roblox and ER:LC communities\n\nA selection of work from our creative team.`));
     container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
         pieces.length ? pieces.map((piece) => `**${piece.caption || 'Featured work'}**\n${piece.url}`).join('\n\n') : 'The portfolio is currently being updated. Check back for new work or browse our design services.'
