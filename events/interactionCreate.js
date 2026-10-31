@@ -598,6 +598,14 @@ async function handleButton(interaction) {
                   footer: { text: `Ticket ID: ${channelId}` },
               };
         if(updated.type==='order' && updated.orderId)return interaction.editReply('Order claimed. Your assignment is now visible on the order progress panel.');
+        if(updated.type==='support' && (interaction.message.flags?.has?.(MessageFlags.IsComponentsV2) ||
+           interaction.message.components?.some?.(c=>(c.toJSON?.()||c).type===17))){
+           await interaction.message.edit(ticketCards.ticket(cfg,{
+             type:'support',channelId,userId:updated.userId,
+             reason:updated.reason,claimedBy:updated.claimedBy
+           }));
+           return interaction.editReply('Support ticket claimed. The card now shows its assigned staff member.');
+        }
         await interaction.message.edit(withFooter({embeds:[embed],components:interaction.message.components}));
         return interaction.editReply('Ticket successfully claimed.');
     }
@@ -792,7 +800,7 @@ async function handleModal(interaction) {
         });
 
         // Legacy order form receives a real sales/order ID too, so it can
-        // be linked by /payment request order_id just like the new shop flow.
+        // be linked by /payment create order_id just like the new shop flow.
         const record=orders.createOrder(guildId,{
             customerId:interaction.user.id,designerId:null,source:'legacyOrderRequest',
             product,quantity:1,price:null,quoteRequired:true,designerEarning:0,
