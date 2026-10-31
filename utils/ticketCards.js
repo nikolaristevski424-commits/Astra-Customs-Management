@@ -22,14 +22,14 @@ function payload(cfg,container){
  return withFooter({flags:MessageFlags.IsComponentsV2,components:[container],
    allowedMentions:{parse:[]}},cfg);
 }
-function ticket(cfg,{type,channelId,userId,reason,reportedUser,evidence}){
+function ticket(cfg,{type,channelId,userId,reason,reportedUser,evidence,claimedBy=null}){
  const names={support:'Support',management:'Management',report:'Report a User'};
  const labels={support:'Support team',management:'Management team',report:'Report review team'};
  const color={support:0x3b82f6,management:0x715fe5,report:0xe68b42};
  const title=names[type]||'Support';
  const c=new ContainerBuilder().setAccentColor(color[type]||parseColor(cfg.accentColor));
  block(c,'# '+safe(cfg.brandName||'Astra Customs',60)+' | '+title+' Ticket\n'+
-   '**Status:** Open   •   **Opened by:** <@'+userId+'>');
+   '**Status:** '+(claimedBy?'Claimed by <@'+claimedBy+'>':'Open')+'   •   **Opened by:** <@'+userId+'>');
  c.addSeparatorComponents(new SeparatorBuilder());
  block(c,'### Request details\n'+safe(reason,1500));
  if(type==='report' && reportedUser)
