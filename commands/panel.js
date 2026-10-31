@@ -327,6 +327,7 @@ module.exports = {
     ticketSelectRow,
     TICKET_CHOICES,
     TICKET_EMOJI,
+    withoutTicketControls,
     async refreshPanels(client,guildId,{discover=false}={}){
         const cfg=config.getConfig(guildId);
         const results=[];
