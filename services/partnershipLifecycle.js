@@ -59,7 +59,7 @@ async function terminateRepresentative(client,guildId,memberId,options={}){
 
 /** Startup reconciliation catches representative departures while the bot was offline. */
 async function reconcileOnReady(client,{fetchMember=null}={}){
-    const guildId=process.env.GUILD_ID;
+    const guildId=serverScope.ASTRA_GUILD_ID;
     if(!guildId || !serverScope.isAstraGuild(guildId))return{checked:0,terminated:0};
     const guild=client.guilds.cache.get(guildId);
     if(!guild)return{checked:0,terminated:0};
