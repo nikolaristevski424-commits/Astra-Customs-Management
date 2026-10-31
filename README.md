@@ -120,6 +120,44 @@ not included in `STAFF_ROLE_IDS`: `1497420088456777859`,
 `1565198911662985336`, `1565689738906574940`,
 `1497415634915561603`. Existing staff/admin access remains.
 
+## New Components V2 ticket and order experience
+
+Ticket creation notifications have been separated from their polished
+Components V2 detail cards. This keeps role pings reliable while making
+request details, order progress, and staff controls much easier to read.
+New Support, Management, and Report ticket cards show the request, privacy
+guidance, terms, and claim/close controls. New order progress cards show a
+short order ID, live status, designer, price, deadline, payment-link command,
+and controls. Legacy message embeds are kept compatible when updated.
+Existing non-order staff/admin embeds are not automatically migrated because
+Discord disallows converting older embed messages to Components V2 in place.
+
+### Exact ticket notification roles
+
+- Support: `1497415634915561603`
+- Management: `1538963485667500144`, `1565167658377158777`
+- Report a User: `1538963485667500144`,
+  `1565167658377158777`, `1565198911662985336`
+
+Only these roles are pinged when the matching type opens, provided those
+roles exist in the server. Private Management and Report ticket channels
+retain their existing separate transcript destinations.
+
+### Order category routing
+
+- Discord, Bots, Embeds: `1566106539234693141`
+- Graphics, Logos, Banners, Photography: `1566107155881263286`
+- Liveries: `1566107772074852524`
+- Uniforms: `1566108552031113366`
+- Websites: `1566108880717742080`
+- ELS: `1566109672149221616`
+
+The bot validates the configured target as an actual Discord category before
+creating a storefront order, and reports missing categories rather than
+silently placing it in an incorrect category. The older free-text order
+form routes recognized items by product keywords; unrecognized products
+still use `ORDER_CATEGORY_ID` as a fallback.
+
 ## Private management and report tickets
 
 Use `/panel tickets` to post one dropdown with Support Ticket,
@@ -128,7 +166,7 @@ custom ticket emoji. The existing older ticket buttons still work.
 
 Management and Report tickets open under Discord category `1565467577415639182`.
 They use private permission overwrites; normal support tickets are unchanged.
-Management reviewers use the configured manager/executive/ownership roles.
+Management reviewers use the two exact roles listed above.
 When a management ticket opens, the bot **mentions those authorized roles**
 inside the private ticket. Report tickets notify only their dedicated
 reviewers; they do not ping unrelated staff roles. Only roles present in the
