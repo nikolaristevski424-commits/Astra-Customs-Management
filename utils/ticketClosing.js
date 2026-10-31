@@ -120,7 +120,7 @@ async function closeTicket(client, guildId, cfg, channelId, closedBy) {
     try {
         await channel.delete(`Ticket closed by ${closedBy || 'automatic 24-hour close request'}`);
     } catch (error) {
-        // Channel is still open: release the lock so staff can retry /closee.
+        // Channel is still open: release the lock so staff can retry /close.
         tickets.update(guildId, channelId, { closingAt: null });
         console.error(`[tickets] Could not delete ticket channel ${channelId}:`, error.message);
         return false;
