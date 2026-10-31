@@ -4,6 +4,7 @@ const perms=require('../utils/permissions');
 const {isExecutive}=require('../utils/env');
 const {isOwner}=require('../utils/ownership');
 const ledger=require('../utils/partnerLedger');
+const {makeCard,COLORS,safe}=require('../utils/visualSystem');
 
 const data=new SlashCommandBuilder().setName('partnership-stats')
     .setDescription('Track successful partnership announcements and team Robux commission.')
@@ -20,28 +21,37 @@ async function execute(interaction){
         return interaction.reply({content:'Only management can view other members’ partnership totals.',flags:MessageFlags.Ephemeral});
     if(sub==='leaderboard'){
         const ranked=ledger.leaderboard(interaction.guildId).slice(0,15);
-        return interaction.reply({flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]},content:[
-            '**Astra Customs | Partnership Team Tracker**',
-            '**Rate:** R$20 per unique successfully published partnership',
-            '',
-            ...(ranked.length?ranked.map((e,i)=>'**'+(i+1)+'.** <@'+e.userId+'> — '+e.count+' partnership(s) · R$'+e.robuxEarned):['No partnerships recorded yet.']),
-            '',
-            'These are tracked amounts, not confirmed or automatically sent Roblox payouts.'
-        ].join('\n').slice(0,1950)});
+        const lines=ranked.map((e,i)=>{
+            const historical=ledger.stats(interaction.guildId,e.userId);
+            return '**'+(i+1)+'.** <@'+e.userId+'>   •   **R$'+e.robuxEarned+'**\n'+
+                 historical.activeCount+' active  /  '+historical.terminatedCount+' terminated  /  '+
+                 historical.count+' recorded';
+        });
+        return interaction.reply(makeCard(cfg,{
+            title:'Partnership Leaderboard',
+            subtitle:'TEAM PERFORMANCE  /  R$20 PER RECORDED PARTNERSHIP',
+            intro:'Historical commissions are preserved even if a representative leaves and a partnership is terminated.',
+            details:['**TEAM MEMBERS**\n'+(lines.length?lines.join('\n\n'):'No partnerships recorded yet.')],
+            note:'**Financial note**  These are tracked commissions, not confirmed or automatically sent Roblox payouts.',
+            accentColor:COLORS.purple,ephemeral:true
+        }));
     }
     const userId=sub==='mine'?interaction.user.id:interaction.options.getUser('member',true).id;
-    const s=ledger.stats(interaction.guildId,userId);
-    return interaction.reply({flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]},content:[
-        '**Astra Customs | Partnership Activity**',
-        '**Team member:** <@'+userId+'>',
-        '**Recorded partnerships:** '+s.count,
-        '**Rate:** R$'+ledger.REWARD_PER_PARTNERSHIP+' per partnership',
-        '**Total accrued:** R$'+s.robuxEarned,
-        '',
-        '**Recent partnerships:**',
-        ...(s.entries.length?s.entries.slice(-5).reverse().map(e=>'• #'+e.id+' — '+e.server+' ('+e.invite+')'):['None recorded yet.']),
-        '',
-        'Amounts are for tracking; a manager must verify partnerships before paying. No Robux are automatically sent.'
-    ].join('\n').slice(0,1950)});
+    const stats=ledger.stats(interaction.guildId,userId);
+    const recent=stats.entries.slice(-6).reverse().map(e=>
+      '**#'+e.id+'  '+safe(e.server,80)+'**  ·  '+(e.status===ledger.STATUS.terminated?'Terminated':'Active')+
+      '\n'+safe(e.invite,200)+(e.terminatedReason?'\nReason: '+safe(e.terminatedReason,150):'')
+    );
+    return interaction.reply(makeCard(cfg,{
+        title:'Partnership Activity',
+        subtitle:'TEAM MEMBER  /  ACCRUED COMMISSIONS',
+        intro:'**Member**  <@'+userId+'>\n**Recorded**  '+stats.count+'   •   **Active**  '+
+             stats.activeCount+'   •   **Terminated**  '+stats.terminatedCount+
+             '\n**Historical earnings**  R$'+stats.robuxEarned,
+        details:['**RECENT PARTNERSHIPS**\n'+(recent.length?recent.join('\n\n'):'No recorded partnerships')],
+        note:'**Important**  Leaving representatives trigger automatic termination and removal of active announcements. Historical commission records remain for management to audit. Payouts are not automatic.',
+        accentColor:COLORS.purple,ephemeral:true
+    }));
+
 }
 module.exports={data,execute};

@@ -67,15 +67,33 @@ function addFooterToV2(payload,url) {
  * Do not overwrite Decision: footers used by application review logic.
  * Do not alter image-only footer/banner embeds.
  */
+// Legacy workflows rely on the original fields and "Decision:" footer
+// marker. Theme these safely instead of converting edited embeds to V2.
+const COLORS=Object.freeze({
+  primary:0x6178dc,success:0x28a88e,warning:0xe3a74a,danger:0xde6571,
+  purple:0x8862d8,muted:0x68788f
+});
+function accentFor(raw){
+  const title=String(raw?.title||'').toLowerCase();
+  if(/\b(denied|cancelled|rejected|terminated|blacklist|failed|error|voided)\b/.test(title))
+    return COLORS.danger;
+  if(/\b(approved|accepted|paid|delivered|success|completed)\b/.test(title))
+    return COLORS.success;
+  if(/\b(pending|request|review|waiting|delayed|warning)\b/.test(title))
+    return COLORS.warning;
+  if(/\b(design|portfolio|creative|showcase)\b/.test(title))
+    return COLORS.purple;
+  return COLORS.primary;
+}
 function polishClassicEmbeds(embeds,cfg={}){
   const brand=String(cfg.brandName||process.env.BRAND_NAME||'Astra Customs').slice(0,256);
   return embeds.map(embed=>{
     const raw=json(embed);
     if(!raw || typeof raw!=='object' || !(raw.title||raw.description||raw.fields?.length))return embed;
     const result=EmbedBuilder.from(embed);
-    if(raw.color==null)result.setColor(0x4f6dd2);
+    if(raw.color==null)result.setColor(accentFor(raw));
     if(!raw.author?.name)result.setAuthor({name:brand});
-    if(!raw.footer?.text)result.setFooter({text:brand+' • Official update'});
+    if(!raw.footer?.text)result.setFooter({text:brand+'  •  Official update'});
     return result;
   });
 }

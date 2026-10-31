@@ -1,4 +1,5 @@
 const { withFooter } = require('./footerBranding');
+const {makeCard,ORDER_STATES,safe}=require('./visualSystem');
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } = require('discord.js');
 const orders=require('./orders');
 const tickets=require('./tickets');
@@ -47,29 +48,37 @@ function embed(cfg,order,ticket){
  return e;
 }
 function panel(cfg,order,ticket){
- const progress=STAGES.map(stage=>stage===order.status?'🔵':'▫️').join('  ');
- const c=new ContainerBuilder().setAccentColor(COLORS[order.status]||0x718096);
- c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-   '# '+String(cfg.brandName||'Astra Customs').slice(0,60)+' | Order #'+order.id+
-   '\n**'+String(order.product||'Custom commission').slice(0,100)+'**\n'+
-   '**Status:** '+order.status+'\n'+progress
- ));
- c.addSeparatorComponents(new SeparatorBuilder());
- c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-   '**Customer:** '+(order.customerId?'<@'+order.customerId+'>':'Unknown')+
-   '   •   **Designer:** '+(order.designerId?'<@'+order.designerId+'>':'Unassigned')+
-   '\n**Quantity:** '+(order.quantity||1)+
-   '   •   **Quoted price:** '+(order.quoteRequired?'Awaiting custom quote':'R$'+(order.price??0))+
-   '\n**Deadline:** '+String(ticket?.deadline||order.deadline||'Not specified').slice(0,200)
- ));
- c.addSeparatorComponents(new SeparatorBuilder());
- c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-   '**Order ID:** `#'+order.id+'` — link a Roblox payment with `/payment create order_id:'+order.id+'`.'+
-   '\n**Terms:** https://astra-customs-terms.vercel.app/'+
-   '\n**Status updates:** This card updates as the order progresses.'
- ));
- for(const row of controls(order))c.addActionRowComponents(row);
- return withFooter({flags:MessageFlags.IsComponentsV2,components:[c],allowedMentions:{parse:[]}},cfg);
+ const current=STAGES.indexOf(order.status);
+ const progress=STAGES.map((name,i)=>{
+   const marker=current<0?'○':i<current?'✓':i===current?'●':'○';
+   return marker+' '+name;
+ }).join('  ›  ');
+ const state=ORDER_STATES[order.status]||ORDER_STATES['Not Paid'];
+ const customer=order.customerId?'<@'+order.customerId+'>':'Unknown';
+ const designer=order.designerId?'<@'+order.designerId+'>':'Awaiting assignment';
+ const deadline=safe(ticket?.deadline||order.deadline||'Not scheduled',150);
+ const price=order.quoteRequired?'Awaiting designer quote':'R$'+(order.price??0);
+ const updated=order.statusUpdatedAt?'<t:'+Math.floor(order.statusUpdatedAt/1000)+':R>':'New order';
+ const details=[
+   '**01  /  ORDER DETAILS**\n'+
+   '**Customer**  '+customer+'   •   **Designer**  '+designer+'\n'+
+   '**Quantity**  '+(order.quantity||1)+'   •   **Price**  '+price+'\n'+
+   '**Deadline**  '+deadline,
+   '**02  /  PROGRESS TRACKER**\n'+progress+
+   '\n**Last updated**  '+updated+
+   (order.statusUpdatedBy?'  by <@'+order.statusUpdatedBy+'>':'')
+ ];
+ if(order.statusNote)details.push('**LATEST UPDATE**\n'+safe(order.statusNote,600));
+ return makeCard(cfg,{
+   title:'Order #'+order.id,
+   subtitle:'CUSTOM COMMISSION  ·  '+state.label.toUpperCase(),
+   intro:'**'+safe(order.product||'Custom commission',140)+'**\n'+
+     '**Current status**  '+state.icon+' '+safe(order.status,80),
+   details,accentColor:state.color,rows:controls(order),
+   note:'**ORDER ID**  `#'+order.id+'`  ·  Link payment using `/payment create order_id:'+order.id+'`\n'+
+        '**Terms**  https://astra-customs-terms.vercel.app/\n'+
+        'This card updates as your commission progresses.'
+ });
 }
 async function refresh(client,guildId,cfg,order){
  if(!order)return;
