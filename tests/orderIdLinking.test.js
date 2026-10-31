@@ -27,13 +27,13 @@ test('new order opening embeds display the real short order ID used by payment l
 test('legacy order path stores the same real ledger ID on ticket and initial embed',async()=>{
  const guildId=GUILD,orderUser='122222222222222222';
  let message;
- let reply;
+ let reply, createdOptions;
  const channelId='1999999999999999991',user={id:orderUser,username:'OrderMember'};
  const guild={id:guildId,roles:{everyone:{id:guildId},cache:new Collection()},
-   channels:{fetch:async id=>({id,type:ChannelType.GuildCategory,guildId}),create:async()=>({
+   channels:{fetch:async id=>({id,type:ChannelType.GuildCategory,guildId}),create:async options=>{createdOptions=options;return({
       id:channelId,
       send:async payload=>{message=payload;return{id:'1888888888888888888'}}
-   })}};
+   })}}};
  const oldCount=orders.listOrders(guildId).length;
  const i={guildId,guild,user,customId:'order_open_modal',
    fields:{getTextInputValue:n=>({product:'Police Livery',style:'Modern',deadline:'Tomorrow',
@@ -52,6 +52,7 @@ test('legacy order path stores the same real ledger ID on ticket and initial emb
    const ticket=tickets.get(guildId,channelId);
    assert.equal(ticket.orderId,order.id);
    assert.equal(order.ticketChannelId,channelId);
+   assert.equal(createdOptions.parent,'1566107772074852524','Police liveries route to the livery category');
    assert.ok(message.flags&MessageFlags.IsComponentsV2);
    assert.equal(message.embeds,undefined);
    assert.ok(JSON.stringify(message.components).includes('Order #'+order.id));
@@ -101,4 +102,41 @@ test('new order progress card is Components V2 with payment ID and controls',()=
  assert.ok(json.includes('/payment create order_id:'+o.id));
  assert.ok(json.includes('order_stage_'+o.id+'_paid'));
  assert.ok(json.includes('ticket_claim_'+o.ticketChannelId));
+});
+test('general support ticket pings only the supplied support role and sends a Components V2 ticket card',async()=>{
+ const memberId='133333333333333333',channelId='1999999999999999995';
+ const support='1497415634915561603';
+ const guild={id:GUILD,roles:{everyone:{id:GUILD},cache:new Collection([
+   [support,{id:support}],['1497417569215189103',{id:'1497417569215189103'}]
+ ])},channels:{create:async opts=>({id:channelId,send:async payload=>{
+   guild.posts.push(payload);return{id:String(guild.posts.length)}
+ }})},posts:[]};
+ let response;
+ const event={
+   guildId:GUILD,guild,user:{id:memberId,username:'SupportRequester'},
+   customId:'ticket_open_modal',fields:{getTextInputValue:()=> 'Help with my payment'},
+   deferReply:async()=>{},editReply:async text=>{response=text},
+   isChatInputCommand:()=>false,isAutocomplete:()=>false,isButton:()=>false,
+   isStringSelectMenu:()=>false,isModalSubmit:()=>true,
+   client:{commands:new Map()},isRepliable:()=>true
+ };
+ const prior=process.env.TICKET_CATEGORY_ID;
+ process.env.TICKET_CATEGORY_ID='1531621342611509408';
+ try{
+   await interaction.execute(event);
+   assert.equal(guild.posts.length,2);
+   assert.deepEqual(guild.posts[0].allowedMentions.roles,[support]);
+   assert.ok(guild.posts[0].content.includes('<@&'+support+'>'));
+   assert.ok(!guild.posts[0].content.includes('<@&1497417569215189103>'));
+   assert.ok(guild.posts[1].flags&MessageFlags.IsComponentsV2);
+   assert.equal(guild.posts[1].embeds,undefined);
+   assert.ok(JSON.stringify(guild.posts[1].components).includes('Support Ticket'));
+   assert.equal(tickets.get(GUILD,channelId).type,'support');
+   assert.equal(tickets.get(GUILD,channelId).staffRoleIds[0],support);
+   assert.ok(String(response).includes(channelId));
+ }finally{
+   if(prior===undefined)delete process.env.TICKET_CATEGORY_ID;
+   else process.env.TICKET_CATEGORY_ID=prior;
+   tickets.remove(GUILD,channelId);
+ }
 });
