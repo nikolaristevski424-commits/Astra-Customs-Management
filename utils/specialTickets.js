@@ -2,16 +2,17 @@ const {
     ActionRowBuilder,ButtonBuilder,ButtonStyle,ChannelType,ModalBuilder,
     TextInputBuilder,TextInputStyle,OverwriteType,PermissionsBitField,MessageFlags
 } = require('discord.js');
-const {withFooter}=require('./footerBranding');
+const cards=require('./ticketCards');
 const tickets=require('./tickets');
-const {getExecutiveRoleIds,parseIdList}=require('./env');
+
 
 const CATEGORY_ID='1565467577415639182';
 const FOUNDER_ID='1255248600850497568';
 const TYPES=Object.freeze({
     management:Object.freeze({
         label:'Management Ticket',prefix:'management',
-        transcriptChannelId:'1531632265812119552',roleIds:[],
+        transcriptChannelId:'1531632265812119552',
+        roleIds:['1538963485667500144','1565167658377158777'],
     }),
     report:Object.freeze({
         label:'Report a User',prefix:'report',
@@ -24,8 +25,7 @@ function routing(type){return TYPES[type]||null;}
 function authorizedRoles(guild,cfg,type){
     const data=routing(type);
     if(!data)return [];
-    const configured=type==='report' ? data.roleIds :
-        [...(cfg.managerRoleIds||[]),...getExecutiveRoleIds(),...parseIdList(process.env.OWNERSHIP_ROLE_IDS)];
+    const configured=data.roleIds;
     return [...new Set(configured)].filter(id=>guild.roles?.cache?.has(id));
 }
 function form(type){
@@ -104,18 +104,6 @@ async function open(interaction,type){
             .catch(error=>console.warn('[specialTickets] Could not remove untracked ticket:',error.message));
         return interaction.editReply('You reached the maximum of '+tickets.MAX_OPEN_TICKETS+' open tickets. Orders do not count toward this limit.');
     }
-    const row=new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('ticket_claim_'+channel.id).setLabel('Claim').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('ticket_close_'+channel.id).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('ticket_close_instant_'+channel.id).setLabel('Staff: Close').setStyle(ButtonStyle.Danger)
-    );
-    const fields=[
-        {name:'Opened by',value:'<@'+interaction.user.id+'>',inline:true},
-        ...(type==='report'?[{name:'Reported user',value:reportedUser.slice(0,100),inline:true}]:[]),
-        {name:'Description',value:reason.slice(0,1024)},
-        ...(evidence?[{name:'Evidence / message links',value:evidence.slice(0,1024)}]:[]),
-        {name:'Status',value:'Open',inline:true}
-    ];
     // Mention precisely the roles given access to this private ticket.
     // Management: configured manager/executive/ownership roles.
     // Report: only the three dedicated report reviewers.
@@ -128,14 +116,14 @@ async function open(interaction,type){
         console.warn('[specialTickets] No valid '+type+' reviewer role IDs found in the guild. Ticket will be private to the opener and founder.');
     }
     try{
-        await channel.send(withFooter({
-            content:text.trim(),embeds:[{title:'Astra Customs | '+definition.label,
-                description:type==='report'?'Report submitted privately. The review team will assess the evidence. Do not contact or harass the reported user.':'Management will review your request here.',
-                fields,color:type==='report'?0xe69a38:0x4e8cdb}],
-            components:[row],
-            allowedMentions:{parse:[],users:[interaction.user.id],roles:pingIds}
-        },cfg));
-        await channel.send({content:'**Terms of Service:** https://astra-customs-terms.vercel.app/\nPlease do not share passwords, security codes, or private credentials.',allowedMentions:{parse:[]}});
+        // A plain message is the reliable role-notification surface; the
+        // detailed Components V2 card remains unpinged, private and editable.
+        await channel.send({content:text.trim(),
+            allowedMentions:{parse:[],users:[interaction.user.id],roles:pingIds}});
+        await channel.send(cards.ticket(cfg,{
+            type,channelId:channel.id,userId:interaction.user.id,reason,
+            reportedUser,evidence
+        }));
     }catch(error){
         console.error('[specialTickets] Ticket created but introductory message failed '+channel.id,error);
         return interaction.editReply('Your ticket was created: <#'+channel.id+'>, but the bot could not post the introduction. Please notify management.');

@@ -1,5 +1,5 @@
 const { withFooter } = require('./footerBranding');
-const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } = require('discord.js');
 const orders=require('./orders');
 const tickets=require('./tickets');
 const perms=require('./permissions');
@@ -46,6 +46,31 @@ function embed(cfg,order,ticket){
  e.setFooter({text:'Astra Customs • Order progress updates automatically'}).setTimestamp(order.statusUpdatedAt||order.createdAt||Date.now());
  return e;
 }
+function panel(cfg,order,ticket){
+ const progress=STAGES.map(stage=>stage===order.status?'🔵':'▫️').join('  ');
+ const c=new ContainerBuilder().setAccentColor(COLORS[order.status]||0x718096);
+ c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+   '# '+String(cfg.brandName||'Astra Customs').slice(0,60)+' | Order #'+order.id+
+   '\n**'+String(order.product||'Custom commission').slice(0,100)+'**\n'+
+   '**Status:** '+order.status+'\n'+progress
+ ));
+ c.addSeparatorComponents(new SeparatorBuilder());
+ c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+   '**Customer:** '+(order.customerId?'<@'+order.customerId+'>':'Unknown')+
+   '   •   **Designer:** '+(order.designerId?'<@'+order.designerId+'>':'Unassigned')+
+   '\n**Quantity:** '+(order.quantity||1)+
+   '   •   **Quoted price:** '+(order.quoteRequired?'Awaiting custom quote':'R$'+(order.price??0))+
+   '\n**Deadline:** '+String(ticket?.deadline||order.deadline||'Not specified').slice(0,200)
+ ));
+ c.addSeparatorComponents(new SeparatorBuilder());
+ c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+   '**Order ID:** `#'+order.id+'` — link a Roblox payment with `/payment create order_id:'+order.id+'`.'+
+   '\n**Terms:** https://astra-customs-terms.vercel.app/'+
+   '\n**Status updates:** This card updates as the order progresses.'
+ ));
+ for(const row of controls(order))c.addActionRowComponents(row);
+ return withFooter({flags:MessageFlags.IsComponentsV2,components:[c],allowedMentions:{parse:[]}},cfg);
+}
 async function refresh(client,guildId,cfg,order){
  if(!order)return;
  const ticket=order.ticketChannelId?tickets.get(guildId,order.ticketChannelId):null;
@@ -54,7 +79,11 @@ async function refresh(client,guildId,cfg,order){
      const channel=await client.channels.fetch(order.ticketChannelId);
      if(order.requestMessageId){
        const msg=await channel.messages.fetch(order.requestMessageId);
-       await msg.edit(withFooter({embeds:[embed(cfg,order,ticket)],components:controls(order),allowedMentions:{parse:[]}}));
+       const isV2=msg.flags?.has?.(MessageFlags.IsComponentsV2) ||
+           msg.components?.some?.(c=>(c.toJSON?.()||c).type===17);
+       await msg.edit(isV2
+          ? panel(cfg,order,ticket)
+          : withFooter({embeds:[embed(cfg,order,ticket)],components:controls(order),allowedMentions:{parse:[]}}));
      }
    }catch(err){console.warn('[orderProgress] Ticket panel refresh failed #'+order.id+': '+err.message)}
  }
@@ -89,4 +118,4 @@ function authorized(member,cfg,next,order=null){
  if(order?.designerId && member?.id===order.designerId)return true;
  return perms.isStaff(member,cfg)||perms.isTicketStaff(member,cfg);
 }
-module.exports={STAGES,TARGETS,canTransition,controls,embed,refresh,setStatus,authorized};
+module.exports={STAGES,TARGETS,canTransition,controls,embed,panel,refresh,setStatus,authorized};

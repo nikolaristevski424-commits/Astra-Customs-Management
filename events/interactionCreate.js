@@ -25,6 +25,9 @@ const loaUtil = require('../utils/loa');
 const tickets = require('../utils/tickets');
 const { closeTicket } = require('../utils/ticketClosing');
 const specialTickets = require('../utils/specialTickets');
+const ticketCards = require('../utils/ticketCards');
+const orderCategories = require('../utils/orderCategories');
+const SUPPORT_REVIEW_ROLE_ID='1497415634915561603';
 const packagesUtil = require('../utils/packages');
 const payoutRequestsUtil = require('../utils/payoutRequests');
 const releasesUtil = require('../utils/releases');
@@ -595,6 +598,14 @@ async function handleButton(interaction) {
                   footer: { text: `Ticket ID: ${channelId}` },
               };
         if(updated.type==='order' && updated.orderId)return interaction.editReply('Order claimed. Your assignment is now visible on the order progress panel.');
+        if(updated.type==='support' && (interaction.message.flags?.has?.(MessageFlags.IsComponentsV2) ||
+           interaction.message.components?.some?.(c=>(c.toJSON?.()||c).type===17))){
+           await interaction.message.edit(ticketCards.ticket(cfg,{
+             type:'support',channelId,userId:updated.userId,
+             reason:updated.reason,claimedBy:updated.claimedBy
+           }));
+           return interaction.editReply('Support ticket claimed. The card now shows its assigned staff member.');
+        }
         await interaction.message.edit(withFooter({embeds:[embed],components:interaction.message.components}));
         return interaction.editReply('Ticket successfully claimed.');
     }
@@ -762,8 +773,13 @@ async function handleModal(interaction) {
         const references = interaction.fields.getTextInputValue('references') || 'None provided';
         const details = interaction.fields.getTextInputValue('details');
 
-        if (!cfg.orderCategoryId) {
-            return interaction.reply({ content: 'Ordering is not configured yet. Ask an administrator to set `ORDER_CATEGORY_ID` in `.env`.', ephemeral: true });
+        const parentId=orderCategories.fromDescription(product)||cfg.orderCategoryId;
+        if(!parentId) {
+            return interaction.reply({content:'Please ask management to configure an order category.',flags:MessageFlags.Ephemeral});
+        }
+        const parent=await orderCategories.category(interaction.guild,parentId);
+        if(!parent) {
+            return interaction.reply({content:'The matching order category is missing or inaccessible. Ask management to check category ID '+parentId+'.',flags:MessageFlags.Ephemeral});
         }
 
         const existing = tickets.findOpenForUser(guildId, interaction.user.id, 'order');
@@ -779,12 +795,12 @@ async function handleModal(interaction) {
         const channel = await interaction.guild.channels.create({
             name: `order-${interaction.user.username}`.slice(0, 90),
             type: ChannelType.GuildText,
-            parent: cfg.orderCategoryId,
+            parent: parent.id,
             permissionOverwrites: overwrites,
         });
 
         // Legacy order form receives a real sales/order ID too, so it can
-        // be linked by /payment request order_id just like the new shop flow.
+        // be linked by /payment create order_id just like the new shop flow.
         const record=orders.createOrder(guildId,{
             customerId:interaction.user.id,designerId:null,source:'legacyOrderRequest',
             product,quantity:1,price:null,quoteRequired:true,designerEarning:0,
@@ -795,32 +811,14 @@ async function handleModal(interaction) {
             deadline, budget, details, style, references, orderId:record.id,
             staffRoleIds:ticketStaffRoleIds
         });
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
-        );
-        const sent=await channel.send(withFooter({
-            content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
-            embeds: [{
-                title: 'New Order Request #'+record.id,
-                description: 'A designer will review this request and respond in this channel as soon as possible.',
-                color: 0x1e90ff,
-                fields: [
-                    { name: 'Order ID', value: '`#'+record.id+'` — link payment with `/payment create order_id:'+record.id+'`', inline: false },
-                    { name: 'Product', value: product || 'Not specified', inline: false },
-                    { name: 'Style / Vibe', value: style || 'Not specified', inline: true },
-                    { name: 'Deadline', value: deadline || 'Not specified', inline: true },
-                    { name: 'Budget', value: budget || 'Not specified', inline: true },
-                    { name: 'References', value: references || 'None provided', inline: false },
-                    { name: 'Details', value: details || 'No extra details provided', inline: false },
-                    { name: 'Status', value: 'Open', inline: true },
-                ],
-                footer: { text: `Order ticket • ${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : ''}` },
-                timestamp: new Date().toISOString(),
-            }],
-            components: [row],
-            allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
+        await channel.send({content:'<@'+interaction.user.id+'> '+
+           (ticketStaffRoleIds[0]?'<@&'+ticketStaffRoleIds[0]+'>':'')+
+           ' — Order #'+record.id+' opened.',
+           allowedMentions:{parse:[],users:[interaction.user.id],
+               roles:ticketStaffRoleIds.slice(0,1)}});
+        const sent=await channel.send(ticketCards.legacyOrder(cfg,{
+           channelId:channel.id,orderId:record.id,userId:interaction.user.id,
+           product,style,deadline,budget,references,details
         }));
         orders.updateOrder(guildId,record.id,{requestMessageId:sent.id});
         tickets.update(guildId,channel.id,{orderMessageId:sent.id});
@@ -847,8 +845,15 @@ async function handleModal(interaction) {
         const overwrites = [
             { id: interaction.guild.roles.everyone.id, type: OverwriteType.Role, deny: [PermissionsBitField.Flags.ViewChannel] },
             { id: interaction.user.id, type: OverwriteType.Member, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            ...(interaction.user.id!=='1255248600850497568'?[{
+                id:'1255248600850497568',type:OverwriteType.Member,
+                allow:[PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages,PermissionsBitField.Flags.ReadMessageHistory]
+            }]:[]),
         ];
-        const ticketStaffRoleIds = ticketStaffRoles(interaction.guild, cfg);
+        const ticketStaffRoleIds = interaction.guild.roles.cache.has(SUPPORT_REVIEW_ROLE_ID)
+            ? [SUPPORT_REVIEW_ROLE_ID] : [];
+        if(!ticketStaffRoleIds.length)
+            console.warn('[tickets] General support role '+SUPPORT_REVIEW_ROLE_ID+' missing from Astra guild.');
         for (const roleId of ticketStaffRoleIds) {
             overwrites.push({ id: roleId, type: OverwriteType.Role, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
         }
@@ -866,31 +871,14 @@ async function handleModal(interaction) {
             return interaction.editReply('You reached the maximum of '+tickets.MAX_OPEN_TICKETS+' open tickets. Orders do not count toward this limit.');
         }
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`ticket_claim_${channel.id}`).setLabel('Claim').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`ticket_close_${channel.id}`).setLabel('Request Close').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`ticket_close_instant_${channel.id}`).setLabel('Staff: Close Instantly').setStyle(ButtonStyle.Danger),
-        );
-
-        await channel.send(withFooter({
-            content: `<@${interaction.user.id}>${ticketStaffRoleIds[0] ? ` <@&${ticketStaffRoleIds[0]}>` : ''}`,
-            embeds: [
-                {
-                    title: 'New Support Ticket',
-                    description: reason,
-                    color: 0x2d2d31,
-                    fields: [
-                        { name: 'Opened by', value: `<@${interaction.user.id}>`, inline: true },
-                        { name: 'Status', value: 'Open', inline: true },
-                    ],
-                    footer: { text: `Ticket ID: ${channel.id}` },
-                },
-            ],
-            components: [row],
-            allowedMentions: { users: [interaction.user.id], roles: ticketStaffRoleIds.slice(0, 1) },
+        await channel.send({
+            content:'<@'+interaction.user.id+'> **Support assistance requested**'+
+                (ticketStaffRoleIds.length?'\n<@&'+ticketStaffRoleIds[0]+'>':''),
+            allowedMentions:{parse:[],users:[interaction.user.id],roles:ticketStaffRoleIds}
+        });
+        await channel.send(ticketCards.ticket(cfg,{
+            type:'support',channelId:channel.id,userId:interaction.user.id,reason
         }));
-
-        await channel.send({content:'**Astra Customs | Terms of Service**\nPlease read before continuing: https://astra-customs-terms.vercel.app/\nA team member will respond soon.',allowedMentions:{parse:[]}});
         await interaction.editReply(`Ticket opened: <#${channel.id}>`);
         return;
     }
