@@ -262,6 +262,20 @@ async function discoverPanels(client,guildId,type,cfg){
     }
     return {messages:[...found.values()].slice(0,8),errors};
 }
+// Old classic Order Here posts cannot become Components V2 in-place.
+// Remove just ticket options while preserving their existing order controls.
+function withoutTicketControls(components){
+    const forbidden=new Set(['astra_ticket_type','help_ticket_open',
+        'management_ticket_open','report_ticket_open']);
+    return (components||[]).map(row=>{
+        const raw=typeof row?.toJSON==='function'?row.toJSON():row;
+        if(raw?.type!==1 || !Array.isArray(raw.components))return row;
+        const keep=raw.components.filter(c=>!forbidden.has(c.custom_id||c.customId));
+        if(!keep.length)return null;
+        if(keep.length===raw.components.length)return row;
+        return new ActionRowBuilder({type:1,components:keep});
+    }).filter(Boolean);
+}
 function legacyOrderPayload(cfg,message){
     // Editing an existing classic embed with Components V2 flags is rejected by
     // Discord. Preserve its working buttons/selects and update the embed text.
@@ -273,11 +287,16 @@ function legacyOrderPayload(cfg,message){
     const e=new EmbedBuilder().setColor(parseColor(cfg.accentColor))
       .setTitle(cfg.brandName+' | Order Here')
       .setDescription('**Choose your service below**\n\n'+lines.join('\n')+
-       '\n\n*Prices are confirmed in your order ticket.*\n'+
+       '\n\n**Status Legend**\n'+
+       availability.icons.open+' **Open** — Accepting new orders\n'+
+       availability.icons.delayed+' **Delayed** — Orders may take longer\n'+
+       availability.icons.closed+' **Closed** — Not accepting new orders\n'+
+       availability.icons.premium+' **Premium / Boosters Only** — Restricted availability\n\n'+
+       '*Prices are confirmed in your order ticket.*\n'+
        '**Terms:** https://astra-customs-terms.vercel.app/');
     const banner=old?.image?.url;
     if(banner)e.setImage(banner);
-    return withFooter({embeds:[e],components:message.components||[],allowedMentions:{parse:[]}},cfg);
+    return withFooter({embeds:[e],components:withoutTicketControls(message.components),allowedMentions:{parse:[]}},cfg);
 }
 function legacyStatusPayload(cfg,message){
     const old=message.embeds?.[0];
