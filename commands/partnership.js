@@ -64,7 +64,7 @@ module.exports={
      // partnership channel. The old tracked post remains authoritative.
      await result.message.delete?.().catch(error=>
        console.warn('[partnership] Could not delete duplicate announcement:',error.message));
-     return interaction.editReply('This partner invite already has an active tracked partnership. No duplicate listing or extra R$20 commission was created.');
+     return interaction.editReply('This partner invite was already recorded as an active partnership. No duplicate listing or extra R$20 commission was created.');
    }
    const totals=partnerLedger.stats(interaction.guildId,interaction.user.id);
    return interaction.editReply('✅ Partnership published to <#'+result.message.channelId+'>: '+result.message.url+
