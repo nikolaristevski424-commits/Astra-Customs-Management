@@ -67,3 +67,19 @@ test('invalid Discord token surfaces an error; command sync is not invoked',asyn
     );
     assert.deepEqual(calls,['login']);
 });
+
+test('a stale slash command receives a private explanation rather than silently hanging',async()=>{
+    const handler=require('../events/interactionCreate');
+    let response;
+    const interaction={
+        guildId:'1488378242846036070',
+        commandName:'old-command',
+        isChatInputCommand:()=>true,
+        isRepliable:()=>true,
+        reply:async payload=>{response=payload;},
+        client:{commands:new Map()}
+    };
+    await handler.execute(interaction);
+    assert.match(response.content,/no longer registered/);
+    assert.ok(response.flags);
+});
