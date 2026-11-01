@@ -90,7 +90,15 @@ module.exports = {
 
 async function handleSlash(interaction) {
     const command = interaction.client.commands.get(interaction.commandName);
-    if (!command) return;
+    if (!command) {
+        // A stale slash-command registration must not silently time out.
+        console.warn('[interactionCreate] Unknown or stale slash command: '+String(interaction.commandName));
+        if(interaction.isRepliable?.())return interaction.reply({
+            content:'That command is no longer registered in this version of Astra Customs Management. Try `/help` after the bot finishes syncing its commands.',
+            flags:MessageFlags.Ephemeral
+        });
+        return;
+    }
     await command.execute(interaction);
 }
 
