@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
+const {startGateway}=require('./utils/discordStartup');
 
 if (!process.env.BOT_TOKEN) {
     console.error('Missing BOT_TOKEN in .env — copy .env.example to .env and fill it in.');
@@ -18,7 +19,11 @@ const client = new Client({
     partials: [Partials.Channel],
 });
 
-client.on('error', (error) => console.error('[index] Discord client error:', error));
+client.on('error', error=>console.error('[index] Discord client error:',error?.message||error));
+client.on('shardError',error=>console.error('[index] Discord gateway shard error:',error?.message||error));
+client.on('shardDisconnect',(event,shardId)=>console.warn(
+    '[index] Discord gateway disconnected (shard '+shardId+', code '+event?.code+').'));
+client.on('shardReconnecting',shardId=>console.log('[index] Reconnecting Discord gateway shard '+shardId+'...'));
 
 // ---- Load commands ----
 client.commands = new Collection();
@@ -43,22 +48,54 @@ for (const file of fs.readdirSync(eventsDir).filter((f) => f.endsWith('.js'))) {
 console.log(`[index] Loaded event handlers.`);
 
 async function deployGuildCommands() {
-    if (!process.env.CLIENT_ID || !process.env.GUILD_ID || process.env.CLIENT_ID === 'your_application_id_here' || process.env.GUILD_ID === 'your_test_server_id_here') {
-        console.warn('[index] CLIENT_ID/GUILD_ID missing or still placeholder; slash commands were not deployed.');
+    if (!process.env.CLIENT_ID || !process.env.GUILD_ID ||
+        process.env.CLIENT_ID === 'your_application_id_here' ||
+        process.env.GUILD_ID === 'your_test_server_id_here') {
+        console.error('[index] Slash commands NOT registered: CLIENT_ID or GUILD_ID is missing/placeholder in Wispbyte .env.');
         return;
     }
 
-    const rest = new REST().setToken(process.env.BOT_TOKEN);
+    // Prevent registering commands under a *different* application, a frequent
+    // cause of Discord showing stale slash commands with no working handlers.
+    if (client.user?.id && String(process.env.CLIENT_ID)!==String(client.user.id)) {
+        console.error('[index] Slash commands NOT registered: CLIENT_ID does not match the logged-in bot application. Verify CLIENT_ID in Wispbyte .env.');
+        return;
+    }
+    const commands=[...client.commands.values()].map(command=>command.data.toJSON());
+    console.log('[index] Syncing '+commands.length+' slash commands with Discord (guild '+process.env.GUILD_ID+')...');
+    // Explicit timeout and limited retries keep Discord API outages from
+    // hanging this sync forever. The gateway is already live either way.
+    const rest=new REST({timeout:15000,retries:1}).setToken(process.env.BOT_TOKEN);
     try {
-        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), {
-            body: [...client.commands.values()].map((command) => command.data.toJSON()),
+        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID,process.env.GUILD_ID),{
+            body:commands
         });
-        console.log(`[index] Deployed ${client.commands.size} slash command(s) to guild ${process.env.GUILD_ID}.`);
+        console.log('[index] Slash commands deployed successfully: '+commands.length+' registered to guild '+process.env.GUILD_ID+'.');
     } catch (error) {
-        console.error('[index] Slash-command deployment failed:', error.message);
+        console.error('[index] Slash-command deployment FAILED (bot stays online): '+
+            (error?.message||'Discord API error')+
+            (error?.status?' | HTTP '+error.status:'')+
+            '. Check CLIENT_ID, GUILD_ID, bot application permissions and Discord API access.');
     }
 }
 
 process.on('unhandledRejection', (err) => console.error('[index] Unhandled promise rejection:', err));
 
-deployGuildCommands().finally(() => client.login(process.env.BOT_TOKEN));
+// Never wait on Discord's REST command sync before connecting the bot.
+// Discord must accept the login even if command registration is delayed.
+const readyWatchdog=setTimeout(()=>{
+    if(!client.isReady())console.error(
+        '[startup] Still not connected to Discord after 45 seconds. Check BOT_TOKEN, '+
+        'the Discord gateway connection, Server Members Intent, and hosting network. '+
+        'This is not proof slash commands were registered.');
+},45000);
+readyWatchdog.unref?.();
+client.once('clientReady',()=>clearTimeout(readyWatchdog));
+startGateway({client,token:process.env.BOT_TOKEN,deployCommands:deployGuildCommands})
+    .catch(error=>{
+        console.error('[startup] Discord LOGIN FAILED: '+(error?.message||'Unknown gateway error'));
+        process.exitCode=1;
+        // Wispbyte must not show a permanently running bot after login fails.
+        client.destroy();
+        process.exit(1);
+    });
