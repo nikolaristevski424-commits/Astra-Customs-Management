@@ -136,7 +136,17 @@ function defaultConfig() {
  */
 function getConfig(guildId) {
     const stored = store.get(STORE, guildId, {});
-    return { ...defaultConfig(), ...getEnvConfigOverrides(), ...stored };
+    const result={ ...defaultConfig(), ...getEnvConfigOverrides(), ...stored };
+    // Migrate the deleted Design Team role even when Wispbyte still has the
+    // old ID in environment variables or old per-guild settings.
+    const oldRole='1497420088456777859';
+    const newRole='1566227474688381088';
+    for(const key of ['payoutRequesterRoleIds','designerApplicationAcceptRoleId']){
+        if(Array.isArray(result[key]))
+            result[key]=[...new Set(result[key].map(id=>id===oldRole?newRole:id))];
+        else if(result[key]===oldRole)result[key]=[newRole];
+    }
+    return result;
 }
 
 function setConfig(guildId, patch) {
