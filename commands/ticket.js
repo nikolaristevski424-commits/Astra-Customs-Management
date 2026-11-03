@@ -33,8 +33,8 @@ function details(ticket){
     ticket.reason?'**Reason:** '+String(ticket.reason).slice(0,650):'',
   ].filter(Boolean).join('\n');
 }
-function getTicket(interaction){
-  const ticket=tickets.get(interaction.guildId,interaction.channelId);
+async function getTicket(interaction,cfg){
+  const ticket=await tickets.getOrRecover(interaction.guildId,interaction.channelId,interaction.client,cfg,interaction.channel);
   if(!ticket || ticket.closedAt) return null;
   return ticket;
 }
@@ -80,7 +80,7 @@ module.exports={
         ' · '+(t.claimedBy?'Claimed <@'+t.claimedBy+'>':'Unclaimed'));
       return reply(interaction,'**Open Tickets ('+open.length+')**\n'+(lines.join('\n')||'No open tickets.'));
     }
-    const ticket=getTicket(interaction);
+    const ticket=await getTicket(interaction,cfg);
     if(!ticket)return reply(interaction,'Run this inside an active ticket channel.');
     if(sub==='info'){
       // The channel is private; ticket details are only returned to the current member.
