@@ -3,12 +3,23 @@
 // any local-only database. For multi-node hosting migrate to external Postgres.
 const fs=require('fs');
 const path=require('path');
+const cloud=require('./cloudStore');
 
 const DATA_DIR=process.env.ASTRA_DATA_DIR
     ?path.resolve(process.env.ASTRA_DATA_DIR)
     :path.join(__dirname,'..','data');
 fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});
 const cache=new Map();
+let bootstrapped=!cloud.enabled();
+async function bootstrap(){
+    if(bootstrapped)return{enabled:cloud.enabled(),alreadyReady:true};
+    const result=await cloud.bootstrap(DATA_DIR);
+    bootstrapped=true;
+    return result;
+}
+function ensureReady(){
+    if(!bootstrapped)throw Error('[store] Supabase is configured but the cloud snapshots have not been restored.');
+}
 const validStoreName=name=>{
     if(!/^[a-zA-Z0-9_-]+$/.test(String(name)))throw Error('Invalid store name');
     return String(name);
@@ -17,6 +28,7 @@ function filePath(name){return path.join(DATA_DIR,validStoreName(name)+'.json');
 
 function load(name){
     name=validStoreName(name);
+    ensureReady();
     if(cache.has(name))return cache.get(name);
     const fp=filePath(name),backup=fp+'.bak';
     let data={};
@@ -53,6 +65,8 @@ function save(name){
     const fp=filePath(name),bak=fp+'.bak';
     const temp=fp+'.'+process.pid+'.'+Date.now().toString(36)+'.tmp';
     const serialized=JSON.stringify(cache.get(name)??{},null,2);
+    ensureReady();
+    const token=cloud.enabled()?cloud.stage(DATA_DIR,name):null;
     // An fs.rename on the same filesystem makes each save atomic.
     try{
         fs.writeFileSync(temp,serialized,{encoding:'utf8',mode:0o600});
@@ -67,6 +81,7 @@ function save(name){
         }
         fs.renameSync(temp,fp);
         if(!fs.existsSync(bak))fs.copyFileSync(fp,bak);
+        if(cloud.enabled())cloud.enqueue(name,cache.get(name)??{},DATA_DIR,token);
     }finally{
         if(fs.existsSync(temp))fs.unlinkSync(temp);
     }
@@ -101,4 +116,4 @@ function diagnostics(){
         hasTickets:files.includes('tickets.json'),
         hasOrders:files.includes('orders.json')};
 }
-module.exports={all,get,set,update,save,load,diagnostics,DATA_DIR};
+module.exports={all,get,set,update,save,load,diagnostics,DATA_DIR,bootstrap,cloudStatus:cloud.status,flushCloud:cloud.flush};
