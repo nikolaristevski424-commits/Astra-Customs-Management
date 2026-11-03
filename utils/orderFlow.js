@@ -58,7 +58,8 @@ async function modal(interaction){
  try{
   channel=await guild.channels.create({
    name:('order-'+p.type+'-'+interaction.user.username).toLowerCase().replace(/[^a-z0-9-]/g,'-').slice(0,90),
-   type:ChannelType.GuildText,parent:parent.id,permissionOverwrites:[
+   type:ChannelType.GuildText,parent:parent.id,
+   topic:require('./ticketRecovery').topicFor({type:'order',userId:interaction.user.id}),permissionOverwrites:[
     {id:guild.roles.everyone.id,deny:[PermissionsBitField.Flags.ViewChannel]},
     {id:interaction.user.id,allow},...roles.map(id=>({id,allow}))
    ]
@@ -72,6 +73,8 @@ async function modal(interaction){
  const record=orders.createOrder(interaction.guildId,{customerId:interaction.user.id,designerId:null,source:'orderRequest',product:p.label,service:p.type,
    quantity:qty,price:total,quoteRequired:total===null,designerEarning:0,ticketChannelId:channel.id,deadline:date,
    status:'Not Paid',statusHistory:[]});
+ await channel.setTopic?.(require('./ticketRecovery').topicFor({type:'order',userId:interaction.user.id,orderId:record.id}))
+    .catch(error=>console.warn('[orderFlow] Could not update ticket recovery metadata:',error.message));
  tickets.create(interaction.guildId,channel.id,{userId:interaction.user.id,type:'order',reason:p.label,product:p.label,service:p.type,orderId:record.id,
   quantity,price:total,deadline:date,budget,details:brief,references:refs,staffRoleIds:roles});
  const row=new ActionRowBuilder().addComponents(
