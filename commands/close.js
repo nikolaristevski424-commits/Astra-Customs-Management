@@ -12,7 +12,7 @@ module.exports={
     .setDescription('Close this ticket now and archive its transcript (staff only)'),
   async execute(interaction){
     const cfg=config.getConfig(interaction.guildId);
-    const ticket=tickets.get(interaction.guildId,interaction.channelId);
+    const ticket=await tickets.getOrRecover(interaction.guildId,interaction.channelId,interaction.client,cfg,interaction.channel);
     if(!ticket||ticket.closedAt) return interaction.reply({content:'This is not an open, tracked ticket.',flags:MessageFlags.Ephemeral});
     if(!canClose(interaction.member,cfg))
       return interaction.reply({content:'Only ticket staff or managers can instantly close tickets. Customers may use /close-request.',flags:MessageFlags.Ephemeral});
