@@ -10,9 +10,10 @@ const DATA_DIR=process.env.ASTRA_DATA_DIR
     :path.join(__dirname,'..','data');
 fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});
 const cache=new Map();
-let bootstrapped=!cloud.enabled();
+let bootstrapped=!process.env.SUPABASE_URL&&!process.env.SUPABASE_SECRET_KEY;
 async function bootstrap(){
     if(bootstrapped)return{enabled:cloud.enabled(),alreadyReady:true};
+    if(!cloud.enabled())throw Error('[store] SUPABASE_URL and SUPABASE_SECRET_KEY must both be configured');
     const result=await cloud.bootstrap(DATA_DIR);
     bootstrapped=true;
     return result;
