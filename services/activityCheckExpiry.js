@@ -6,6 +6,8 @@ const { withFooter } = require('../utils/footerBranding');
 const config = require('../utils/config');
 const serverScope = require('../utils/serverScope');
 const activity = require('../utils/activity');
+const loa=require('../utils/loa');
+const LOA_ROLE_ID='1507411048167112724';
 const hr = require('../utils/hr');
 const activityCmd = require('../commands/activity');
 const { sendInfractionMessages } = require('../utils/infractionMessages');
@@ -34,11 +36,41 @@ async function processCheck(client, guildId, guild, cfg, record) {
     const voters = new Set(record.voterIds);
     const processed = new Set(record.processedUserIds || []);
     let issuedCount = 0;
+    let exemptCount = 0;
 
     for (const userId of targetIds) {
         if (voters.has(userId) || processed.has(userId)) continue;
 
         try {
+            // Always re-check LOA when a notice would be issued, rather than
+            // trusting a stale membership snapshot from 24 hours ago.
+            let member;
+            try{
+                member=await guild.members.fetch(userId);
+            }catch(error){
+                if(error?.code===10007){
+                    // A departed member cannot receive an activity infraction.
+                    activity.markUserProcessed(guildId,record.id,userId);
+                    processed.add(userId);
+                    continue;
+                }
+                // Network/permission failures must NOT result in an infraction;
+                // retry once we can check the member's LOA role reliably.
+                throw new Error('Could not confirm member LOA status: '+(error?.message||error?.code||'unknown'));
+            }
+            if(!member || !member.roles?.cache?.has){
+                throw new Error('Member roles could not be verified for '+userId);
+            }
+            const hasLoaRole=member.roles.cache.has(LOA_ROLE_ID) ||
+                (cfg.loaRoleId && member.roles.cache.has(cfg.loaRoleId));
+            const approved=loa.findActiveForUser(guildId,userId);
+            const activeLoa=approved && approved.startDate<=Date.now() && approved.endDate>Date.now();
+            if(hasLoaRole||activeLoa){
+                activity.markUserExempt(guildId,record.id,userId);
+                processed.add(userId);
+                exemptCount++;
+                continue;
+            }
             const infraction = hr.issueInfraction(guildId, {
                 userId,
                 issuedBy: client.user.id,
@@ -98,7 +130,7 @@ async function processCheck(client, guildId, guild, cfg, record) {
         }
     }
 
-    console.log(`[activityCheckExpiry] Closed check #${record.id} in guild ${guildId}; issued ${issuedCount} Notice infraction(s).`);
+    console.log(`[activityCheckExpiry] Closed check #${record.id} in guild ${guildId}; issued ${issuedCount} Notice infraction(s), exempted ${exemptCount} member(s) on LOA.`);
 }
 
 async function processDueChecks(client) {
@@ -130,4 +162,4 @@ function start(client) {
     }, CHECK_INTERVAL_MS);
 }
 
-module.exports = { start, processDueChecks };
+module.exports = { start, processDueChecks, processCheck, LOA_ROLE_ID };
