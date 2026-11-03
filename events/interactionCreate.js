@@ -568,7 +568,7 @@ async function handleButton(interaction) {
     // ---- Ticket claim/close ----
     if (customId.startsWith('ticket_claim_')) {
         const channelId = customId.replace('ticket_claim_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         const authorizedToClaim=perms.isTicketStaff(interaction.member,cfg)||perms.isManager(interaction.member,cfg)||perms.isStaff(interaction.member,cfg)||
             (ticket?.staffRoleIds||[]).some(roleId=>interaction.member.roles.cache.has(roleId));
         if(!authorizedToClaim)return interaction.reply({content:'Only the assigned service designers or ticket staff can claim this order.',flags:MessageFlags.Ephemeral});
@@ -625,7 +625,7 @@ async function handleButton(interaction) {
 
     if (customId.startsWith('ticket_keep_open_')) {
         const channelId = customId.replace('ticket_keep_open_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
             return interaction.reply({ content: 'This ticket is no longer open.', ephemeral: true });
         }
@@ -653,7 +653,7 @@ async function handleButton(interaction) {
     // Immediate staff-only closure: no 24-hour delay or confirmation modal.
     if (customId.startsWith('ticket_close_instant_')) {
         const channelId = customId.slice('ticket_close_instant_'.length);
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
             return interaction.reply({content:'This is not an open ticket.',flags:MessageFlags.Ephemeral});
         }
@@ -677,7 +677,7 @@ async function handleButton(interaction) {
 
     if (customId.startsWith('ticket_close_now_')) {
         const channelId = customId.replace('ticket_close_now_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId) {
             return interaction.reply({ content: 'This ticket is no longer open.', ephemeral: true });
         }
@@ -707,7 +707,7 @@ async function handleButton(interaction) {
 
     if (customId.startsWith('ticket_close_confirm_')) {
         const channelId = customId.replace('ticket_close_confirm_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
         }
@@ -718,7 +718,7 @@ async function handleButton(interaction) {
 
     if (customId.startsWith('ticket_close_cancel_')) {
         const channelId = customId.replace('ticket_close_cancel_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to cancel this close action.', ephemeral: true });
         }
@@ -728,7 +728,7 @@ async function handleButton(interaction) {
 
     if (customId.startsWith('ticket_close_')) {
         const channelId = customId.replace('ticket_close_', '');
-        const ticket = tickets.get(guildId, channelId);
+        const ticket = await tickets.getOrRecover(guildId,channelId,interaction.client,cfg,interaction.channel);
         if (!ticket || ticket.closedAt || interaction.channelId !== channelId || !canManageTicket(interaction.member, ticket, cfg, interaction.user.id)) {
             return interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
         }
