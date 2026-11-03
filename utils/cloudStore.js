@@ -70,6 +70,20 @@ function readLocal(dir,name){
     if(!data||typeof data!=='object'||Array.isArray(data))throw Error('Invalid local JSON root '+name);
     return data;
 }
+function dirtyPath(dir,name){return path.join(dir,name+'.pending');}
+function stage(dir,name){
+    if(!enabled())return null;
+    if(!ready)throw Error('Cloud storage not bootstrapped');
+    const token=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+    const fp=dirtyPath(dir,name),temp=fp+'.tmp';
+    fs.writeFileSync(temp,token,{mode:0o600});
+    fs.renameSync(temp,fp);
+    return token;
+}
+function clearDirty(dir,name,token){
+    const file=dirtyPath(dir,name);
+    if(fs.existsSync(file)&&fs.readFileSync(file,'utf8')===token)fs.unlinkSync(file);
+}
 function persistLocal(dir,name,payload){
     const file=path.join(dir,name+'.json');
     const temp=file+'.cloud-'+process.pid+'.tmp';
@@ -98,21 +112,35 @@ async function bootstrap(dir){
     // For any store not yet in Supabase, migrate the existing local JSON.
     const localFiles=fs.readdirSync(dir).filter(f=>/^[a-zA-Z0-9_-]+\.json$/.test(f));
     let uploaded=0;
+    const wasUploaded=new Set();
     for(const filename of localFiles){
         const name=filename.slice(0,-5);
-        if(names.has(name))continue;
+        if(names.has(name) && !fs.existsSync(dirtyPath(dir,name)))continue;
         const local=readLocal(dir,name);
         await request('POST','?on_conflict=store_name',[{store_name:name,payload:local}]);
+        clearDirty(dir,name,fs.existsSync(dirtyPath(dir,name))
+            ?fs.readFileSync(dirtyPath(dir,name),'utf8'):null);
+        names.add(name);
+        wasUploaded.add(name);
         uploaded++;
     }
     // Do not touch the JSON files unless every remote fetch and initial
     // upload succeeded. Use the cloud copy for all previously synced stores.
-    for(const row of data)persistLocal(dir,row.store_name,row.payload);
+    for(const row of data){
+        // A locally pending write is newer than the last acknowledged cloud
+        // snapshot and was just uploaded in the loop above.
+        if(fs.existsSync(dirtyPath(dir,row.store_name)))continue;
+        if(localFiles.includes(row.store_name+'.json') && uploaded>0 &&
+           !fs.existsSync(dirtyPath(dir,row.store_name)) &&
+           // A store migrated from dirty local data should not be reverted.
+           wasUploaded.has(row.store_name))continue;
+        persistLocal(dir,row.store_name,row.payload);
+    }
     ready=true;healthy=true;lastError=null;
     console.log('[cloudStore] Cloud storage ready: '+data.length+' restored snapshots; '+uploaded+' local stores uploaded.');
     return{enabled:true,remote:data.length,uploaded};
 }
-function enqueue(name,payload){
+function enqueue(name,payload,dir,token){
     if(!enabled())return;
     if(!ready)throw Error('Cloud storage not bootstrapped; refusing unsynced writes');
     const snapshot=structuredClone(payload);
@@ -121,6 +149,7 @@ function enqueue(name,payload){
         try{
             await request('POST','?on_conflict=store_name',[{store_name:name,payload:snapshot}]);
             queued++;healthy=true;lastError=null;
+            if(dir&&token)clearDirty(dir,name,token);
         }catch(error){
             healthy=false;lastError=String(error.message||error);
             // The local file still exists, but it MUST NOT be treated as synced.
@@ -134,4 +163,4 @@ function enqueue(name,payload){
 }
 async function flush(){await queue;}
 function status(){return{enabled:enabled(),ready,healthy,pending,queued,lastError};}
-module.exports={enabled,bootstrap,enqueue,flush,status,settings};
+module.exports={enabled,bootstrap,stage,enqueue,flush,status,settings};
