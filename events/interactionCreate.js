@@ -809,6 +809,7 @@ async function handleModal(interaction) {
             name: `order-${interaction.user.username}`.slice(0, 90),
             type: ChannelType.GuildText,
             parent: parent.id,
+            topic:require('../utils/ticketRecovery').topicFor({type:'order',userId:interaction.user.id}),
             permissionOverwrites: overwrites,
         });
 
@@ -819,6 +820,8 @@ async function handleModal(interaction) {
             product,quantity:1,price:null,quoteRequired:true,designerEarning:0,
             ticketChannelId:channel.id,deadline,status:'Not Paid',statusHistory:[]
         });
+        await channel.setTopic?.(require('../utils/ticketRecovery').topicFor({type:'order',userId:interaction.user.id,orderId:record.id}))
+            .catch(error=>console.warn('[orders] Could not persist order channel metadata:',error.message));
         const ticket = tickets.create(guildId, channel.id, {
             userId: interaction.user.id, reason: product, type: 'order', product,
             deadline, budget, details, style, references, orderId:record.id,
@@ -875,6 +878,7 @@ async function handleModal(interaction) {
             name: `ticket-${interaction.user.username}`.slice(0, 90),
             type: ChannelType.GuildText,
             parent: cfg.ticketCategoryId,
+            topic:require('../utils/ticketRecovery').topicFor({type:'support',userId:interaction.user.id}),
             permissionOverwrites: overwrites,
         });
 
