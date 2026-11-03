@@ -16,7 +16,7 @@ module.exports = {
         .setDescription('Request ticket closure in 24 hours unless someone objects.'),
 
     async execute(interaction) {
-        const ticket = tickets.get(interaction.guildId, interaction.channelId);
+        const ticket = await tickets.getOrRecover(interaction.guildId, interaction.channelId, interaction.client, config.getConfig(interaction.guildId), interaction.channel);
         if (!ticket || ticket.closedAt) {
             return interaction.reply({ content: 'This command can only be used in an open ticket channel.', ephemeral: true });
         }
