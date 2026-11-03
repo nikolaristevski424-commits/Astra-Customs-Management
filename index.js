@@ -61,4 +61,16 @@ async function deployGuildCommands() {
 
 process.on('unhandledRejection', (err) => console.error('[index] Unhandled promise rejection:', err));
 
-deployGuildCommands().finally(() => client.login(process.env.BOT_TOKEN));
+// Restore all cloud snapshots before connecting or processing Discord events.
+// Without this gate, an empty Wispbyte data directory could overwrite records.
+const store=require('./utils/store');
+store.bootstrap().then(result=>{
+    if(result.enabled)console.log('[index] Supabase hydrated: '+result.remote+' restored, '+result.uploaded+' existing local stores uploaded.');
+    return deployGuildCommands();
+}).then(()=>client.login(process.env.BOT_TOKEN)).catch(error=>{
+    console.error('[index] Startup stopped; existing data was NOT reset: '+(error?.message||error));
+    process.exitCode=1;
+    process.exit(1);
+});
+process.on('SIGTERM',()=>{store.flushCloud().catch(e=>console.error('[index] Cloud flush failed:',e.message)).finally(()=>process.exit());});
+process.on('SIGINT',()=>{store.flushCloud().catch(e=>console.error('[index] Cloud flush failed:',e.message)).finally(()=>process.exit());});

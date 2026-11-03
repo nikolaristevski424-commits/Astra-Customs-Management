@@ -8,7 +8,7 @@ const { baseEmbed } = require('../utils/embeds');
 // Members with any of these roles may submit LOA requests, even when
 // their role isn't part of STAFF_ROLE_IDS.
 const LOA_REQUEST_ROLE_IDS=Object.freeze([
-    '1497420088456777859', // Design team
+    '1566227474688381088', // Design team
     '1565198911662985336', // Moderator
     '1565689738906574940', // Partnership team
     '1497415634915561603', // Staff

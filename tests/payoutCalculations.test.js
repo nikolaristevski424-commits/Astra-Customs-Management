@@ -68,8 +68,8 @@ test('review embed displays sale total, tax, role, rate and exact payout',()=>{
 });
 test('actual payout request stores computed amount and real matching role',async()=>{
   const guildId='computed-payout-'+Date.now();
-  const requester=member('1497420088456777859','1497420258900709426','1497420194807808174');
-  config.setConfig(guildId,{commissionRates:RATES,payoutRequesterRoleIds:['1497420088456777859'],
+  const requester=member('1566227474688381088','1497420258900709426','1497420194807808174');
+  config.setConfig(guildId,{commissionRates:RATES,payoutRequesterRoleIds:['1566227474688381088'],
     payoutRequestsChannelId:'1560658675368984677'});
   let result;
   const channel={

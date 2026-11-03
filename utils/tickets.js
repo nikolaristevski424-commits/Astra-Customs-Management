@@ -64,4 +64,10 @@ function remove(guildId, channelId) {
     });
 }
 
-module.exports = { get, list, findOpenForUser, openForUser, ticketLimit, MAX_OPEN_TICKETS, create, createLimited, update, remove };
+// If a local JSON ticket ledger was lost during a Wispbyte migration,
+// verify the original Discord ticket and reconstruct only that record.
+async function getOrRecover(guildId,channelId,client,cfg={},channelHint=null){
+    return get(guildId,channelId) ||
+        require('./ticketRecovery').recoverTicket(guildId,channelId,client,cfg,channelHint);
+}
+module.exports = { get, getOrRecover, list, findOpenForUser, openForUser, ticketLimit, MAX_OPEN_TICKETS, create, createLimited, update, remove };

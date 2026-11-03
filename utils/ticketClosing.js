@@ -29,7 +29,7 @@ async function buildTranscript(channel) {
 }
 
 async function closeTicket(client, guildId, cfg, channelId, closedBy) {
-    const ticket = tickets.get(guildId, channelId);
+    const ticket = await tickets.getOrRecover(guildId, channelId, client, cfg);
     if (!ticket || ticket.closedAt || ticket.closingAt) return false;
 
     const channel = await client.channels.fetch(channelId).catch((error) => {

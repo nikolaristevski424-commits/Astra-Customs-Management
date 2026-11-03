@@ -22,13 +22,13 @@ function defaultConfig() {
         hrRoleIds: [],                // can /infract, /promote
         creditManagerRoleIds: [],     // can /credit add|remove
         payoutManagerRoleIds: [],     // can /order reset
-        payoutRequesterRoleIds: ['1497420088456777859'], // can submit /payout request
+        payoutRequesterRoleIds: ['1566227474688381088'], // can submit /payout request
         qcRoleIds: [],                // can accept/deny /qc submissions
         ticketStaffRoleIds: [],       // can claim/close tickets — falls back to staffRoleIds if empty
         welcomeRoleId: null,
         applicationReviewerRoleIds: [], // roles allowed to accept/deny applications
         staffApplicationAcceptRoleId: [],
-        designerApplicationAcceptRoleId: [],
+        designerApplicationAcceptRoleId: ['1566227474688381088'],
         moderatorApplicationAcceptRoleId: [],
         partnershipApplicationAcceptRoleId: [],
         applicationStatus: { staff: 'open', designer: 'open', moderator: 'open', partnership: 'open' },
@@ -63,7 +63,7 @@ function defaultConfig() {
         payoutRequestsChannelId: null, // where /payout request goes for the payout team to fulfill
         qcChannelId: null,             // where /qc submit posts submissions for review
         loaChannelId: null,
-        loaRoleId: null,
+        loaRoleId: '1507411048167112724',
         honeypotChannelId: null,
         affiliationsChannelId: null,
         giveawayChannelId: null,       // default channel for /giveaway start
@@ -136,7 +136,17 @@ function defaultConfig() {
  */
 function getConfig(guildId) {
     const stored = store.get(STORE, guildId, {});
-    return { ...defaultConfig(), ...getEnvConfigOverrides(), ...stored };
+    const result={ ...defaultConfig(), ...getEnvConfigOverrides(), ...stored };
+    // Migrate the deleted Design Team role even when Wispbyte still has the
+    // old ID in environment variables or old per-guild settings.
+    const oldRole='1497420088456777859';
+    const newRole='1566227474688381088';
+    for(const key of ['payoutRequesterRoleIds','designerApplicationAcceptRoleId']){
+        if(Array.isArray(result[key]))
+            result[key]=[...new Set(result[key].map(id=>id===oldRole?newRole:id))];
+        else if(result[key]===oldRole)result[key]=[newRole];
+    }
+    return result;
 }
 
 function setConfig(guildId, patch) {
