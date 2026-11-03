@@ -72,6 +72,17 @@ function markUserProcessed(guildId, id, userId) {
     });
 }
 
+function markUserExempt(guildId,id,userId){
+    store.update(STORE,guildId,{},current=>{
+        const record=current.checks?.[String(id)];
+        if(!record)return current;
+        record.processedUserIds ||= [];
+        record.loaExemptUserIds ||= [];
+        if(!record.processedUserIds.includes(userId))record.processedUserIds.push(userId);
+        if(!record.loaExemptUserIds.includes(userId))record.loaExemptUserIds.push(userId);
+        return current;
+    });
+}
 function complete(guildId, id, completedAt = Date.now()) {
     store.update(STORE, guildId, state(guildId), (current) => {
         const record = current.checks[String(id)];
@@ -88,4 +99,4 @@ function cancel(guildId, id, cancelledAt = Date.now()) {
     });
 }
 
-module.exports = { create, find, addVote, attachMessage, listDue, markUserProcessed, complete, cancel, CHECK_DURATION_MS };
+module.exports = { create, find, addVote, attachMessage, listDue, markUserProcessed, markUserExempt, complete, cancel, CHECK_DURATION_MS };
