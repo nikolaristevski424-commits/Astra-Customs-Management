@@ -89,6 +89,7 @@ async function open(interaction,type){
             name:(definition.prefix+'-'+interaction.user.username).toLowerCase()
                 .replace(/[^a-z0-9-]/g,'-').slice(0,90),
             type:ChannelType.GuildText,parent:CATEGORY_ID,permissionOverwrites:overrides,
+            topic:require('./ticketRecovery').topicFor({type,userId:interaction.user.id}),
             reason:'Astra Customs '+definition.label+' opened by '+interaction.user.id
         });
     }catch(error){
