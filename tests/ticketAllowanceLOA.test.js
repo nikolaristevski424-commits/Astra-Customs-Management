@@ -35,7 +35,7 @@ test('closing a ticket reopens a slot; closing an order has no impact on tickets
   assert.equal(tickets.ticketLimit(GUILD,USER).count,3);
 });
 test('the four specified roles independently authorize LOA requests',()=>{
-  const expected=['1497420088456777859','1565198911662985336','1565689738906574940','1497415634915561603'];
+  const expected=['1566227474688381088','1565198911662985336','1565689738906574940','1497415634915561603'];
   assert.deepEqual(loa.LOA_REQUEST_ROLE_IDS,expected);
   const cfg={staffRoleIds:[]};
   for(const roleId of expected){
