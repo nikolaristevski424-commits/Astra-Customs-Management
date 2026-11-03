@@ -1,3 +1,69 @@
+## Astra Customs — Supabase persistence, ticket recovery and staff roles
+
+The bot now supports a dedicated, separate Supabase Postgres database for
+durable storage of JSON-based bot state (orders, tickets, payments, payouts,
+activity checks, partnership ledgers and other store modules). Its private
+table is `public.astra_store_snapshots`, with Row Level Security enabled and
+no grants for anonymous or authenticated public users. Only the server-side
+secret key may access the records.
+
+**Wispbyte Setup > Environment Variables:**
+
+```env
+SUPABASE_URL=https://tmfkwhcqsyowahcmodrk.supabase.co
+SUPABASE_SECRET_KEY=<paste server secret from Astra Supabase Project Settings → API Keys>
+# Optional persistent local backup folder (not required for Supabase):
+ASTRA_DATA_DIR=
+# Replace legacy roles in existing Wispbyte settings:
+DESIGNER_APPLICATION_ACCEPT_ROLE_ID=1566227474688381088
+PAYOUT_REQUESTER_ROLE_IDS=1566227474688381088
+LOA_ROLE_ID=1507411048167112724
+```
+
+**Never put the secret key in GitHub, chat, public screenshots, or frontend.**
+The publishable/anon key does not have access to the private store table.
+
+**First activation and migration:** Before changing the Wispbyte settings,
+back up the entire current `data/` folder, including `ticket-transcripts/`.
+When the bot starts with Supabase enabled, it *must* first fetch all existing
+remote snapshots. Previously synced remote data is authoritative; local store
+files that do not yet exist in the cloud are uploaded automatically (preserving
+past orders and ticket records). Local pending-write markers take priority over
+old cloud snapshots. Do not deploy this bot on two servers simultaneously:
+the compatibility bridge expects **one active bot process**.
+
+**Write durability:** The legacy command modules still use synchronous local
+JSON state. Writes are saved atomically to local JSON and mirrored to
+Supabase asynchronously in order, with local `.pending` markers until the
+cloud confirms them. A sudden host wipe before the cloud has confirmed its
+latest write can still lose that very recent change. A future fully async
+database-backed rewrite would remove this remaining limitation. Monitor
+`[cloudStore]` errors and retain a persistent volume for the local backup.
+If Supabase credentials are missing/invalid or the cloud is unreachable,
+startup stops before the bot handles commands to avoid corrupting records.
+Until both Supabase variables are configured, the bot keeps its original
+local-only storage behavior.
+
+**Lost ticket JSON recovery:** New ticket/order channels contain bot-generated
+ticket metadata in their Discord channel topic. Existing private tickets with
+missing records may be recovered on `/close`, `/close-request`, `/ticket`,
+or ticket button clicks if their original bot-authored opening card still
+exists in an approved ticket category. The bot never treats a random
+look-alike channel as an official ticket. Recovered records may be missing
+some old details (e.g. designer assignment or original order ledger data);
+these cannot be reconstructed without a backup.
+
+**Activity checks:** Members carrying LOA role `1507411048167112724`
+(or an approved, currently active LOA record) are skipped when the automated
+24-hour Notice infractions run. If member status cannot be checked, the notice
+is deferred rather than issued automatically.
+
+**Design Team:** Use new role `1566227474688381088` for designer
+application acceptance, payout requests and LOA eligibility. The deleted
+older role is remapped from previously saved Wispbyte settings.
+
+---
+
 ## Order Here status legend and application identity fixes
 
 The **Order Here** panel now offers only the service ordering dropdown; it
